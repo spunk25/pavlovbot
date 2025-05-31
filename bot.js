@@ -178,6 +178,13 @@ async function scheduleNextRandomMessage(type) {
     const maxDelay = avgDelayPerMessage * 1.5; // Ate 150% do delay medio
     const delay = calculateRandomDelay(minDelay / (60 * 1000), maxDelay / (60*1000));
 
+    // Adicione este log para mostrar o tempo restante até a próxima mensagem
+    const delayMinutes = Math.round(delay / 60000);
+    const delayHours = Math.floor(delayMinutes / 60);
+    const delayMins = delayMinutes % 60;
+    console.log(
+      `Próxima mensagem de servidor aberto em: ${delayHours > 0 ? delayHours + 'h ' : ''}${delayMins}min`
+    );
 
     // Verifica se o delay não ultrapassa o horário de fechamento
     const now = new Date();
@@ -223,6 +230,14 @@ async function scheduleNextRandomMessage(type) {
     const minDelay = Math.max(30 * 60 * 1000, avgDelayPerMessage * 0.5); // Pelo menos 30 min
     const maxDelay = avgDelayPerMessage * 1.5;
     const delay = calculateRandomDelay(minDelay / (60 * 1000), maxDelay / (60 * 1000));
+
+    // Adicione este log para mostrar o tempo restante até a próxima mensagem
+    const delayMinutes = Math.round(delay / 60000);
+    const delayHours = Math.floor(delayMinutes / 60);
+    const delayMins = delayMinutes % 60;
+    console.log(
+      `Próxima mensagem diurna em: ${delayHours > 0 ? delayHours + 'h ' : ''}${delayMins}min`
+    );
 
     const now = new Date();
     const daytimeEndDateTime = new Date(now);
@@ -408,6 +423,17 @@ app.post('/webhook', (req, res) => {
       if (farewellMsg) sendMessageToGroup(farewellMsg);
     }
   }
+
+  // --- NOVO: Detecta comando !teste ---
+  if (payload.event === 'MESSAGE_RECEIVED' || payload.event === 'MESSAGE_CREATE') {
+    const messageText = payload.data?.body || payload.data?.message?.conversation || '';
+    if (typeof messageText === 'string' && messageText.trim().toLowerCase().startsWith('!teste')) {
+      // Aqui você pode checar se o autor é admin, se quiser
+      sendMessageToGroup('testado!');
+      return res.status(200).send('Comando !teste processado');
+    }
+  }
+
   res.status(200).send('Webhook processado');
 });
 
