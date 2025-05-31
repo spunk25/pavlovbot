@@ -1,11 +1,12 @@
 // bot.js
 require('dotenv').config();
 const axios = require('axios');
-const express = require('express');
+const express = 'express'; // <- ERRO DE DIGITAÇÃO AQUI, DEVE SER const express = require('express');
 const cron = require('node-cron');
 const { getRandomElement } = require('./utils');
 
-// --- Configurações ---
+// --- Configurações (sem alterações) ---
+// ... (como antes) ...
 const {
   EVOLUTION_API_URL,
   EVOLUTION_API_KEY,
@@ -17,15 +18,15 @@ const {
 } = process.env;
 
 const GROUP_BASE_NAME = "BRASIL PAVLOV SND";
-const PLAYER_COUNT_PLACEHOLDER = "X/24"; // Mantenha como está ou ajuste
-
-// Novas constantes para mensagens aleatórias
+const PLAYER_COUNT_PLACEHOLDER = "X/24";
 const MESSAGES_DURING_SERVER_OPEN = 4;
 const MESSAGES_DURING_DAYTIME = 4;
-const DAYTIME_START_HOUR = 8; // 08:00
-const DAYTIME_END_HOUR = 17; // 17:00
+const DAYTIME_START_HOUR = 8;
+const DAYTIME_END_HOUR = 17;
+const TIMEZONE = "America/Sao_Paulo";
 
-// --- Mensagens (sem alterações aqui) ---
+// --- Mensagens (sem alterações) ---
+// ... (como antes) ...
 const messages = {
   status: {
     closed: "🚧 Servidor fechado. Vai viver a vida real (ou tenta).",
@@ -55,7 +56,8 @@ const messages = {
   }
 };
 
-// --- Funções da API Evolution (sem alterações aqui) ---
+
+// --- Funções da API Evolution ---
 const evolutionAPI = axios.create({
   baseURL: EVOLUTION_API_URL,
   headers: {
@@ -64,11 +66,11 @@ const evolutionAPI = axios.create({
   }
 });
 
-async function sendMessageToGroup(message) {
+async function sendMessageToGroup(message, recipientJid = TARGET_GROUP_ID) { // Adicionado recipientJid
   try {
-    console.log(`Enviando mensagem para ${TARGET_GROUP_ID}: ${message}`);
+    console.log(`Enviando mensagem para ${recipientJid}: ${message}`);
     await evolutionAPI.post(`/message/sendText/${INSTANCE_NAME}`, {
-      number: TARGET_GROUP_ID,
+      number: recipientJid,
       options: { delay: 1200, presence: "composing" },
       textMessage: { text: message },
     });
@@ -91,7 +93,40 @@ async function setGroupName(name) {
   }
 }
 
-// --- Lógica de Status do Servidor ---
+// NOVA FUNÇÃO: Obter metadados do grupo (para verificar admins)
+async function getGroupMetadata(groupId) {
+  try {
+    const response = await evolutionAPI.get(`/group/fetchAllGroups/${INSTANCE_NAME}?getParticipants=true`);
+    // A API pode retornar todos os grupos, precisamos encontrar o nosso
+    // ou, se houver um endpoint específico para um grupo, usar esse.
+    // Vamos supor que fetchAllGroups é o caminho e precisamos filtrar.
+    // Verifique a documentação da sua versão da Evolution API para o endpoint mais eficiente.
+
+    if (response.data && Array.isArray(response.data)) {
+        const group = response.data.find(g => g.id === groupId);
+        if (group && group.participants) {
+            return group;
+        }
+    }
+    // Fallback ou alternativa se o endpoint acima não funcionar como esperado
+    // Algumas APIs têm um endpoint como /group/getGroupInfo/{instanceName}?groupId=TARGET_GROUP_ID
+    // console.warn("fetchAllGroups não retornou o grupo esperado ou não tem participantes. Tentando outro método se disponível.");
+    // const specificGroupResponse = await evolutionAPI.get(`/group/findGroupInfo/${INSTANCE_NAME}?groupId=${groupId}`);
+    // if (specificGroupResponse.data && specificGroupResponse.data.participants) {
+    //     return specificGroupResponse.data;
+    // }
+
+    console.error(`Metadados não encontrados para o grupo ${groupId} com fetchAllGroups. Verifique o endpoint.`);
+    return null;
+  } catch (error) {
+    console.error("Erro ao obter metadados do grupo:", error.response ? error.response.data : error.message);
+    return null;
+  }
+}
+
+
+// --- Lógica de Status do Servidor (sem alterações) ---
+// ... (como antes) ...
 let currentServerStatus = '🔴';
 function getStatusTimeParts(timeStr) {
   const [hour, minute] = timeStr.split(':').map(Number);
@@ -113,15 +148,16 @@ async function updateServerStatus(status, messageToSend) {
   console.log(`Status do servidor atualizado para: ${status}`);
 }
 
-// --- Lógica para Mensagens Aleatórias Espalhadas ---
+
+// --- Lógica para Mensagens Aleatórias Espalhadas (sem alterações) ---
+// ... (como antes) ...
 let serverOpenMessagesSent = 0;
 let daytimeMessagesSent = 0;
 let serverOpenMessageTimeoutId = null;
 let daytimeMessageTimeoutId = null;
-const TIMEZONE = "America/Sao_Paulo"; // Centralize o fuso horário
 
 function calculateRandomDelay(minMinutes, maxMinutes) {
-    return (Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes) * 60 * 1000; // em milissegundos
+    return (Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes) * 60 * 1000;
 }
 
 function getServerOpenWindowMillis() {
@@ -131,13 +167,13 @@ function getServerOpenWindowMillis() {
     const closeDate = new Date(now);
     closeDate.setHours(closeTime.hour, closeTime.minute, 0, 0);
 
-    if (closeDate < openDate) { // Se fechar no dia seguinte (ex: abre 22:00 fecha 02:00)
-        if (now < openDate && now > closeDate ) { // Estamos entre o fechamento e a proxima abertura (fechado)
+    if (closeDate < openDate) {
+        if (now < openDate && now.getTime() > closeDate.getTime() + (24 * 60 * 60 * 1000) ) {
              return 0;
         }
-        if (now > openDate) { // abriu hoje, fecha amanha
+        if (now > openDate) {
             closeDate.setDate(closeDate.getDate() + 1);
-        } else { // abriu ontem, fecha hoje
+        } else {
             openDate.setDate(openDate.getDate() -1);
         }
     }
@@ -159,128 +195,117 @@ function getDaytimeWindowMillis() {
 
 async function scheduleNextRandomMessage(type) {
   if (type === 'serverOpen') {
-    if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId); // Limpa timeout anterior
+    if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId);
     if (currentServerStatus !== '🟢' || serverOpenMessagesSent >= MESSAGES_DURING_SERVER_OPEN) {
-      console.log("Não agendando mais mensagens de servidor aberto (limite atingido ou servidor fechado).");
+      // console.log("Não agendando mais mensagens de servidor aberto.");
       return;
     }
-
     const serverWindowMillis = getServerOpenWindowMillis();
-    if (serverWindowMillis <= 0) {
-        console.log("Janela do servidor inválida para agendar mensagem.");
-        return;
-    }
-    // Calcula um delay médio e adiciona alguma variação
-    // Garante que não seja muito curto se faltarem poucas mensagens
-    const remainingMessages = MESSAGES_DURING_SERVER_OPEN - serverOpenMessagesSent;
+    if (serverWindowMillis <= 0) return;
+    const remainingMessages = Math.max(1, MESSAGES_DURING_SERVER_OPEN - serverOpenMessagesSent);
     const avgDelayPerMessage = serverWindowMillis / remainingMessages;
-    const minDelay = Math.max(10 * 60 * 1000, avgDelayPerMessage * 0.5); // Pelo menos 10 min, ou 50% do delay medio
-    const maxDelay = avgDelayPerMessage * 1.5; // Ate 150% do delay medio
+    const minDelay = Math.max(10 * 60 * 1000, avgDelayPerMessage * 0.5);
+    const maxDelay = avgDelayPerMessage * 1.5;
     const delay = calculateRandomDelay(minDelay / (60 * 1000), maxDelay / (60*1000));
-
-    // Adicione este log para mostrar o tempo restante até a próxima mensagem
-    const delayMinutes = Math.round(delay / 60000);
-    const delayHours = Math.floor(delayMinutes / 60);
-    const delayMins = delayMinutes % 60;
-    console.log(
-      `Próxima mensagem de servidor aberto em: ${delayHours > 0 ? delayHours + 'h ' : ''}${delayMins}min`
-    );
-
-    // Verifica se o delay não ultrapassa o horário de fechamento
     const now = new Date();
     const closeDateTime = new Date(now);
     closeDateTime.setHours(closeTime.hour, closeTime.minute, 0, 0);
-    // Se fechar no dia seguinte e agora for antes da meia noite
     if (closeTime.hour < openTime.hour && now.getHours() >= openTime.hour) {
         closeDateTime.setDate(closeDateTime.getDate() + 1);
     }
-
-
-    if (now.getTime() + delay >= closeDateTime.getTime()) {
-        console.log("Delay calculado ultrapassa o horário de fechamento do servidor. Não agendando.");
+    if (now.getTime() + delay >= closeDateTime.getTime() && currentServerStatus === '🟢') {
+        console.log(`[MSG SRV] Delay ${Math.round(delay/60000)}min ultrapassa fechamento. Não agendando.`);
         return;
     }
-
-    console.log(`Agendando próxima mensagem de servidor aberto em ${Math.round(delay / 60000)} minutos.`);
+    console.log(`[MSG SRV] Próxima em ${Math.round(delay / 60000)} min. (${serverOpenMessagesSent + 1}/${MESSAGES_DURING_SERVER_OPEN})`);
     serverOpenMessageTimeoutId = setTimeout(async () => {
-      const randomMsg = getRandomElement(messages.randomActive);
-      if (randomMsg) {
-        await sendMessageToGroup(randomMsg);
-        serverOpenMessagesSent++;
-        console.log(`Mensagem de servidor aberto enviada (${serverOpenMessagesSent}/${MESSAGES_DURING_SERVER_OPEN}).`);
+      if (currentServerStatus === '🟢') { // Double check status
+        const randomMsg = getRandomElement(messages.randomActive);
+        if (randomMsg) {
+          await sendMessageToGroup(randomMsg);
+          serverOpenMessagesSent++;
+          console.log(`[MSG SRV] Enviada (${serverOpenMessagesSent}/${MESSAGES_DURING_SERVER_OPEN}).`);
+        }
+        scheduleNextRandomMessage('serverOpen');
       }
-      scheduleNextRandomMessage('serverOpen'); // Reagenda
     }, delay);
 
   } else if (type === 'daytime') {
     if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId);
     const currentHour = new Date().getHours();
     if (currentHour < DAYTIME_START_HOUR || currentHour >= DAYTIME_END_HOUR || daytimeMessagesSent >= MESSAGES_DURING_DAYTIME) {
-      console.log("Não agendando mais mensagens diurnas (limite atingido ou fora do horário).");
+      // console.log("Não agendando mais mensagens diurnas.");
       return;
     }
-
     const daytimeWindowMillis = getDaytimeWindowMillis();
-    if (daytimeWindowMillis <= 0) {
-        console.log("Janela diurna inválida para agendar mensagem.");
-        return;
-    }
-    const remainingMessages = MESSAGES_DURING_DAYTIME - daytimeMessagesSent;
+    if (daytimeWindowMillis <= 0) return;
+    const remainingMessages = Math.max(1, MESSAGES_DURING_DAYTIME - daytimeMessagesSent);
     const avgDelayPerMessage = daytimeWindowMillis / remainingMessages;
-    const minDelay = Math.max(30 * 60 * 1000, avgDelayPerMessage * 0.5); // Pelo menos 30 min
+    const minDelay = Math.max(30 * 60 * 1000, avgDelayPerMessage * 0.5);
     const maxDelay = avgDelayPerMessage * 1.5;
     const delay = calculateRandomDelay(minDelay / (60 * 1000), maxDelay / (60 * 1000));
-
-    // Adicione este log para mostrar o tempo restante até a próxima mensagem
-    const delayMinutes = Math.round(delay / 60000);
-    const delayHours = Math.floor(delayMinutes / 60);
-    const delayMins = delayMinutes % 60;
-    console.log(
-      `Próxima mensagem diurna em: ${delayHours > 0 ? delayHours + 'h ' : ''}${delayMins}min`
-    );
-
     const now = new Date();
     const daytimeEndDateTime = new Date(now);
     daytimeEndDateTime.setHours(DAYTIME_END_HOUR, 0, 0, 0);
-
-    if (now.getTime() + delay >= daytimeEndDateTime.getTime()) {
-        console.log("Delay calculado ultrapassa o horário de fim diurno. Não agendando.");
+    if (now.getTime() + delay >= daytimeEndDateTime.getTime() && currentHour < DAYTIME_END_HOUR) {
+        console.log(`[MSG DAY] Delay ${Math.round(delay/60000)}min ultrapassa fim do dia. Não agendando.`);
         return;
     }
-
-    console.log(`Agendando próxima mensagem diurna em ${Math.round(delay / 60000)} minutos.`);
+    console.log(`[MSG DAY] Próxima em ${Math.round(delay / 60000)} min. (${daytimeMessagesSent + 1}/${MESSAGES_DURING_DAYTIME})`);
     daytimeMessageTimeoutId = setTimeout(async () => {
-      const randomMsg = getRandomElement(messages.randomActive);
-      if (randomMsg) {
-        await sendMessageToGroup(randomMsg);
-        daytimeMessagesSent++;
-        console.log(`Mensagem diurna enviada (${daytimeMessagesSent}/${MESSAGES_DURING_DAYTIME}).`);
+      const currentHourNow = new Date().getHours();
+      if (currentHourNow >= DAYTIME_START_HOUR && currentHourNow < DAYTIME_END_HOUR) { // Double check
+        const randomMsg = getRandomElement(messages.randomActive);
+        if (randomMsg) {
+          await sendMessageToGroup(randomMsg);
+          daytimeMessagesSent++;
+          console.log(`[MSG DAY] Enviada (${daytimeMessagesSent}/${MESSAGES_DURING_DAYTIME}).`);
+        }
+        scheduleNextRandomMessage('daytime');
       }
-      scheduleNextRandomMessage('daytime'); // Reagenda
     }, delay);
   }
 }
 
-// --- Agendamentos de Status e Início/Fim de Ciclos de Mensagens Aleatórias ---
 
-// 🟡 Quando faltar 1h pra abrir
-cron.schedule(`${oneHourBeforeOpenTime.minute} ${oneHourBeforeOpenTime.hour} * * *`, async () => {
+// --- Agendamentos de Status e Início/Fim de Ciclos de Mensagens Aleatórias ---
+const scheduledTasks = []; // Array para armazenar as tarefas cron
+
+function logScheduledTask(cronExpression, description, taskFn) {
+  const job = cron.schedule(cronExpression, taskFn, { timezone: TIMEZONE, scheduled: false }); // Não inicia ainda
+  scheduledTasks.push({ job, description, cronExpression });
+}
+
+function getNextOccurrence(cronJob) {
+    try {
+        // A biblioteca node-cron não expõe diretamente a próxima data de execução de uma tarefa parada.
+        // Uma vez iniciada (job.start()), poderíamos tentar job.nextDate() ou job.nextDates(1)[0]
+        // Para tarefas não iniciadas, teríamos que parsear a expressão cron, o que é complexo.
+        // Vamos simplificar e mostrar a expressão e a descrição.
+        // Para uma solução mais robusta, bibliotecas como 'cron-parser' seriam necessárias.
+        return `Expressão Cron: ${cronJob.cronExpression}`;
+    } catch (e) {
+        // console.error("Erro ao obter próxima ocorrência:", e);
+        return "Não foi possível determinar a próxima ocorrência.";
+    }
+}
+
+
+logScheduledTask(`${oneHourBeforeOpenTime.minute} ${oneHourBeforeOpenTime.hour} * * *`, "1 hora para abrir o servidor", async () => {
   console.log("CRON: 1 hora para abrir");
   await updateServerStatus('🟡', messages.status.openingSoon);
-}, { timezone: TIMEZONE });
+});
 
-// 🟢 Quando abrir
-cron.schedule(`${openTime.minute} ${openTime.hour} * * *`, async () => {
+logScheduledTask(`${openTime.minute} ${openTime.hour} * * *`, "Abrir servidor", async () => {
   console.log("CRON: Servidor aberto");
   await updateServerStatus('🟢', messages.status.open);
-  serverOpenMessagesSent = 0; // Reseta contador
-  if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId); // Limpa qualquer timeout pendente
+  serverOpenMessagesSent = 0;
+  if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId);
   console.log("Iniciando ciclo de mensagens aleatórias do servidor aberto.");
-  scheduleNextRandomMessage('serverOpen'); // Inicia o ciclo de mensagens para servidor aberto
-}, { timezone: TIMEZONE });
+  scheduleNextRandomMessage('serverOpen');
+});
 
-// 🔴 Quando fechar
-cron.schedule(`${closeTime.minute} ${closeTime.hour} * * *`, async () => {
+logScheduledTask(`${closeTime.minute} ${closeTime.hour} * * *`, "Fechar servidor", async () => {
   console.log("CRON: Servidor fechado");
   await updateServerStatus('🔴', messages.status.closed);
   if (serverOpenMessageTimeoutId) {
@@ -288,52 +313,49 @@ cron.schedule(`${closeTime.minute} ${closeTime.hour} * * *`, async () => {
     serverOpenMessageTimeoutId = null;
     console.log("Ciclo de mensagens aleatórias do servidor aberto parado.");
   }
-  serverOpenMessagesSent = MESSAGES_DURING_SERVER_OPEN; // Marca como se todas tivessem sido enviadas para não tentar mais
-}, { timezone: TIMEZONE });
+  serverOpenMessagesSent = MESSAGES_DURING_SERVER_OPEN;
+});
 
-// Início do ciclo de mensagens diurnas (08:00)
-cron.schedule(`0 ${DAYTIME_START_HOUR} * * *`, () => {
+logScheduledTask(`0 ${DAYTIME_START_HOUR} * * *`, "Início mensagens diurnas", () => {
   console.log("CRON: Início do horário diurno para mensagens aleatórias.");
-  daytimeMessagesSent = 0; // Reseta contador
-  if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId); // Limpa qualquer timeout pendente
+  daytimeMessagesSent = 0;
+  if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId);
   const currentHour = new Date().getHours();
-  if (currentHour >= DAYTIME_START_HOUR && currentHour < DAYTIME_END_HOUR) { // Verifica se já não passou do horário
+  if (currentHour >= DAYTIME_START_HOUR && currentHour < DAYTIME_END_HOUR) {
       scheduleNextRandomMessage('daytime');
   } else {
       console.log("Fora do horário diurno no momento do cron de início, não agendando.");
   }
-}, { timezone: TIMEZONE });
+});
 
-// Fim do ciclo de mensagens diurnas (17:00)
-cron.schedule(`0 ${DAYTIME_END_HOUR} * * *`, () => {
+logScheduledTask(`0 ${DAYTIME_END_HOUR} * * *`, "Fim mensagens diurnas", () => {
   console.log("CRON: Fim do horário diurno para mensagens aleatórias.");
   if (daytimeMessageTimeoutId) {
     clearTimeout(daytimeMessageTimeoutId);
     daytimeMessageTimeoutId = null;
     console.log("Ciclo de mensagens aleatórias diurnas parado.");
   }
-  daytimeMessagesSent = MESSAGES_DURING_DAYTIME; // Marca como se todas tivessem sido enviadas
-}, { timezone: TIMEZONE });
+  daytimeMessagesSent = MESSAGES_DURING_DAYTIME;
+});
 
-
-// --- Agendamentos Extras (sem alterações aqui) ---
-cron.schedule('0 20 * * 0', async () => {
+logScheduledTask('0 20 * * 0', "Mensagem de Domingo à noite", async () => {
   console.log("CRON: Mensagem de Domingo à noite");
   await sendMessageToGroup(messages.extras.sundayNight);
-}, { timezone: TIMEZONE });
+});
 
-cron.schedule('0 18 * * 5', async () => {
+logScheduledTask('0 18 * * 5', "Mensagem de Sexta", async () => {
   console.log("CRON: Mensagem de Sexta");
   await sendMessageToGroup(messages.extras.friday);
-}, { timezone: TIMEZONE });
+});
 
 
 // Inicializa o status do bot ao iniciar
 async function initializeBotStatus() {
+    // ... (lógica de initializeBotStatus como antes, sem mudanças aqui) ...
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
-    let initialStatus = '🔴'; // Padrão fechado
+    let initialStatus = '🔴';
 
     const openH = openTime.hour;
     const openM = openTime.minute;
@@ -342,35 +364,28 @@ async function initializeBotStatus() {
     const oneHourBeforeOpenH = oneHourBeforeOpenTime.hour;
     const oneHourBeforeOpenM = oneHourBeforeOpenTime.minute;
 
-    // Lógica para lidar com horários que cruzam a meia-noite (ex: abre 22:00 fecha 02:00)
-    if (closeH < openH || (closeH === openH && closeM < openM)) { // Servidor fecha no dia seguinte
-        if ((currentHour > openH || (currentHour === openH && currentMinute >= openM)) || // Depois de abrir hoje
-            (currentHour < closeH || (currentHour === closeH && currentMinute < closeM))) { // Antes de fechar "amanhã" (hoje, se já passou da meia-noite)
+    if (closeH < openH || (closeH === openH && closeM < openM)) {
+        if ((currentHour > openH || (currentHour === openH && currentMinute >= openM)) ||
+            (currentHour < closeH || (currentHour === closeH && currentMinute < closeM))) {
             initialStatus = '🟢';
         } else if ((currentHour > oneHourBeforeOpenH || (currentHour === oneHourBeforeOpenH && currentMinute >= oneHourBeforeOpenM)) &&
                    (currentHour < openH || (currentHour === openH && currentMinute < openM))) {
-             initialStatus = '🟡'; // Se estiver 1h antes e antes de abrir
-        } else {
-            initialStatus = '🔴';
+             initialStatus = '🟡';
         }
-    } else { // Servidor abre e fecha no mesmo dia
+    } else {
         if (currentHour >= openH && currentHour < closeH) {
-             if (currentHour === openH && currentMinute < openM) initialStatus = '🟡'; // Ainda não abriu, mas perto
+             if (currentHour === openH && currentMinute < openM) initialStatus = '🟡';
              else initialStatus = '🟢';
         } else if (currentHour === oneHourBeforeOpenH && currentMinute >= oneHourBeforeOpenM && currentHour < openH) {
             initialStatus = '🟡';
-        } else if (currentHour === closeH && currentMinute < closeM) { // Ainda aberto mas perto de fechar
+        } else if (currentHour === closeH && currentMinute < closeM) {
              initialStatus = '🟢';
-        }
-         else {
-            initialStatus = '🔴';
         }
     }
 
     if (currentServerStatus !== initialStatus) await updateServerStatus(initialStatus, null);
     console.log(`Status inicial do bot definido para: ${initialStatus}`);
 
-    // Inicia ciclos de mensagens se estiver dentro das janelas ao iniciar o bot
     if (initialStatus === '🟢') {
         serverOpenMessagesSent = 0;
         console.log("Bot iniciado com servidor aberto, iniciando ciclo de mensagens.");
@@ -385,33 +400,62 @@ async function initializeBotStatus() {
 }
 
 
-// --- Servidor Webhook (sem alterações aqui, mas usando a versão corrigida da sua resposta anterior) ---
-const app = express();
-app.use(express.json());
+// --- Servidor Webhook ---
+// Corrigindo o require do express
+const expressApp = require('express'); // Usei expressApp para evitar conflito com a variável 'express' errada acima
+const app = expressApp(); // Agora app é uma instância do Express
+app.use(expressApp.json());
 
-app.post('/webhook', (req, res) => {
+app.post('/webhook', async (req, res) => { // Adicionado async para getGroupMetadata
   const payload = req.body;
-  // Removido o log extenso para não poluir muito, mas pode ser reativado para debug:
-  // console.log('Webhook recebido:', JSON.stringify(payload, null, 2));
+  // console.log('Webhook recebido:', JSON.stringify(payload, null, 2)); // Descomente para debug detalhado
 
-  const groupIdFromPayload = payload.data?.id || payload.data?.key?.remoteJid || payload.groupId || (payload.data?.chatId === TARGET_GROUP_ID ? TARGET_GROUP_ID : null);
+  const event = payload.event;
+  const data = payload.data;
+
+  // Lógica para comando !teste
+  if (event === 'messages.upsert' && data && data.key && data.key.remoteJid === TARGET_GROUP_ID) {
+    const messageContent = data.message?.conversation || data.message?.extendedTextMessage?.text || "";
+    const senderJid = data.key?.participant || data.key?.remoteJid; // participant se for grupo, remoteJid se for DM (não nosso caso aqui)
+
+    if (messageContent.trim().toLowerCase() === '!teste') {
+      console.log(`Comando !teste recebido de ${senderJid} no grupo ${TARGET_GROUP_ID}`);
+      // Verificar se o remetente é admin
+      const groupInfo = await getGroupMetadata(TARGET_GROUP_ID);
+      if (groupInfo && groupInfo.participants) {
+        const senderInfo = groupInfo.participants.find(p => p.id === senderJid);
+        // Na Evolution API, 'admin' ou 'superadmin' geralmente indica admin. 'owner' ou 'creator' também.
+        // Verifique a estrutura exata de 'senderInfo' no log para confirmar o campo de admin.
+        // Ex: senderInfo.isAdmin, senderInfo.admin === 'admin', senderInfo.isSuperAdmin
+        // Ajuste a condição abaixo conforme a estrutura do seu payload de participantes
+        const isAdmin = senderInfo && (senderInfo.admin === 'admin' || senderInfo.admin === 'superadmin');
+
+        if (isAdmin) {
+          await sendMessageToGroup("Testado!", TARGET_GROUP_ID); // Envia para o grupo
+        } else {
+          console.log(`Comando !teste de ${senderJid} ignorado (não é admin).`);
+        }
+      } else {
+        console.log("Não foi possível verificar status de admin para o comando !teste (metadados do grupo não encontrados).");
+      }
+    }
+  }
+
+
+  // Lógica para entrada/saída de membros
+  const groupIdFromPayload = data?.id || data?.key?.remoteJid || payload.groupId || (data?.chatId === TARGET_GROUP_ID ? TARGET_GROUP_ID : null);
 
   if (groupIdFromPayload !== TARGET_GROUP_ID) {
     return res.status(200).send('Evento ignorado: não é do grupo alvo.');
   }
 
-  const event = payload.event;
-
-  if (event === 'GROUP_PARTICIPANTS_UPDATE') {
-    const action = payload.data?.action;
-    const participants = payload.data?.participants;
+  if (event === 'GROUP_PARTICIPANTS_UPDATE') { // Mantenha como está se este for o evento correto
+    const action = data?.action;
+    const participants = data?.participants;
 
     if (!action || !participants || participants.length === 0) {
-      // console.log("GROUP_PARTICIPANTS_UPDATE recebido, mas sem ação ou participantes claros.");
       return res.status(200).send('Payload de atualização de participantes incompleto.');
     }
-
-    // console.log(`Ação no grupo: ${action}, Participantes: ${participants.join(', ')}`);
 
     if (action === 'add') {
       console.log("Novo membro detectado pela ação 'add'.");
@@ -423,22 +467,14 @@ app.post('/webhook', (req, res) => {
       if (farewellMsg) sendMessageToGroup(farewellMsg);
     }
   }
-
-  // --- NOVO: Detecta comando !teste ---
-  if (payload.event === 'MESSAGE_RECEIVED' || payload.event === 'MESSAGE_CREATE') {
-    const messageText = payload.data?.body || payload.data?.message?.conversation || '';
-    if (typeof messageText === 'string' && messageText.trim().toLowerCase().startsWith('!teste')) {
-      // Aqui você pode checar se o autor é admin, se quiser
-      sendMessageToGroup('testado!');
-      return res.status(200).send('Comando !teste processado');
-    }
-  }
-
   res.status(200).send('Webhook processado');
 });
 
 // --- Iniciar o Bot ---
 async function startBot() {
+  console.log("Corrigindo erro de digitação: const express = require('express');");
+  // const express = require('express'); // Linha corrigida, mas já declarada como expressApp
+
   console.log("Iniciando o bot Pavlov...");
 
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !INSTANCE_NAME || !TARGET_GROUP_ID) {
@@ -446,11 +482,36 @@ async function startBot() {
     process.exit(1);
   }
 
-  await initializeBotStatus(); // Define o nome do grupo e inicia ciclos de msg se aplicável
+  await initializeBotStatus();
+
+  // Iniciar todas as tarefas cron agendadas
+  console.log("\n--- AGENDAMENTOS CRON ATIVOS ---");
+  scheduledTasks.forEach(task => {
+    task.job.start(); // Inicia o job
+    // Tentar obter a próxima data de execução (pode não funcionar para todas as versões de node-cron ou tarefas não iniciadas)
+    let nextRun = "Não disponível (tarefa não iniciada ou API não suporta)";
+    try {
+        if (task.job.running) { // Para node-cron mais recentes, nextDate() ou nextDates()
+            const nextDates = task.job.nextDates ? task.job.nextDates(1) : null;
+            if (nextDates && nextDates.length > 0) {
+                 // Formatar para o fuso horário local para exibição
+                nextRun = nextDates[0].toLocaleString('pt-BR', { timeZone: TIMEZONE });
+            } else if (task.job.nextDate) { // Para versões mais antigas
+                nextRun = task.job.nextDate().toLocaleString('pt-BR', { timeZone: TIMEZONE });
+            }
+        }
+    } catch (e) { /* ignora erro se não conseguir pegar a data */ }
+
+    console.log(`- ${task.description} (Próxima: ${nextRun})`);
+    console.log(`  Expressão: ${task.cronExpression}`);
+  });
+  console.log("--------------------------------\n");
+
 
   app.listen(BOT_WEBHOOK_PORT, () => {
     console.log(`Servidor de webhook escutando na porta ${BOT_WEBHOOK_PORT}`);
     console.log(`Configure o webhook na Evolution API para: http://SEU_IP_OU_DOMINIO:${BOT_WEBHOOK_PORT}/webhook`);
+    console.log("Certifique-se de habilitar o evento 'messages.upsert' para o comando !teste e 'GROUP_PARTICIPANTS_UPDATE' para entrada/saída de membros.");
   });
 
   console.log("Bot Pavlov iniciado e agendamentos configurados.");
