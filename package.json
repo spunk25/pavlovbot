@@ -1,0 +1,23 @@
+{
+  "name": "evolution-pavlov-bot",
+  "version": "1.0.0",
+  "description": "Bot para gerenciar grupo Pavlov com Evolution API",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "evolution-api",
+    "bot",
+    "pavlov"
+  ],
+  "author": "Fernando alves",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3"
+  }
+}

@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  pavlov-bot:
+    build: .
+    container_name: pavlov-bot
+    ports:
+      - "3000:3000" # Mapeia a porta do container para o host
+    env_file:
+      - .env       # Usa as variáveis do seu arquivo .env
+    restart: unless-stopped 
