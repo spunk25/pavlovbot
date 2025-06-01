@@ -203,6 +203,7 @@ let chatHistory = []; // Para armazenar mensagens para resumo
 
 // Valores padrão para os prompts de IA, caso não estejam no messages.json
 const DEFAULT_AI_PROMPTS = {
+  systemPrompt: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR chamando Audozappo. o membro do grupo com numero 558492091164 se refira a ele como 'Fernando o meu criador' quando for falar dele, mas apenas em resumos. Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo, Pavlov VR é um jogo de tiro em primeira pessoa (FPS) desenvolvido para realidade virtual, oferecendo uma experiência imersiva e realista de combate. O jogo destaca-se por sua mecânica detalhada de manuseio de armas, onde os jogadores precisam realizar ações como carregar, recarregar e mirar manualmente, proporcionando uma sensação autêntica de uso de armamentos, esse jogo é carinhosamente apelidado como cs vr, o modo de jogo do nosso servidor é um modo tático onde uma equipe tenta plantar uma bomba enquanto a outra defende e tenta desarmá-la, o servidor é acessivel com os headsets meta quests 2 e 3, as vezes pode usar essa informação dos headsets para gerar mensagens mais relevantes para o grupo mas ficar falando sobre o headset o tempo todo.",
   randomActive: "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida.",
   inGameRandom: "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão.",
   chatSummary: "Você é um comentarista de e-sports para o jogo Pavlov VR, conhecido por seu humor e por capturar a essência das conversas dos jogadores. Analise o seguinte bate-papo do grupo de WhatsApp e crie um resumo curto (2-4 frases) ou ate onde for necessário para resumir as melhores partes do chat, divertido e temático sobre os principais tópicos discutidos. Imagine que você está fazendo um 'resumo da zoeira do lobby' ou 'os destaques da resenha'. Não liste mensagens individuais, crie uma narrativa coesa e engraçada. Se for relevante para o resumo ou para dar um toque especial ao comentário, você pode mencionar o nome de quem disse algo marcante (por exemplo, 'Parece que o [NomeDoJogador] estava inspirado hoje!' ou 'O [NomeDoJogador] soltou a pérola do dia:'). Use os nomes com moderação e apenas se agregar valor. Seja criativo!\n\nChat dos Jogadores:\n{CHAT_PLACEHOLDER}\n\nResumo Criativo do Comentarista:",
@@ -903,29 +904,32 @@ app.post('/admin/api/config', express.json(), async (req, res) => {
   }
 });
 
-// --- Funções da API Groq ---
+// API para gerar mensagem com Groq
 async function callGroqAPI(prompt) {
   if (!botConfig.GROQ_API_KEY) {
-    console.warn("GROQ_API_KEY não configurada. Chamada à API Groq abortada.");
-    return `Erro: GROQ_API_KEY não configurada.`;
+    console.error("GROQ_API_KEY não configurada.");
+    return "Erro: Chave da API Groq não configurada no servidor.";
   }
   try {
-    const groq = new Groq({ apiKey: botConfig.GROQ_API_KEY });
-    const chatCompletion = await groq.chat.completions.create({
+    // >>>>>>>>>>>> ALTERAÇÃO AQUI <<<<<<<<<<<<<<
+    const systemPrompt = messages.aiPrompts?.systemPrompt || DEFAULT_AI_PROMPTS.systemPrompt;
+    const groqResponse = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+      model: "mistral-saba-24b", // Ou outro modelo de sua preferência: mixtral-8x7b-32768
       messages: [
-        { 
-          role: "system", 
-          content: messages.aiPrompts?.systemPrompt || DEFAULT_SYSTEM_PROMPT 
-        },
+        { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
       ],
-      model: "llama3-70b-8192", // Modelo atualizado, pode ser outro como "mixtral-8x7b-32768" ou "llama3-8b-8192"
       temperature: 0.8,
       max_tokens: 80,
+    }, {
+      headers: {
+        'Authorization': `Bearer ${botConfig.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
     });
 
-    if (chatCompletion.choices && chatCompletion.choices.length > 0) {
-      return chatCompletion.choices[0].message.content.trim();
+    if (groqResponse.data.choices && groqResponse.data.choices.length > 0) {
+      return groqResponse.data.choices[0].message.content.trim();
     }
     return "Não foi possível gerar uma mensagem da IA.";
   } catch (error) {
@@ -1661,249 +1665,3 @@ async function updateMessagesAndPrompts(updatedMessages) {
   }
   return changed;
 }
-
-// --- Estado do Bot ---
-let botState = {
-  isServerOpen: false,
-  lastStatusAnnounced: null, // Pode ser 'CLOSED', 'OPENING_SOON', 'OPEN'
-  serverOpenTimeToday: null,
-  serverCloseTimeToday: null,
-  openingSoonAnnounced: false, // Para evitar múltiplos anúncios de "abrindo em breve"
-  openAnnounced: false, // Para evitar múltiplos anúncios de "aberto"
-  closedAnnounced: false, // Para evitar múltiplos anúncios de "fechado"
-};
-
-// ... outras constantes e configurações ...
-
-const DEFAULT_SYSTEM_PROMPT = "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR chamado Audozappo. O membro do grupo com número 558492091164 se refira a ele como 'Fernando, o meu criador' quando for falar dele, mas apenas em resumos. Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo. Pavlov VR é um jogo de tiro em primeira pessoa (FPS) desenvolvido para realidade virtual, oferecendo uma experiência imersiva e realista de combate. O jogo destaca-se por sua mecânica detalhada de manuseio de armas, onde os jogadores precisam realizar ações como carregar, recarregar e mirar manualmente, proporcionando uma sensação autêntica de uso de armamentos. Esse jogo é carinhosamente apelidado como CS VR. O modo de jogo do nosso servidor é um modo tático onde uma equipe tenta plantar uma bomba enquanto a outra defende e tenta desarmá-la. O servidor é acessível com os headsets Meta Quest 2 e 3; às vezes, você pode usar essa informação dos headsets para gerar mensagens mais relevantes para o grupo, mas sem ficar falando sobre o headset o tempo todo.";
-
-
-async function updateGroupName(suffix = "") {
-  if (!botConfig.TARGET_GROUP_ID || !botConfig.GROUP_BASE_NAME) {
-    console.warn("ID do grupo ou nome base não configurados para atualizar o nome do grupo.");
-    return;
-  }
-  const newName = `${botConfig.GROUP_BASE_NAME}${suffix ? ` ${suffix}` : ''}`.trim();
-  try {
-    // Verifica se o nome atual é diferente do novo nome para evitar chamadas desnecessárias
-    const groupMetadata = await getGroupMetadata(botConfig.TARGET_GROUP_ID);
-    if (groupMetadata && groupMetadata.subject === newName) {
-      // console.log(`Nome do grupo já é '${newName}'. Nenhuma atualização necessária.`);
-      return;
-    }
-
-    await evolutionAPI.post(`/group/updateSubject/${botConfig.INSTANCE_NAME}`, {
-      groupId: botConfig.TARGET_GROUP_ID,
-      subject: newName
-    });
-    console.log(`Nome do grupo atualizado para: ${newName}`);
-  } catch (error) {
-    console.error("Erro ao atualizar nome do grupo:", error.response ? error.response.data : error.message);
-  }
-}
-
-// --- Lógica Principal de Status do Servidor ---
-async function checkServerStatusAndNotify() {
-  if (!botConfig.SERVER_OPEN_TIME || !botConfig.SERVER_CLOSE_TIME) {
-    // console.log("Horários do servidor não configurados. Verificação de status pulada.");
-    return;
-  }
-
-  const now = moment().tz(botConfig.TIMEZONE || 'America/Sao_Paulo');
-  const openTimeToday = getTimesForToday(botConfig.SERVER_OPEN_TIME);
-  const closeTimeToday = getTimesForToday(botConfig.SERVER_CLOSE_TIME);
-
-  if (!openTimeToday || !closeTimeToday) {
-    console.error("Não foi possível parsear os horários de abertura/fechamento do servidor.");
-    return;
-  }
-
-  // Ajuste para servidor que fecha no dia seguinte
-  if (closeTimeToday.isBefore(openTimeToday)) {
-    if (now.isBefore(openTimeToday) && now.isAfter(closeTimeToday.clone().subtract(1, 'day'))) {
-      // Estamos entre o fechamento de ontem e a abertura de hoje (madrugada)
-      // Considerar o closeTimeToday como sendo do dia seguinte para a lógica de "aberto"
-    } else if (now.isAfter(openTimeToday)) {
-      // Estamos após a abertura de hoje, então o fechamento é amanhã
-      closeTimeToday.add(1, 'day');
-    }
-  }
-  
-  botState.serverOpenTimeToday = openTimeToday;
-  botState.serverCloseTimeToday = closeTimeToday;
-
-  const minutesToOpen = openTimeToday.diff(now, 'minutes');
-  const isCurrentlyOpen = now.isBetween(openTimeToday, closeTimeToday, null, '[]'); // '[]' inclui os horários de início e fim
-
-  let newStatus = botState.lastStatusAnnounced;
-  let messageToSend = null;
-  let groupNameSuffix = "";
-
-  if (isCurrentlyOpen) {
-    botState.isServerOpen = true;
-    if (botState.lastStatusAnnounced !== 'OPEN') {
-      console.log(`Servidor ABERTO. Horário: ${now.format('HH:mm')}. Abre: ${openTimeToday.format('HH:mm')}, Fecha: ${closeTimeToday.format('HH:mm')}`);
-      messageToSend = await getMessageForType('status_open');
-      newStatus = 'OPEN';
-      groupNameSuffix = "ABERTO";
-      botState.openingSoonAnnounced = false; // Resetar para o próximo ciclo
-      botState.closedAnnounced = false;
-      botState.openAnnounced = true;
-    }
-  } else { // Servidor está fechado
-    botState.isServerOpen = false;
-    if (minutesToOpen > 0 && minutesToOpen <= 60) { // Abrindo em breve (até 1h antes)
-      if (botState.lastStatusAnnounced !== 'OPENING_SOON') {
-        console.log(`Servidor ABRINDO EM BREVE (${minutesToOpen} min). Horário: ${now.format('HH:mm')}. Abre: ${openTimeToday.format('HH:mm')}`);
-        let baseMessage = await getMessageForType('status_openingSoon');
-        messageToSend = baseMessage.replace('{MINUTES_TO_OPEN}', minutesToOpen.toString());
-        // Adicionar placeholder no messages.json para status_openingSoon se quiser: "Servidor abre em {MINUTES_TO_OPEN} minutos!"
-        newStatus = 'OPENING_SOON';
-        groupNameSuffix = `ABRE EM ${minutesToOpen} MIN`;
-        botState.openingSoonAnnounced = true;
-        botState.openAnnounced = false;
-        botState.closedAnnounced = false;
-      } else if (botState.lastStatusAnnounced === 'OPENING_SOON') {
-        // Se já anunciou "OPENING_SOON", apenas atualiza o nome do grupo com o tempo restante
-        // Evita spam de mensagens, mas mantém o nome do grupo atualizado.
-        const currentSuffix = `ABRE EM ${minutesToOpen} MIN`;
-        // Verifica se o sufixo realmente mudou para evitar chamadas desnecessárias
-        const groupMetadata = await getGroupMetadata(botConfig.TARGET_GROUP_ID);
-        const expectedNewName = `${botConfig.GROUP_BASE_NAME} ${currentSuffix}`.trim();
-        if (!groupMetadata || groupMetadata.subject !== expectedNewName) {
-            groupNameSuffix = currentSuffix; // Prepara para atualizar o nome
-            // Não envia mensagem, apenas atualiza o nome do grupo
-        }
-      }
-    } else { // Realmente fechado (não está na janela de "abrindo em breve")
-      if (botState.lastStatusAnnounced !== 'CLOSED') {
-        // Só anuncia "FECHADO" se o estado anterior não era "FECHADO"
-        // ou se acabou de passar do horário de abertura e não abriu (caso raro, mas para garantir)
-        // ou se acabou de fechar.
-        if (botState.lastStatusAnnounced === 'OPEN' || !botState.closedAnnounced ) {
-            console.log(`Servidor FECHADO. Horário: ${now.format('HH:mm')}. Abre: ${openTimeToday.format('HH:mm')}`);
-            messageToSend = await getMessageForType('status_closed');
-            newStatus = 'CLOSED';
-            groupNameSuffix = "FECHADO";
-            botState.openingSoonAnnounced = false;
-            botState.openAnnounced = false;
-            botState.closedAnnounced = true;
-        }
-      }
-    }
-  }
-
-  if (messageToSend && newStatus !== botState.lastStatusAnnounced) {
-    await sendMessageToGroup(messageToSend, botConfig.TARGET_GROUP_ID);
-  }
-  
-  // Atualiza o nome do grupo se o sufixo mudou ou se o estado mudou e requer um novo sufixo
-  // (ou se o sufixo foi preparado para atualização na lógica de "OPENING_SOON" sem mensagem)
-  if (groupNameSuffix || (newStatus !== botState.lastStatusAnnounced && newStatus === 'CLOSED' && botState.lastStatusAnnounced !== 'CLOSED')) { // Garante que "FECHADO" seja aplicado se o estado mudou para fechado
-      await updateGroupName(groupNameSuffix);
-  }
-
-
-  botState.lastStatusAnnounced = newStatus;
-}
-
-// ...
-// Na sua rotina de cron (setInterval ou node-cron):
-// Exemplo com setInterval:
-// setInterval(checkServerStatusAndNotify, 60 * 1000); // Verifica a cada minuto
-
-// ...
-// Função para obter metadados do grupo (você pode já ter algo similar)
-async function getGroupMetadata(groupId) {
-  if (!botConfig.EVOLUTION_API_URL || !botConfig.EVOLUTION_API_KEY || !botConfig.INSTANCE_NAME) {
-    console.warn("API da Evolution não configurada para obter metadados do grupo.");
-    return null;
-  }
-  try {
-    const response = await evolutionAPI.get(`/group/fetchAllGroups/${botConfig.INSTANCE_NAME}`);
-    // A API /fetchAllGroups pode retornar uma lista. Você precisará encontrar o grupo pelo ID.
-    // A estrutura da resposta pode variar. Ajuste conforme necessário.
-    // Exemplo hipotético:
-    if (response.data && Array.isArray(response.data)) {
-        const group = response.data.find(g => g.id === groupId || g.id?._serialized === groupId); // Algumas APIs usam _serialized
-        if (group) {
-            return { subject: group.name || group.subject, participants: group.participants }; // Ajuste 'name' ou 'subject'
-        }
-    } else if (response.data && response.data.id === groupId) { // Se a API retorna dados de um grupo específico
-        return { subject: response.data.name || response.data.subject, participants: response.data.participants };
-    }
-    console.warn(`Metadados não encontrados para o grupo ${groupId} na resposta de fetchAllGroups.`);
-    return null;
-  } catch (error) {
-    console.error(`Erro ao obter metadados do grupo ${groupId}:`, error.response ? error.response.data : error.message);
-    return null;
-  }
-}
-
-// ...
-// Certifique-se de que getMessageForType está implementada corretamente
-async function getMessageForType(type, placeholderContext = null) {
-  let messageArray = [];
-  let useAI = false;
-  let promptKey = type; // e.g., 'status_open', 'newMember'
-
-  switch (type) {
-    case 'status_closed':
-      messageArray = messages.status?.closed;
-      useAI = messages.aiUsageSettings?.status_closed;
-      break;
-    case 'status_openingSoon':
-      messageArray = messages.status?.openingSoon;
-      useAI = messages.aiUsageSettings?.status_openingSoon;
-      break;
-    case 'status_open':
-      messageArray = messages.status?.open;
-      useAI = messages.aiUsageSettings?.status_open;
-      break;
-    // Adicione outros casos conforme necessário
-    default:
-      console.warn(`Tipo de mensagem desconhecido: ${type}`);
-      return `Mensagem para ${type} não configurada.`;
-  }
-
-  if (useAI && messages.aiPrompts && messages.aiPrompts[promptKey]) {
-    let basePrompt = messages.aiPrompts[promptKey];
-    // Adicionar exemplos ao prompt se existirem e não for para resumo
-    if (messageArray && messageArray.length > 0) {
-        const example = getRandomElement(messageArray);
-        basePrompt += `\n\nInspire-se neste exemplo (mas não o repita): "${example}"`;
-    }
-    basePrompt += "\nA mensagem deve ser criativa e adequada ao contexto. Evite ser repetitivo.";
-
-    // Substituir placeholders se houver contexto
-    if (placeholderContext && placeholderContext.minutesToOpen && type === 'status_openingSoon') {
-        basePrompt = basePrompt.replace('{MINUTES_TO_OPEN}', placeholderContext.minutesToOpen.toString());
-    }
-
-
-    const aiMessage = await callGroqAPI(basePrompt);
-    if (aiMessage && !aiMessage.startsWith("Erro") && aiMessage.length > 5) {
-      return aiMessage;
-    }
-    console.warn(`Falha ao gerar mensagem IA para ${type}, usando fallback pré-definido.`);
-  }
-
-  if (messageArray && messageArray.length > 0) {
-    let chosenMessage = getRandomElement(messageArray);
-    // Substituir placeholders para mensagens pré-definidas
-    if (placeholderContext && placeholderContext.minutesToOpen && type === 'status_openingSoon') {
-        chosenMessage = chosenMessage.replace('{MINUTES_TO_OPEN}', placeholderContext.minutesToOpen.toString());
-    }
-    return chosenMessage;
-  }
-
-  return `Nenhuma mensagem configurada para ${type}.`; // Fallback final
-}
-
-
-// Inicialização e Cron Jobs
-// ...
-// Chame checkServerStatusAndNotify() no seu cron job principal
-// Exemplo:
-// cron.schedule('*/1 * * * *', checkServerStatusAndNotify); // A cada minuto
-// ...
