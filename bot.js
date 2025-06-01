@@ -964,22 +964,19 @@ async function initializeBotStatus() {
 
   console.log(`Windows: warning=${inWarningWindow}, open=${inOpenWindow}, expectedStatus=${expectedStatus}`);
 
-  // Define o status interno E atualiza o nome do grupo para refletir o estado atual
-  currentServerStatus = expectedStatus;
-  
-  // Atualiza o nome do grupo para refletir o status atual (sem enviar mensagens)
-  const newGroupName = `[${expectedStatus}${botConfig.GROUP_BASE_NAME}]`;
-  await setGroupName(newGroupName);
-  console.log(`Nome do grupo atualizado na inicialização para: ${newGroupName}`);
-  
-  if (expectedStatus === '🟢') {
-    console.log("Inicialização: horário de servidor aberto detectado. Iniciando apenas o ciclo de mensagens.");
-    // Só inicia o ciclo de mensagens, sem enviar mensagem de abertura
-    serverOpenMessagesSent = 0;
-    if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId);
-    scheduleNextRandomMessage('serverOpen');
+  // DISPARA AS AÇÕES APROPRIADAS BASEADAS NO HORÁRIO ATUAL
+  if (inWarningWindow && !inOpenWindow) {
+    console.log("Inicialização: dentro da janela de aviso. Disparando triggerServerOpeningSoon.");
+    await triggerServerOpeningSoon();
+  } else if (inOpenWindow) {
+    console.log("Inicialização: dentro do horário de abertura. Disparando triggerServerOpen.");
+    await triggerServerOpen();
   } else {
-    console.log(`Inicialização: status definido como ${expectedStatus}. Aguardando próximo cron para ações completas.`);
+    console.log("Inicialização: fora de qualquer janela especial. Definindo status fechado.");
+    currentServerStatus = '🔴';
+    const newGroupName = `[🔴${botConfig.GROUP_BASE_NAME}]`;
+    await setGroupName(newGroupName);
+    console.log(`Nome do grupo atualizado na inicialização para: ${newGroupName}`);
   }
 
   // Mensagens aleatórias diurnas
