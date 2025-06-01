@@ -273,14 +273,11 @@ document.addEventListener('DOMContentLoaded', () => {
             GROUP_BASE_NAME: configGroupBaseNameInput.value.trim(),
             SERVER_OPEN_TIME: configServerOpenTimeInput.value,
             SERVER_CLOSE_TIME: configServerCloseTimeInput.value,
-            TIMEZONE: configTimezoneInput.value.trim(),
             MESSAGES_DURING_SERVER_OPEN: parseInt(configMessagesDuringServerOpenInput.value, 10),
             MESSAGES_DURING_DAYTIME: parseInt(configMessagesDuringDaytimeInput.value, 10),
             DAYTIME_START_HOUR: parseInt(configDaytimeStartHourInput.value, 10),
             DAYTIME_END_HOUR: parseInt(configDaytimeEndHourInput.value, 10),
-            CHAT_SUMMARY_TIMES: configChatSummaryTimesInput.value.trim(),
-            BOT_WEBHOOK_PORT: parseInt(configBotWebhookPortInput.value, 10),
-            BOT_PUBLIC_URL: configBotPublicUrlInput.value.trim(),
+            CHAT_SUMMARY_TIMES: configChatSummaryTimesInput.value.trim()         
         };
         
         let validationError = false;
