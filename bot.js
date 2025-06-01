@@ -477,7 +477,7 @@ function isFromMe(data) {
       return app._router.handle(req, res, next, '/webhook/group-participants-update');
     }
     // Caso nenhum case, devolve 200 normal
-    return res.status(200).send(`Evento não mapeado ou não habilitado. Evento: ${event}`);
+    return res.status(200).send(`Evento não mapeado ou não habilitado. Evento: ${payload}`);
   });
   
 
