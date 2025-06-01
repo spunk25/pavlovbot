@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
             DAYTIME_START_HOUR: parseInt(configDaytimeStartHourInput.value, 10),
             DAYTIME_END_HOUR: parseInt(configDaytimeEndHourInput.value, 10),
             CHAT_SUMMARY_TIMES: configChatSummaryTimesInput.value.trim(),
-            CHAT_SUMMARY_COUNT_PER_DAY: parseInt(configChatSummaryCountPerDayInput.value, 10)
+            CHAT_SUMMARY_COUNT_PER_DAY: configChatSummaryCountPerDayInput ? parseInt(configChatSummaryCountPerDayInput.value, 10) : 3
         };
         
         let validationError = false;
