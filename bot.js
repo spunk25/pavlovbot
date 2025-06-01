@@ -23,8 +23,7 @@ const {
   SERVER_CLOSE_TIME,
 } = process.env;
 
-const GROUP_BASE_NAME = "BRASIL PAVLOV SND";
-const PLAYER_COUNT_PLACEHOLDER = "X/24"; // Ou o que você preferir
+const GROUP_BASE_NAME = "BRASIL PAVLOV SND 6/24";
 const MESSAGES_DURING_SERVER_OPEN = 4;
 const MESSAGES_DURING_DAYTIME = 4;
 const DAYTIME_START_HOUR = 8;
@@ -176,7 +175,7 @@ function initializeTimeDetails() {
 }
 
 async function updateServerStatus(status, messageToSend) {
-  const newGroupName = `[${status}${GROUP_BASE_NAME} ${PLAYER_COUNT_PLACEHOLDER}]`;
+  const newGroupName = `[${status}${GROUP_BASE_NAME}]`;
   await setGroupName(newGroupName);
   if (messageToSend) {
     await sendMessageToGroup(messageToSend);
@@ -405,115 +404,232 @@ async function isUserAdmin(groupId, userId) {
     return false;
 }
 
-app.post('/webhook', async (req, res) => {
-  const payload = req.body;
-  const event = payload.event;
-  const data = payload.data;
-
-try {
-  const timestamp = new Date().toISOString();
-  //salvar o payload em um arquivo json
-  fs.appendFileSync('payloads.json', JSON.stringify({ timestamp, payload }, null, 2)); 
-  console.log("payload salvo em payloads.json");
-} catch (error) {
-  console.error("Erro ao salvar payload em payloads.json:", error);
-}
-
-  if (event === 'messages.upsert' && data && data.key && data.key.remoteJid === TARGET_GROUP_ID) {
-    const messageContent = data.message?.conversation || data.message?.extendedTextMessage?.text || "";
-    const senderJid = data.key?.participant || data.key?.remoteJid;
-
-    if (!messageContent && !data.message?.buttonsResponseMessage && !data.message?.listResponseMessage && !data.message?.templateButtonReplyMessage) {
-        console.log(`Mensagem de ${senderJid} no grupo ${TARGET_GROUP_ID} sem conteúdo de texto claro.`);
-        return res.status(200).send('Mensagem sem conteúdo de texto processável.');
+app.post('/webhook/messages-upsert', async (req, res) => {
+    const payload = req.body;
+    const event = payload.event; // deve ser "MESSAGES_UPSERT"
+    const data = payload.data;
+  
+    // Salva o payload num arquivo (para auditoria/debug)
+    try {
+      const timestamp = new Date().toISOString();
+      fs.appendFileSync(
+        'payloads.json',
+        JSON.stringify({ timestamp, payload }, null, 2) + ',\n'
+      );
+      console.log("Payload messages.upsert salvo em payloads.json");
+    } catch (error) {
+      console.error("Erro ao salvar payload messages.upsert:", error);
     }
-
-    const commandText = messageContent.trim().toLowerCase();
-    const command = commandText.split(' ')[0];
-    const args = commandText.split(' ').slice(1);
-    let processed = true;
-
-    if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
+  
+    // Verifica se a mensagem é do grupo-alvo e não é do próprio bot
+    if (
+      data &&
+      data.key &&
+      data.key.remoteJid === TARGET_GROUP_ID &&
+      !isFromMe(data)
+    ) {
+      // Extrai o conteúdo da mensagem e quem enviou
+      const messageContent =
+        data.message?.conversation ||
+        data.message?.extendedTextMessage?.text ||
+        "";
+      const senderJid = data.key.participant || data.key.remoteJid;
+      const commandText = messageContent.trim().toLowerCase();
+      const command = commandText.split(' ')[0];
+      const args = commandText.split(' ').slice(1);
+      let processed = true;
+  
+      // Comandos restritos a administradores
+      if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
         const isAdmin = await isUserAdmin(TARGET_GROUP_ID, senderJid);
         if (isAdmin) {
-            if (command === '!teste') await sendMessageToGroup("Testado por admin!", TARGET_GROUP_ID);
-            else if (command === '!abrir') {
-                await triggerServerOpen();
-                scheduledCronTasks.forEach(task => { if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) task.job.stop(); });
-                console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
-            } else if (command === '!fechar') {
-                await triggerServerClose();
-                scheduledCronTasks.forEach(task => { if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) task.job.stop(); });
-                console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
-            } else if (command === '!avisar') {
-                await triggerServerOpeningSoon();
-                scheduledCronTasks.forEach(task => { if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) task.job.stop(); });
-                console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
-            } else if (command === '!statusauto') {
-                scheduledCronTasks.forEach(task => { if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) task.job.start(); });
-                await sendMessageToGroup("Agendamentos automáticos de status REATIVADOS.", TARGET_GROUP_ID);
-                console.log("Agendamentos automáticos de status REATIVADOS.");
-            }
+          if (command === '!teste') {
+            await sendMessageToGroup("Testado por admin!", TARGET_GROUP_ID);
+          } else if (command === '!abrir') {
+            await triggerServerOpen();
+            // Pausar agendamentos automáticos de status
+            scheduledCronTasks.forEach(task => {
+              if (
+                ["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(
+                  task.description
+                )
+              ) {
+                task.job.stop();
+              }
+            });
+            console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
+          } else if (command === '!fechar') {
+            await triggerServerClose();
+            // Pausar agendamentos automáticos de status
+            scheduledCronTasks.forEach(task => {
+              if (
+                ["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(
+                  task.description
+                )
+              ) {
+                task.job.stop();
+              }
+            });
+            console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
+          } else if (command === '!avisar') {
+            await triggerServerOpeningSoon();
+            // Pausar agendamentos automáticos de status
+            scheduledCronTasks.forEach(task => {
+              if (
+                ["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(
+                  task.description
+                )
+              ) {
+                task.job.stop();
+              }
+            });
+            console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
+          } else if (command === '!statusauto') {
+            // Reativar agendamentos automáticos de status
+            scheduledCronTasks.forEach(task => {
+              if (
+                ["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(
+                  task.description
+                )
+              ) {
+                task.job.start();
+              }
+            });
+            await sendMessageToGroup("Agendamentos automáticos de status REATIVADOS.", TARGET_GROUP_ID);
+            console.log("Agendamentos automáticos de status REATIVADOS.");
+          }
         } else {
-            await sendMessageToGroup("Desculpe, apenas administradores podem usar este comando.", senderJid);
+          await sendMessageToGroup(
+            "Desculpe, apenas administradores podem usar este comando.",
+            senderJid
+          );
         }
-    }
-    else if (command === '!random') {
-        const randomMsg = getRandomElement(messages.randomActive); if (randomMsg) await sendMessageToGroup(randomMsg);
-    }
-    else if (command === '!jogar?') {
+      }
+      // Comando para mensagem aleatória
+      else if (command === '!random') {
+        const randomMsg = getRandomElement(messages.randomActive);
+        if (randomMsg) await sendMessageToGroup(randomMsg);
+      }
+      // Comando para criar enquete
+      else if (command === '!jogar?') {
         const pollTitle = "Quem vai jogar Pavlov hoje?";
         const pollOptions = ["Eu! 👍", "Talvez mais tarde 🤔", "Hoje não 👎"];
         await sendPoll(pollTitle, pollOptions, TARGET_GROUP_ID, pollOptions.length);
-    }
-    else if (command === '!audio' && args.length > 0) {
+      }
+      // Comando para enviar áudio narrado
+      else if (command === '!audio' && args.length > 0) {
         const audioUrl = args[0];
-        if (audioUrl.startsWith('http')) await sendNarratedAudio(audioUrl, TARGET_GROUP_ID);
-        else await sendMessageToGroup("Uso: !audio <URL_DO_AUDIO>", senderJid);
-    }
-    else if (command === '!enquete' && args.length >= 2) {
-        let pollTitle = ""; let pollOptions = []; let currentArg = ""; let inQuotes = false;
-        for (const part of args) {
-            if (part.startsWith('"') && !inQuotes) {
-                currentArg = part.substring(1); inQuotes = true;
-                if (part.endsWith('"') && part.length > 1) {
-                    currentArg = currentArg.slice(0, -1);
-                    if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg);
-                    currentArg = ""; inQuotes = false;
-                }
-            } else if (part.endsWith('"') && inQuotes) {
-                currentArg += " " + part.slice(0, -1);
-                if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg);
-                currentArg = ""; inQuotes = false;
-            } else if (inQuotes) { currentArg += " " + part;
-            } else { if (!pollTitle) pollTitle = part; else pollOptions.push(part); }
+        if (audioUrl.startsWith('http')) {
+          await sendNarratedAudio(audioUrl, TARGET_GROUP_ID);
+        } else {
+          await sendMessageToGroup("Uso: !audio <URL_DO_AUDIO>", senderJid);
         }
-        if (currentArg && inQuotes) { if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg); }
-        if (pollTitle && pollOptions.length > 0) await sendPoll(pollTitle, pollOptions, TARGET_GROUP_ID, pollOptions.length);
-        else await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', senderJid);
-    } else {
-        processed = false;
+      }
+      // Comando para enquete customizada
+      else if (command === '!enquete' && args.length >= 2) {
+        let pollTitle = "";
+        let pollOptions = [];
+        let currentArg = "";
+        let inQuotes = false;
+        for (const part of args) {
+          if (part.startsWith('"') && !inQuotes) {
+            currentArg = part.substring(1);
+            inQuotes = true;
+            if (part.endsWith('"') && part.length > 1) {
+              currentArg = currentArg.slice(0, -1);
+              if (!pollTitle) pollTitle = currentArg;
+              else pollOptions.push(currentArg);
+              currentArg = "";
+              inQuotes = false;
+            }
+          } else if (part.endsWith('"') && inQuotes) {
+            currentArg += " " + part.slice(0, -1);
+            if (!pollTitle) pollTitle = currentArg;
+            else pollOptions.push(currentArg);
+            currentArg = "";
+            inQuotes = false;
+          } else if (inQuotes) {
+            currentArg += " " + part;
+          } else {
+            if (!pollTitle) pollTitle = part;
+            else pollOptions.push(part);
+          }
+        }
+        if (currentArg && inQuotes) {
+          if (!pollTitle) pollTitle = currentArg;
+          else pollOptions.push(currentArg);
+        }
+        if (pollTitle && pollOptions.length > 0) {
+          await sendPoll(pollTitle, pollOptions, TARGET_GROUP_ID, pollOptions.length);
+        } else {
+          await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', senderJid);
+        }
+      }
     }
-    if(processed) return res.status(200).send('Comando processado.');
-  }
-
-  const groupIdFromPayload = data?.id || data?.chat?.id || data?.chatId || payload.groupId || (data?.key?.remoteJid === TARGET_GROUP_ID ? TARGET_GROUP_ID : null);
-  if (event !== 'messages.upsert' && groupIdFromPayload !== TARGET_GROUP_ID) {
-    return res.status(200).send(`Evento ignorado. Evento: ${event}, GroupId: ${groupIdFromPayload}`);
-  }
-
-  if (event === 'GROUP_PARTICIPANTS_UPDATE') {
-    const action = data?.action; const participants = data?.participants;
-    if (!action || !participants || participants.length === 0) return res.status(200).send('Payload incompleto.');
-    if (action === 'add') {
-      const welcomeMsg = getRandomElement(messages.newMember); if (welcomeMsg) await sendMessageToGroup(welcomeMsg);
-    } else if (action === 'remove' || action === 'leave') {
-      const farewellMsg = getRandomElement(messages.memberLeft); if (farewellMsg) await sendMessageToGroup(farewellMsg);
+  
+    return res.status(200).send('messages.upsert processado.');
+  });
+  
+  /*
+    -------------------------------------------------------------------------------------------------
+    2) Rota para GROUP_PARTICIPANTS_UPDATE
+    URL esperada (com webhook_by_events=true):
+      POST https://seu-dominio.com/webhook/group-participants-update
+    -------------------------------------------------------------------------------------------------
+  */
+  app.post('/webhook/group-participants-update', async (req, res) => {
+    const payload = req.body;
+    const event = payload.event; // deve ser "GROUP_PARTICIPANTS_UPDATE"
+    const data = payload.data;
+  
+    // Salva o payload num arquivo (para auditoria/debug)
+    try {
+      const timestamp = new Date().toISOString();
+      fs.appendFileSync(
+        'payloads.json',
+        JSON.stringify({ timestamp, payload }, null, 2) + ',\n'
+      );
+      console.log("Payload group.participants.update salvo em payloads.json");
+    } catch (error) {
+      console.error("Erro ao salvar payload group.participants.update:", error);
     }
-  }
-  res.status(200).send('Webhook processado.');
-});
-
+  
+    // Verifica se é o grupo correto e se existe lista de participantes
+    if (
+      data &&
+      (data.id === TARGET_GROUP_ID || data.chatId === TARGET_GROUP_ID) &&
+      Array.isArray(data.participants)
+    ) {
+      const action = data.action; // "add" ou "remove"
+      const participants = data.participants;
+  
+      if (action === 'add') {
+        // Dá boas-vindas
+        const welcomeMsg = getRandomElement(messages.newMember);
+        if (welcomeMsg) await sendMessageToGroup(welcomeMsg);
+      } else if (action === 'remove' || action === 'leave') {
+        // Diz adeus
+        const farewellMsg = getRandomElement(messages.memberLeft);
+        if (farewellMsg) await sendMessageToGroup(farewellMsg);
+      }
+    }
+  
+    return res.status(200).send('group.participants.update processado.');
+  });
+  
+  /*
+    -------------------------------------------------------------------------------------------------
+    3) Rotas adicionais – caso deseje outros eventos (exemplos)
+    -------------------------------------------------------------------------------------------------
+  */
+  // Exemplo para CONECTION_UPDATE (se configurado)
+  app.post('/webhook/connection-update', async (req, res) => {
+    const payload = req.body;
+    // TODO: tratar payload de conexão (online / offline)
+    console.log("Evento connection.update recebido:", JSON.stringify(payload, null, 2));
+    return res.status(200).send('connection.update processado.');
+  });
+  
 // --- Iniciar o Bot ---
 async function startBot() {
   console.log("Iniciando o bot Pavlov...");
