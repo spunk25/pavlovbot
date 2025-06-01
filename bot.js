@@ -408,12 +408,15 @@ app.post('/webhook', async (req, res) => {
   const payload = req.body;
   const event = payload.event;
   const data = payload.data;
+
+try {
   const timestamp = new Date().toISOString();
-
-
   //salvar o payload em um arquivo json
   fs.appendFileSync('payloads.json', JSON.stringify({ timestamp, payload }, null, 2)); 
   console.log("payload salvo em payloads.json");
+} catch (error) {
+  console.error("Erro ao salvar payload em payloads.json:", error);
+}
 
   if (event === 'messages.upsert' && data && data.key && data.key.remoteJid === TARGET_GROUP_ID) {
     const messageContent = data.message?.conversation || data.message?.extendedTextMessage?.text || "";
@@ -495,7 +498,7 @@ app.post('/webhook', async (req, res) => {
 
   const groupIdFromPayload = data?.id || data?.chat?.id || data?.chatId || payload.groupId || (data?.key?.remoteJid === TARGET_GROUP_ID ? TARGET_GROUP_ID : null);
   if (event !== 'messages.upsert' && groupIdFromPayload !== TARGET_GROUP_ID) {
-    return res.status(200).send('Evento ignorado.');
+    return res.status(200).send(`Evento ignorado. Evento: ${event}, GroupId: ${groupIdFromPayload}`);
   }
 
   if (event === 'GROUP_PARTICIPANTS_UPDATE') {
