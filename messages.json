@@ -1,8 +1,15 @@
 {
   "status": {
-    "closed": "🚧 Servidor fechado. Vai viver a vida real (ou tenta).",
-    "openingSoon": "⏳ Servidor abre em 1 hora! Aqueles que forem entrar, aqueçam as mãos (e preparem as desculpas).",
-    "open": "🟢 Servidor aberto! Que comecem os tiros, os gritos e os rage quits."
+    "closed": [
+      "🚧 Servidor fechado. Vai viver a vida real (ou tenta).",
+      "Servidor fechado! Amanhã tem mais tiro, porrada e bomba."
+    ],
+    "openingSoon": [
+      "⏳ Servidor abre em 1 hora! Aqueles que forem entrar, aqueçam as mãos (e preparem as desculpas)."
+    ],
+    "open": [
+      "🟢 Servidor aberto! Que comecem os tiros, os gritos e os rage quits."
+    ]
   },
   "newMember": [
     "🔥 Mais um corno chegou! Alguém dá o manual (mentira, a gente joga ele no mapa e vê no que dá).",
@@ -36,8 +43,12 @@
     "Segura esse rush que nem mãe segurando filho teimoso!"
   ],
   "extras": {
-    "sundayNight": "☠️ Chega de paz, começa a guerra. Domingo é dia de Pavlov. Tiro, tática e treta.",
-    "friday": "🍻 Sextou no servidor! Hoje vale até errar e culpar o amigo."
+    "sundayNight": [
+      "☠️ Chega de paz, começa a guerra. Domingo é dia de Pavlov. Tiro, tática e treta."
+    ],
+    "friday": [
+      "�� Sextou no servidor! Hoje vale até errar e culpar o amigo."
+    ]
   },
   "chatSummary": {
     "summaryTitle": "📢 *Resenha da Rodada (Fofocas do Front):*",

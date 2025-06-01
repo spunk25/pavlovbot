@@ -90,17 +90,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const messages = await response.json();
 
             if (messages.status) {
-                statusClosedInput.value = messages.status.closed || '';
-                statusOpeningSoonInput.value = messages.status.openingSoon || '';
-                statusOpenInput.value = messages.status.open || '';
+                statusClosedInput.value = Array.isArray(messages.status.closed) ? messages.status.closed.join('\n') : (messages.status.closed || '');
+                statusOpeningSoonInput.value = Array.isArray(messages.status.openingSoon) ? messages.status.openingSoon.join('\n') : (messages.status.openingSoon || '');
+                statusOpenInput.value = Array.isArray(messages.status.open) ? messages.status.open.join('\n') : (messages.status.open || '');
             }
             newMemberTextarea.value = Array.isArray(messages.newMember) ? messages.newMember.join('\n') : '';
             memberLeftTextarea.value = Array.isArray(messages.memberLeft) ? messages.memberLeft.join('\n') : '';
             randomActiveTextarea.value = Array.isArray(messages.randomActive) ? messages.randomActive.join('\n') : '';
             inGameRandomTextarea.value = Array.isArray(messages.inGameRandom) ? messages.inGameRandom.join('\n') : '';
             if (messages.extras) {
-                extrasSundayNightInput.value = messages.extras.sundayNight || '';
-                extrasFridayInput.value = messages.extras.friday || '';
+                extrasSundayNightInput.value = Array.isArray(messages.extras.sundayNight) ? messages.extras.sundayNight.join('\n') : (messages.extras.sundayNight || '');
+                extrasFridayInput.value = Array.isArray(messages.extras.friday) ? messages.extras.friday.join('\n') : (messages.extras.friday || '');
             }
         } catch (error) {
             console.error('Erro ao carregar mensagens:', error);
@@ -147,17 +147,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const updatedMessages = {
             status: {
-                closed: statusClosedInput.value.trim(),
-                openingSoon: statusOpeningSoonInput.value.trim(),
-                open: statusOpenInput.value.trim(),
+                closed: statusClosedInput.value.split('\n').map(s => s.trim()).filter(s => s),
+                openingSoon: statusOpeningSoonInput.value.split('\n').map(s => s.trim()).filter(s => s),
+                open: statusOpenInput.value.split('\n').map(s => s.trim()).filter(s => s),
             },
             newMember: newMemberTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             memberLeft: memberLeftTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             randomActive: randomActiveTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             inGameRandom: inGameRandomTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             extras: {
-                sundayNight: extrasSundayNightInput.value.trim(),
-                friday: extrasFridayInput.value.trim(),
+                sundayNight: extrasSundayNightInput.value.split('\n').map(s => s.trim()).filter(s => s),
+                friday: extrasFridayInput.value.split('\n').map(s => s.trim()).filter(s => s),
             }
         };
 
