@@ -529,12 +529,20 @@ async function triggerServerOpen() {
     return;
   }
   console.log("ACIONADO: Abertura do servidor.");
-  // Pega um texto aleatório de abertura
-  const msg = getRandomElement(
-    messages.status.open,
-    messages.aiPrompts.status_open,
-    messages.aiUsageSettings.status_open
-  );
+  
+  // Seleciona mensagem corretamente
+  let msg;
+  const useAI = messages.aiUsageSettings && messages.aiUsageSettings.status_open && botConfig.GROQ_API_KEY;
+  
+  if (useAI) {
+    msg = await callGroqAPI(messages.aiPrompts?.status_open || DEFAULT_AI_PROMPTS.status_open);
+    if (!msg || msg.startsWith("Erro") || msg.length < 5) {
+      msg = getRandomElement(messages.status.open) || "Servidor aberto! Bora jogar!";
+    }
+  } else {
+    msg = getRandomElement(messages.status.open) || "Servidor aberto! Bora jogar!";
+  }
+  
   await updateServerStatus('🟢', msg);
 
   serverOpenMessagesSent = 0;
@@ -549,12 +557,20 @@ async function triggerServerClose() {
     return;
   }
   console.log("ACIONADO: Fechamento do servidor.");
-  // Pega um texto aleatório de fechamento
-  const msg = getRandomElement(
-    messages.status.closed,
-    messages.aiPrompts.status_closed,
-    messages.aiUsageSettings.status_closed
-  );
+  
+  // Seleciona mensagem corretamente
+  let msg;
+  const useAI = messages.aiUsageSettings && messages.aiUsageSettings.status_closed && botConfig.GROQ_API_KEY;
+  
+  if (useAI) {
+    msg = await callGroqAPI(messages.aiPrompts?.status_closed || DEFAULT_AI_PROMPTS.status_closed);
+    if (!msg || msg.startsWith("Erro") || msg.length < 5) {
+      msg = getRandomElement(messages.status.closed) || "Servidor fechado por hoje!";
+    }
+  } else {
+    msg = getRandomElement(messages.status.closed) || "Servidor fechado por hoje!";
+  }
+  
   await updateServerStatus('🔴', msg);
 
   if (serverOpenMessageTimeoutId) {
@@ -570,15 +586,23 @@ async function triggerServerOpeningSoon() {
     return;
   }
   console.log("ACIONADO: Aviso de 1h para abrir.");
-  // Pega um texto aleatório de aviso
-  const msg = getRandomElement(
-    messages.status.openingSoon,
-    messages.aiPrompts.status_openingSoon,
-    messages.aiUsageSettings.status_openingSoon
-  );
+  
+  // Seleciona mensagem usando a mesma lógica das outras partes do código
+  let msg;
+  const useAI = messages.aiUsageSettings && messages.aiUsageSettings.status_openingSoon && botConfig.GROQ_API_KEY;
+  
+  if (useAI) {
+    msg = await callGroqAPI(messages.aiPrompts?.status_openingSoon || DEFAULT_AI_PROMPTS.status_openingSoon);
+    if (!msg || msg.startsWith("Erro") || msg.length < 5) {
+      msg = getRandomElement(messages.status.openingSoon) || "Servidor abrindo em 1 hora!";
+    }
+  } else {
+    msg = getRandomElement(messages.status.openingSoon) || "Servidor abrindo em 1 hora!";
+  }
+  
   await updateServerStatus('🟡', msg);
 
-  // Ao avisar 1h antes da abertura, também envia enquete de jogar
+  // Enquete de jogar
   await sendPoll(
     "Ei!! Você 🫵 vai jogar Pavlov hoje?",
     ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
@@ -860,7 +884,7 @@ function logCronJobs() {
             status = "Agendada";
             if (cronParser) {
                 try {
-                    const nextDate = cronParser.parseExpression(job.cron, { tz: botConfig.TIMEZONE }).next().toDate();
+                    const nextDate = cronParser.parseExpression(job.cronExpression, { tz: botConfig.TIMEZONE }).next().toDate();
                     nextExecution = nextDate.toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
                 } catch (e) {
                     console.error(`Erro ao parsear cron "${job.cron}" para ${job.name} com fuso ${botConfig.TIMEZONE}: ${e.message}`);
@@ -893,19 +917,31 @@ async function initializeBotStatus() {
   const closeTime = closeTimeDetails.hour * 60 + closeTimeDetails.minute;
   const warningTime = oneHourBeforeOpenDetails.hour * 60 + oneHourBeforeOpenDetails.minute;
 
-  // Verifica "aberto" considerando cruzamento de meia-noite
-  const inOpenWindow = openTime < closeTime
-    ? (timeNow >= openTime && timeNow < closeTime)
-    : (timeNow >= openTime || timeNow < closeTime);
+  console.log(`initializeBotStatus: now=${timeNow}, warning=${warningTime}, open=${openTime}, close=${closeTime}`);
 
-  // Verifica "1h antes" considerando cruzamento de meia-noite
-  const inWarningWindow = warningTime < openTime
-    ? (timeNow >= warningTime && timeNow < openTime)
-    : (timeNow >= warningTime || timeNow < openTime);
+  // Verifica se está na janela de aviso (1h antes de abrir)
+  let inWarningWindow = false;
+  if (warningTime < openTime) {
+    // Caso normal: 18:00 até 19:00
+    inWarningWindow = (timeNow >= warningTime && timeNow < openTime);
+  } else {
+    // Cruza meia-noite: 23:00 até 00:00 do dia seguinte
+    inWarningWindow = (timeNow >= warningTime || timeNow < openTime);
+  }
 
-  console.log(`initializeBotStatus: now=${timeNow}, warningWindow=[${warningTime}-${openTime}), openWindow=[${openTime}-${closeTime})`);
+  // Verifica se está na janela de abertura
+  let inOpenWindow = false;
+  if (openTime < closeTime) {
+    // Caso normal: 19:00 até 23:00
+    inOpenWindow = (timeNow >= openTime && timeNow < closeTime);
+  } else {
+    // Cruza meia-noite: 22:00 até 02:00 do dia seguinte
+    inOpenWindow = (timeNow >= openTime || timeNow < closeTime);
+  }
 
-  if (inWarningWindow) {
+  console.log(`Windows: warning=${inWarningWindow}, open=${inOpenWindow}`);
+
+  if (inWarningWindow && !inOpenWindow) {
     console.log("Inicialização: dentro da janela de aviso (1h antes). Disparando aviso com enquete.");
     await triggerServerOpeningSoon();
   } else if (inOpenWindow) {
@@ -916,7 +952,7 @@ async function initializeBotStatus() {
     console.log("Status inicial 'fechado' detectado fora de horário. Nome do grupo NÃO será alterado.");
   }
 
-  // Mensagens aleatórias diurnas (se estiver dentro da janela diurna)
+  // Mensagens aleatórias diurnas
   const currentHourNow = now.getHours();
   if (currentHourNow >= botConfig.DAYTIME_START_HOUR && currentHourNow < botConfig.DAYTIME_END_HOUR) {
     daytimeMessagesSent = 0;
