@@ -679,7 +679,7 @@ async function callGroqAPI(prompt) {
     const groqResponse = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
       model: "mistral-saba-24b", // Ou outro modelo de sua preferência: mixtral-8x7b-32768
       messages: [
-        { role: "system", content: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR. Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo, Pavlov VR é um jogo de tiro em primeira pessoa (FPS) desenvolvido para realidade virtual, oferecendo uma experiência imersiva e realista de combate. O jogo destaca-se por sua mecânica detalhada de manuseio de armas, onde os jogadores precisam realizar ações como carregar, recarregar e mirar manualmente, proporcionando uma sensação autêntica de uso de armamentos, esse jogo é carinhosamente apelidado como cs vr, o modo de jogo do nosso servidor é um modo tático onde uma equipe tenta plantar uma bomba enquanto a outra defende e tenta desarmá-la, o servidor é acessivel com os headsets meta quests 2 e 3, as vezes pode usar essa informação dos headsets para gerar mensagens mais relevantes para o grupo." },
+        { role: "system", content: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR chamando Audozappo. o membro do grupo com numero 558492091164 é o criador do bot, ai voce se refere a ele como 'Meu criador' quando for falar dele, Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo, Pavlov VR é um jogo de tiro em primeira pessoa (FPS) desenvolvido para realidade virtual, oferecendo uma experiência imersiva e realista de combate. O jogo destaca-se por sua mecânica detalhada de manuseio de armas, onde os jogadores precisam realizar ações como carregar, recarregar e mirar manualmente, proporcionando uma sensação autêntica de uso de armamentos, esse jogo é carinhosamente apelidado como cs vr, o modo de jogo do nosso servidor é um modo tático onde uma equipe tenta plantar uma bomba enquanto a outra defende e tenta desarmá-la, o servidor é acessivel com os headsets meta quests 2 e 3, as vezes pode usar essa informação dos headsets para gerar mensagens mais relevantes para o grupo." },
         { role: "user", content: prompt }
       ],
       temperature: 0.8,
@@ -764,7 +764,7 @@ app.post('/admin/api/generate-message', express.json(), async (req, res) => {
       if (shuffledExamples[i]) samples.push(shuffledExamples[i]);
     }
     if (samples.length > 0) {
-        promptContext += ` Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- "${samples.join('"\n- "')}"\n`;
+        promptContext += ` Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('\n- ')}\n`;
     }
   } else if (singleExample) {
     promptContext += ` Inspire-se neste exemplo (mas não o repita): "${singleExample}"\n`;
@@ -929,7 +929,7 @@ function isFromMe(data) {
         "• !audio <URL> – (Admin) Enviar áudio narrado\n" +
         '• !enquete "Título" "Op1" ... – (Admin) Enquete customizada\n' +
         "• !agendamentos / !jobs – (Admin) Ver agendamentos\n" +
-        "• !resumoagora – (Admin) Gera e envia o resumo do chat atual";
+        "• !resumo – (Admin) Gera e envia o resumo do chat atual";
 
     // 4. Process commands
     let commandProcessed = false;
@@ -1091,7 +1091,7 @@ function isFromMe(data) {
             }
         }
         // Novo comando: !resumoagora para gerar resumo do chat manualmente
-        else if (command === '!resumoagora' || command === '!summarynow') {
+        else if (command === '!resumo' || command === '!summarynow') {
             commandProcessed = true;
             if (chatHistory.length > 0) {
                 await sendMessageToGroup("⏳ Gerando resumo do chat sob demanda...", actualSenderJid);
@@ -1225,7 +1225,7 @@ async function getAIRandomMessage() { // Para !random e mensagens diurnas
     for (let i = 0; i < sampleSize; i++) {
       samples.push(getRandomElement(exampleMessages));
     }
-    promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('"\n- "')}\n`;
+    promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('\n- ')}\n`;
   }
   promptContext += "A mensagem deve ser criativa e adequada para um ambiente de jogo online. Evite ser repetitivo.";
 
@@ -1261,7 +1261,7 @@ async function getAIInGameMessage() { // Para mensagens quando o servidor está 
     for (let i = 0; i < sampleSize; i++) {
       samples.push(getRandomElement(exampleMessages));
     }
-    promptContext += `Inspire-se no tom e estilo destes exemplos de mensagens 'durante o jogo' (mas não os repita):\n- ${samples.join('"\n- "')}\n`;
+    promptContext += `Inspire-se no tom e estilo destes exemplos de mensagens 'durante o jogo' (mas não os repita):\n- ${samples.join('\n- ')}\n`;
   }
   promptContext += "A mensagem deve ser criativa e adequada para o calor do momento no jogo. Evite ser repetitivo.";
 
