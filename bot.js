@@ -129,19 +129,36 @@ function loadMessages() {
     if (fs.existsSync(MESSAGES_FILE_PATH)) {
       const fileContent = fs.readFileSync(MESSAGES_FILE_PATH, 'utf-8');
       messages = JSON.parse(fileContent);
+      // Ensure gameTips exists
+      if (!messages.gameTips) {
+        messages.gameTips = [
+          "Dica: Comunique-se com sua equipe para coordenar táticas!",
+          "Dica: Aprenda os pontos de 'spawn' dos inimigos nos mapas.",
+          "Dica: Use granadas de fumaça para bloquear a visão e avançar.",
+          "Dica: Recarregar atrás de cobertura pode salvar sua vida.",
+          "Dica: Conheça os 'callouts' dos mapas para informar posições."
+        ];
+      }
       console.log("Mensagens carregadas de messages.json");
     } else {
       console.error("ERRO: messages.json não encontrado. Usando mensagens padrão (se houver) ou bot pode não funcionar corretamente.");
-      // Você pode querer ter mensagens padrão aqui ou criar o arquivo se não existir
-      // Por enquanto, vamos assumir que ele deve existir.
-      // Para criar um default se não existir:
-      // messages = { /* estrutura padrão aqui */ };
-      // saveMessages(); // e então salvar
+      messages = { status: {}, newMember: [], memberLeft: [], randomActive: [], extras: {}, gameTips: [
+          "Dica: Comunique-se com sua equipe para coordenar táticas!",
+          "Dica: Aprenda os pontos de 'spawn' dos inimigos nos mapas.",
+          "Dica: Use granadas de fumaça para bloquear a visão e avançar.",
+          "Dica: Recarregar atrás de cobertura pode salvar sua vida.",
+          "Dica: Conheça os 'callouts' dos mapas para informar posições."
+        ] };
     }
   } catch (error) {
     console.error("Erro ao carregar messages.json:", error);
-    // Fallback para um objeto vazio ou estrutura padrão para evitar que o bot quebre totalmente
-    messages = { status: {}, newMember: [], memberLeft: [], randomActive: [], extras: {} };
+    messages = { status: {}, newMember: [], memberLeft: [], randomActive: [], extras: {}, gameTips: [
+        "Dica: Comunique-se com sua equipe para coordenar táticas!",
+        "Dica: Aprenda os pontos de 'spawn' dos inimigos nos mapas.",
+        "Dica: Use granadas de fumaça para bloquear a visão e avançar.",
+        "Dica: Recarregar atrás de cobertura pode salvar sua vida.",
+        "Dica: Conheça os 'callouts' dos mapas para informar posições."
+      ] };
   }
 }
 
@@ -190,16 +207,60 @@ async function sendNarratedAudio(audioUrlOrBase64, recipientJid = botConfig.TARG
   }
 }
 
-async function sendPoll(pollName, pollValues, recipientJid = botConfig.TARGET_GROUP_ID, selectableCount = 1, options = {}) {
+async function sendPoll(title, options, recipientJid, selectableCount = 1) {
+  if (!botConfig.EVOLUTION_API_URL || !botConfig.EVOLUTION_API_KEY || !botConfig.INSTANCE_NAME) {
+    console.warn("API da Evolution não configurada para enviar enquete.");
+    return;
+  }
   try {
-    await evolutionAPI.post(`/message/sendPoll/${botConfig.INSTANCE_NAME}`, {
-      number: recipientJid,
-      name: pollName,
-      selectableCount: selectableCount,
-      values: pollValues,
-      ...options
-    });
-    console.log(`Enquete "${pollName}" enviada para ${recipientJid}`);
+    const message = {
+      name: title,
+      values: options,
+      selectableCount: selectableCount
+    };
+
+    let mentionOptions = {};
+    if (recipientJid.endsWith('@g.us')) { // Só tenta buscar participantes para grupos
+        const participants = await getGroupParticipants(recipientJid);
+        if (participants.length > 0) {
+            mentionOptions.mentions = participants;
+            console.log(`Enquete para ${recipientJid} incluirá ${participants.length} menções invisíveis.`);
+        }
+    }
+
+    await axios.post(
+      `${botConfig.EVOLUTION_API_URL}/message/sendPoll/${botConfig.INSTANCE_NAME}`,
+      {
+        number: recipientJid,
+        options: {
+            delay: 1200,
+            presence: 'composing',
+            // Não precisa de "mentions" aqui se a API da Evolution não suportar no corpo principal para sendPoll
+            // e sim como um parâmetro separado ou se for inferido pelo options.mentions abaixo.
+            // Verifique a documentação da sua API.
+        },
+        message: message,
+        // Adicionando as menções aqui se a API suportar desta forma para sendPoll
+        // Se a API da Evolution espera 'mentions' dentro do objeto 'options' da mensagem,
+        // você precisará ajustar. Por enquanto, estou assumindo que pode ser um parâmetro de alto nível
+        // ou que a função sendMessageToGroup (se sendPoll usasse ela) lidaria com isso.
+        // Como estamos chamando diretamente o endpoint sendPoll, precisamos ver onde 'mentions' se encaixa.
+        // Se o endpoint sendPoll não suportar menções diretamente, uma alternativa seria enviar
+        // a enquete e, em seguida, uma mensagem de texto vazia ou um "." com as menções,
+        // mas isso é menos ideal.
+        // Vamos assumir que podemos passar como parte do payload principal para sendPoll,
+        // ou que a API da Evolution é inteligente o suficiente para pegar de um campo `extraOptions` ou similar.
+        // Se o endpoint sendPoll não tiver um campo direto para mentions,
+        // esta abordagem de menção invisível pode não funcionar para enquetes.
+        // A forma mais comum é que `mentions` seja parte de um objeto `options` ou `extraParams`.
+        // Vamos tentar adicioná-lo ao objeto principal do payload, que é uma suposição.
+        ...(mentionOptions.mentions && { mentions: mentionOptions.mentions }) // Adiciona se houver menções
+      },
+      {
+        headers: { 'apikey': botConfig.EVOLUTION_API_KEY, 'Content-Type': 'application/json' }
+      }
+    );
+    console.log(`Enquete "${title}" enviada para ${recipientJid}.`);
   } catch (error) {
     console.error(`Erro ao enviar enquete para ${recipientJid}:`, error.response ? error.response.data : error.message);
   }
@@ -364,17 +425,15 @@ async function scheduleNextRandomMessage(type) {
       console.log(`[DEBUG] [serverOpen] Limite de ${botConfig.MESSAGES_DURING_SERVER_OPEN} mensagens atingido. Não agendando mais.`);
       return;
     }
-    // intervalo em minutos entre cada mensagem durante o servidor aberto
     delay = calculateRandomDelay(10, 30);
-  } 
+  }
   else if (type === 'daytime') {
     if (daytimeMessagesSent >= botConfig.MESSAGES_DURING_DAYTIME) {
       console.log(`[DEBUG] [daytime] Limite de ${botConfig.MESSAGES_DURING_DAYTIME} mensagens atingido. Não agendando mais.`);
       return;
     }
-    // intervalo em minutos entre cada mensagem de dia
     delay = calculateRandomDelay(60, 120);
-  } 
+  }
   else {
     console.warn(`[DEBUG] scheduleNextRandomMessage recebeu tipo desconhecido: ${type}`);
     return;
@@ -387,22 +446,34 @@ async function scheduleNextRandomMessage(type) {
       type === 'serverOpen' ? serverOpenMessagesSent : daytimeMessagesSent
     }`);
 
-    const msg = getRandomElement(messages.randomActive);
+    let msg;
+    if (type === 'serverOpen') {
+      // Server is open, more likely an in-game context message or tip
+      msg = await getAIInGameMessage(); // This function now includes tips
+    } else { // 'daytime'
+      // General daytime message or tip
+      msg = await getAIRandomMessage(); // This function now includes tips
+    }
+
     if (msg) {
       console.log(`[DEBUG] Enviando mensagem automática: "${msg}"`);
       await sendMessageToGroup(msg);
     } else {
-      console.warn(`[DEBUG] Nenhuma mensagem disponível em messages.randomActive`);
+      console.warn(`[DEBUG] Nenhuma mensagem disponível (IA ou dica) para o tipo '${type}'`);
     }
 
     if (type === 'serverOpen') {
       serverOpenMessagesSent++;
       serverOpenMessageTimeoutId = null;
-      scheduleNextRandomMessage('serverOpen');
+      if (serverOpenMessagesSent < botConfig.MESSAGES_DURING_SERVER_OPEN) { // Check before scheduling next
+        scheduleNextRandomMessage('serverOpen');
+      }
     } else {
       daytimeMessagesSent++;
       daytimeMessageTimeoutId = null;
-      scheduleNextRandomMessage('daytime');
+      if (daytimeMessagesSent < botConfig.MESSAGES_DURING_DAYTIME) { // Check before scheduling next
+        scheduleNextRandomMessage('daytime');
+      }
     }
   }, delay);
 
@@ -679,7 +750,7 @@ async function callGroqAPI(prompt) {
     const groqResponse = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
       model: "mistral-saba-24b", // Ou outro modelo de sua preferência: mixtral-8x7b-32768
       messages: [
-        { role: "system", content: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR chamando Audozappo. o membro do grupo com numero 558492091164 é o criador do bot, ai voce se refere a ele como 'Meu criador' quando for falar dele, Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo, Pavlov VR é um jogo de tiro em primeira pessoa (FPS) desenvolvido para realidade virtual, oferecendo uma experiência imersiva e realista de combate. O jogo destaca-se por sua mecânica detalhada de manuseio de armas, onde os jogadores precisam realizar ações como carregar, recarregar e mirar manualmente, proporcionando uma sensação autêntica de uso de armamentos, esse jogo é carinhosamente apelidado como cs vr, o modo de jogo do nosso servidor é um modo tático onde uma equipe tenta plantar uma bomba enquanto a outra defende e tenta desarmá-la, o servidor é acessivel com os headsets meta quests 2 e 3, as vezes pode usar essa informação dos headsets para gerar mensagens mais relevantes para o grupo." },
+        { role: "system", content: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR chamando Audozappo. o membro do grupo com numero 558492091164 é o criador do bot, ai voce se refere a ele como 'Fernando o meu criador' quando for falar dele, Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo, Pavlov VR é um jogo de tiro em primeira pessoa (FPS) desenvolvido para realidade virtual, oferecendo uma experiência imersiva e realista de combate. O jogo destaca-se por sua mecânica detalhada de manuseio de armas, onde os jogadores precisam realizar ações como carregar, recarregar e mirar manualmente, proporcionando uma sensação autêntica de uso de armamentos, esse jogo é carinhosamente apelidado como cs vr, o modo de jogo do nosso servidor é um modo tático onde uma equipe tenta plantar uma bomba enquanto a outra defende e tenta desarmá-la, o servidor é acessivel com os headsets meta quests 2 e 3, as vezes pode usar essa informação dos headsets para gerar mensagens mais relevantes para o grupo." },
         { role: "user", content: prompt }
       ],
       temperature: 0.8,
@@ -898,55 +969,32 @@ function isFromMe(data) {
         // console.log(`[ChatHistory] Added: ${senderName}: ${messageContent.substring(0,30)}... Total: ${chatHistory.length}`);
     }
 
-    let replyTo = actualSenderJid; // Default: reply to where the command came from (PM or group if sender is the bot's JID in a group context)
-    if (isGroupMessage && remoteJid === botConfig.TARGET_GROUP_ID) {
-        replyTo = botConfig.TARGET_GROUP_ID; // If command is in target group, usually reply to group
-        if (isAdmin) { // If admin types in group, reply can be to group or PM based on command
-           // For most admin commands that give feedback, sending to actualSenderJid (PM) might be better if they typed in group.
-           // However, for simplicity and current setup, admin commands typed in group will reply to group or actualSenderJid based on specific command logic below.
-           // The `replyTo` variable will be adjusted by specific command logic if needed.
-           // For now, if admin types in group, replyTo is the group. If they type in PM, replyTo is their JID.
-           // Let's refine: if admin types in group, replyTo should be actualSenderJid for direct feedback,
-           // unless the command is inherently group-wide for its reply (like !jogar? confirmation)
-           // For now, let's keep replyTo as actualSenderJid for admin commands, and TARGET_GROUP_ID for public commands.
-           replyTo = actualSenderJid; // Admin commands reply to admin (PM or group where they typed)
-        }
-    }
-
     const helpText = 
-        "👋 Olá! Eu sou o Bot Pavlov.\n" +
-        "Comandos disponíveis:\n" +
-        "• !start       – Mostra esta ajuda\n" +
-        "• !abrir       – (Admin) Abrir servidor\n" +
-        "• !fechar      – (Admin) Fechar servidor\n" +
-        "• !avisar      – (Admin) Aviso 1h antes de abrir\n" +
-        "• !statusauto  – (Admin) Reativar status automático\n" +
-        "• !teste       – (Admin) Testa o bot\n" +
-        "• !say <msg>   – (Admin) Envia msg customizada ao grupo\n" +
-        "• !anunciar <msg>– (Admin) Alias para !say\n" +
-        "• !random      – Mensagem aleatória (IA)\n" +
-        "• !jogar?      – Enquete rápida de jogo\n" +
-        "• !audio <URL> – (Admin) Enviar áudio narrado\n" +
-        '• !enquete "Título" "Op1" ... – (Admin) Enquete customizada\n' +
-        "• !agendamentos / !jobs – (Admin) Ver agendamentos\n" +
-        "• !resumo – (Admin) Gera e envia o resumo do chat atual";
+        "👋 Olá! Eu sou o " + (messages.botInfo?.name || "Bot Pavlov") + ".\n" +
+        "Comandos disponíveis (apenas para admins):\n\n" +      
+        "• !jogar?      – Enquete rápida de jogo\n" +          
+        "• !random      – Mensagem aleatória (IA/Dica)\n" +
+        "• !abrir       – Abrir servidor\n" +
+        "• !fechar      – Fechar servidor\n" +
+        "• !say <msg>   – Envia msg customizada ao grupo\n" +
+        "• !audio <URL> – Enviar áudio narrado\n" +
+        '• !enquete "Título" "Opção 1" "Opção 2" ... – Enquete customizada\n' +   
+        "• !resumo      – Gera e envia o resumo do chat atual\n";
+        // Comandos removidos: !votemap, !sortear
 
-    // 4. Process commands
     let commandProcessed = false;
 
-    if (command === '!start') {
-        await sendMessageToGroup(helpText, actualSenderJid); // Send help to where !start was typed
-        commandProcessed = true;
-    }
-    else if (isAdmin) {
-        // Admin commands reply to actualSenderJid (PM or group where admin typed)
-        // Group-affecting actions still target TARGET_GROUP_ID
-        if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
+    if (isAdmin) {
+        if (command === '!start') {
+            await sendMessageToGroup(helpText, actualSenderJid); // Send help to admin
+            commandProcessed = true;
+        }
+        else if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
             commandProcessed = true;
             if (command === '!teste') {
                 await sendMessageToGroup("Testado por admin!", actualSenderJid);
             } else if (command === '!abrir') {
-                await triggerServerOpen(); // Affects TARGET_GROUP_ID
+                await triggerServerOpen();
                 scheduledCronTasks.forEach(task => {
                     if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
                         task.job.stop();
@@ -955,7 +1003,7 @@ function isFromMe(data) {
                 console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
                 await sendMessageToGroup("Servidor aberto manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
             } else if (command === '!fechar') {
-                await triggerServerClose(); // Affects TARGET_GROUP_ID
+                await triggerServerClose();
                 scheduledCronTasks.forEach(task => {
                     if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
                         task.job.stop();
@@ -964,7 +1012,7 @@ function isFromMe(data) {
                 console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
                 await sendMessageToGroup("Servidor fechado manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
             } else if (command === '!avisar') {
-                await triggerServerOpeningSoon(); // Affects TARGET_GROUP_ID
+                await triggerServerOpeningSoon();
                 scheduledCronTasks.forEach(task => {
                     if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
                         task.job.stop();
@@ -982,19 +1030,19 @@ function isFromMe(data) {
                 console.log("Agendamentos automáticos de status REATIVADOS.");
             }
         }
-        else if (command === '!random') { // Admin version of !random
+        else if (command === '!random') {
             commandProcessed = true;
-            const randomMsg = await getAIRandomMessage();
-            if (randomMsg) await sendMessageToGroup(randomMsg, actualSenderJid);
+            const randomMsg = await getAIRandomMessage(); // This now can return a tip or AI message
+            if (randomMsg) await sendMessageToGroup(randomMsg, botConfig.TARGET_GROUP_ID); // Send to group
+            await sendMessageToGroup("Mensagem aleatória enviada para o grupo.", actualSenderJid); // Confirm to admin
         }
-        else if (command === '!jogar?') { // Admin version of !jogar?
+        else if (command === '!jogar?') {
             commandProcessed = true;
             await sendPoll(
                 "Ei!! Você 🫵 vai jogar Pavlov hoje?",
                 ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
                 botConfig.TARGET_GROUP_ID // Poll always goes to the target group
             );
-            // Confirm to admin where they sent it
             await sendMessageToGroup("Enquete '!jogar?' enviada para o grupo.", actualSenderJid);
         }
         else if (command === '!audio' && args.length > 0) {
@@ -1075,11 +1123,10 @@ function isFromMe(data) {
             }
             await sendMessageToGroup(resp, actualSenderJid);
         }
-        // Novo comando: !say ou !anunciar para enviar mensagem customizada
         else if (command === '!say' || command === '!anunciar') {
             commandProcessed = true;
             if (args.length > 0) {
-                const messageToSend = messageContent.substring(command.length + 1).trim(); // Pega todo o texto após o comando
+                const messageToSend = messageContent.substring(command.length + 1).trim();
                 if (messageToSend) {
                     await sendMessageToGroup(messageToSend, botConfig.TARGET_GROUP_ID);
                     await sendMessageToGroup("✅ Mensagem enviada para o grupo.", actualSenderJid);
@@ -1090,49 +1137,31 @@ function isFromMe(data) {
                 await sendMessageToGroup("⚠️ Uso: !say <sua mensagem>", actualSenderJid);
             }
         }
-        // Novo comando: !resumoagora para gerar resumo do chat manualmente
         else if (command === '!resumo' || command === '!summarynow') {
             commandProcessed = true;
             if (chatHistory.length > 0) {
                 await sendMessageToGroup("⏳ Gerando resumo do chat sob demanda...", actualSenderJid);
-                await triggerChatSummary(); // Chama a função que gera e envia o resumo
-                // A função triggerChatSummary já envia para o TARGET_GROUP_ID
-                // e já limpa o chatHistory.
-                // Podemos enviar uma confirmação para o admin.
+                await triggerChatSummary();
                 await sendMessageToGroup("✅ Resumo do chat solicitado enviado para o grupo.", actualSenderJid);
             } else {
                 await sendMessageToGroup("ℹ️ Não há mensagens no histórico para resumir no momento.", actualSenderJid);
             }
         }
-        // If admin sent a PM and it wasn't any of the above commands
-        else if (!isGroupMessage && !commandProcessed && commandText.length > 0) {
-             await sendMessageToGroup(helpText, actualSenderJid);
-             commandProcessed = true; // Consider it processed by showing help
+        // Admin typed an unrecognized command
+        else if (commandText.startsWith("!")) {
+            await sendMessageToGroup(`Comando "${command}" não reconhecido. Digite !start para a lista de comandos de admin.`, actualSenderJid);
+            commandProcessed = true;
         }
     } 
-    // Public commands (for non-admins or if admin command didn't match in group and it's not a PM)
-    // These only work if sent in the TARGET_GROUP_ID
-    else if (isGroupMessage && remoteJid === botConfig.TARGET_GROUP_ID) {
-        if (command === '!random') {
-            commandProcessed = true;
-            const randomMsg = await getAIRandomMessage();
-            if (randomMsg) await sendMessageToGroup(randomMsg, botConfig.TARGET_GROUP_ID); // Reply to group
-        }
-        else if (command === '!jogar?') {
-            commandProcessed = true;
-            await sendPoll(
-                "Ei!! Você 🫵 vai jogar Pavlov hoje?",
-                ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
-                botConfig.TARGET_GROUP_ID // Poll to group
-            );
-            // No separate confirmation needed here as the poll itself is the action in the group
-        }
+    // Non-admin typed a command
+    else if (commandText.startsWith("!")) {
+        // Silently ignore commands from non-admins, or send a "permission denied" message.
+        // For now, let's ignore.
+        console.log(`Comando '${commandText}' de usuário não-admin ${actualSenderJid} ignorado.`);
+        commandProcessed = true; // Mark as processed to prevent any other handling
     }
     
-    if (!commandProcessed && commandText.startsWith("!")) {
-        // Optional: Reply if it looked like a command but wasn't recognized
-        // await sendMessageToGroup(`Comando "${command}" não reconhecido. Digite !start para ajuda.`, actualSenderJid);
-    }
+    // No need for the old `if (!commandProcessed && commandText.startsWith("!"))` as all cases are handled.
 
     return res.status(200).send('messages.upsert processado.');
   });
@@ -1206,14 +1235,23 @@ async function startBot() {
 
 startBot();
 
-// Função para obter uma mensagem aleatória GERAL, potencialmente gerada por IA
-async function getAIRandomMessage() { // Para !random e mensagens diurnas
+// Função para obter uma mensagem aleatória GERAL, potencialmente gerada por IA ou uma dica
+async function getAIRandomMessage() {
+  // 30% chance to return a game tip
+  if (Math.random() < 0.3 && messages.gameTips && messages.gameTips.length > 0) {
+    console.log("Retornando dica de jogo (geral).");
+    return getRandomElement(messages.gameTips);
+  }
+
   if (!botConfig.GROQ_API_KEY) {
-    console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista randomActive.");
+    console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista randomActive ou dica.");
     if (messages.randomActive && messages.randomActive.length > 0) {
       return getRandomElement(messages.randomActive);
     }
-    return "Aqui deveria ter uma piada, mas a IA está de folga e não temos exemplos para mensagens gerais!";
+    if (messages.gameTips && messages.gameTips.length > 0) { // Fallback to tip if randomActive is empty
+        return getRandomElement(messages.gameTips);
+    }
+    return "Aqui deveria ter uma piada ou dica, mas a IA está de folga e não temos exemplos!";
   }
 
   const exampleMessages = messages.randomActive || [];
@@ -1222,10 +1260,14 @@ async function getAIRandomMessage() { // Para !random e mensagens diurnas
   if (exampleMessages.length > 0) {
     const sampleSize = Math.min(exampleMessages.length, 2);
     const samples = [];
+    // Pega amostras aleatórias para evitar sempre os mesmos exemplos
+    const shuffledExamples = [...exampleMessages].sort(() => 0.5 - Math.random());
     for (let i = 0; i < sampleSize; i++) {
-      samples.push(getRandomElement(exampleMessages));
+      if (shuffledExamples[i]) samples.push(shuffledExamples[i]);
     }
-    promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('\n- ')}\n`;
+    if (samples.length > 0) {
+        promptContext += ` Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('\n- ')}\n`;
+    }
   }
   promptContext += "A mensagem deve ser criativa e adequada para um ambiente de jogo online. Evite ser repetitivo.";
 
@@ -1234,22 +1276,34 @@ async function getAIRandomMessage() { // Para !random e mensagens diurnas
   if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
     return generatedMessage;
   } else {
-    console.warn("Falha ao gerar mensagem GERAL com Groq, usando fallback da lista randomActive.");
+    console.warn("Falha ao gerar mensagem GERAL com Groq, usando fallback da lista randomActive ou dica.");
     if (messages.randomActive && messages.randomActive.length > 0) {
       return getRandomElement(messages.randomActive);
+    }
+    if (messages.gameTips && messages.gameTips.length > 0) { // Fallback to tip
+        return getRandomElement(messages.gameTips);
     }
     return "A IA tentou, mas falhou na mensagem geral. Que tal um 'bora jogar!' clássico?";
   }
 }
 
-// Função para obter uma mensagem aleatória "DURANTE O JOGO", potencialmente gerada por IA
-async function getAIInGameMessage() { // Para mensagens quando o servidor está aberto
+// Função para obter uma mensagem aleatória "DURANTE O JOGO", potencialmente gerada por IA ou uma dica
+async function getAIInGameMessage() {
+  // 30% chance to return a game tip
+  if (Math.random() < 0.3 && messages.gameTips && messages.gameTips.length > 0) {
+    console.log("Retornando dica de jogo (in-game).");
+    return getRandomElement(messages.gameTips);
+  }
+
   if (!botConfig.GROQ_API_KEY) {
-    console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista inGameRandom.");
+    console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista inGameRandom ou dica.");
     if (messages.inGameRandom && messages.inGameRandom.length > 0) {
       return getRandomElement(messages.inGameRandom);
     }
-    return "O jogo está rolando, mas a IA de mensagens de jogo está offline!";
+    if (messages.gameTips && messages.gameTips.length > 0) { // Fallback to tip
+        return getRandomElement(messages.gameTips);
+    }
+    return "O jogo está rolando, mas a IA de mensagens de jogo está offline! Fica a dica: mire na cabeça!";
   }
 
   const exampleMessages = messages.inGameRandom || [];
@@ -1258,10 +1312,14 @@ async function getAIInGameMessage() { // Para mensagens quando o servidor está 
   if (exampleMessages.length > 0) {
     const sampleSize = Math.min(exampleMessages.length, 2);
     const samples = [];
+    // Pega amostras aleatórias para evitar sempre os mesmos exemplos
+    const shuffledInGameExamples = [...exampleMessages].sort(() => 0.5 - Math.random());
     for (let i = 0; i < sampleSize; i++) {
-      samples.push(getRandomElement(exampleMessages));
+      if (shuffledInGameExamples[i]) samples.push(shuffledInGameExamples[i]);
     }
-    promptContext += `Inspire-se no tom e estilo destes exemplos de mensagens 'durante o jogo' (mas não os repita):\n- ${samples.join('\n- ')}\n`;
+    if (samples.length > 0) {
+        promptContext += ` Inspire-se no tom e estilo destes exemplos de mensagens 'durante o jogo' (mas não os repita):\n- ${samples.join('\n- ')}\n`;
+    }
   }
   promptContext += "A mensagem deve ser criativa e adequada para o calor do momento no jogo. Evite ser repetitivo.";
 
@@ -1270,9 +1328,12 @@ async function getAIInGameMessage() { // Para mensagens quando o servidor está 
   if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
     return generatedMessage;
   } else {
-    console.warn("Falha ao gerar mensagem IN-GAME com Groq, usando fallback da lista inGameRandom.");
+    console.warn("Falha ao gerar mensagem IN-GAME com Groq, usando fallback da lista inGameRandom ou dica.");
     if (messages.inGameRandom && messages.inGameRandom.length > 0) {
       return getRandomElement(messages.inGameRandom);
+    }
+    if (messages.gameTips && messages.gameTips.length > 0) { // Fallback to tip
+        return getRandomElement(messages.gameTips);
     }
     return "A IA de jogo bugou! Foquem no objetivo!";
   }
@@ -1317,5 +1378,69 @@ async function triggerChatSummary() {
     console.warn("Falha ao gerar resumo do chat ou resumo inválido:", summary);
     // Opcional: notificar o grupo sobre a falha
     // await sendMessageToGroup("A IA hoje não colaborou para o resumo. Mais sorte na próxima!", botConfig.TARGET_GROUP_ID);
+  }
+}
+
+// --- Funções Auxiliares da API Evolution ---
+
+async function getGroupParticipants(groupId) {
+  if (!botConfig.EVOLUTION_API_URL || !botConfig.EVOLUTION_API_KEY || !botConfig.INSTANCE_NAME) {
+    console.warn("API da Evolution não configurada para buscar participantes do grupo.");
+    return [];
+  }
+  try {
+    const response = await axios.get(
+      `${botConfig.EVOLUTION_API_URL}/group/fetchAllGroups/${botConfig.INSTANCE_NAME}`,
+      {
+        headers: { 'apikey': botConfig.EVOLUTION_API_KEY }
+      }
+    );
+    // A resposta pode ser uma lista de todos os grupos, precisamos encontrar o nosso.
+    // Ou, se houver um endpoint mais específico como /group/fetchGroupInfo/{groupId}/{instanceName}
+    // seria melhor usá-lo. Vou assumir que precisamos filtrar de uma lista geral por enquanto.
+    // Adapte esta lógica se sua API tiver um endpoint direto para metadados de UM grupo.
+
+    const groups = response.data; // Supondo que response.data é um array de grupos
+    const targetGroup = groups.find(group => group.id === groupId || group.id?.user === groupId.split('@')[0]);
+
+    if (targetGroup && targetGroup.participants) {
+      return targetGroup.participants.map(p => p.id); // Retorna um array de JIDs
+    } else {
+      // Tentar um endpoint específico se o anterior falhar ou não for ideal
+      try {
+        const specificGroupResponse = await axios.get(
+          `${botConfig.EVOLUTION_API_URL}/group/fetchGroupInfo/${groupId}/${botConfig.INSTANCE_NAME}`,
+          {
+            headers: { 'apikey': botConfig.EVOLUTION_API_KEY }
+          }
+        );
+        if (specificGroupResponse.data && specificGroupResponse.data.participants) {
+          return specificGroupResponse.data.participants.map(p => p.id);
+        }
+      } catch (specificError) {
+        console.warn(`Não foi possível encontrar o grupo ${groupId} na lista geral nem buscar informações específicas. Erro específico: ${specificError.message}`);
+      }
+      console.warn(`Grupo ${groupId} não encontrado ou sem participantes na resposta da API.`);
+      return [];
+    }
+  } catch (error) {
+    console.error(`Erro ao buscar participantes do grupo ${groupId}:`, error.message);
+    return [];
+  }
+}
+
+async function sendMessageToGroup(message, recipientJid, options = {}) {
+  if (!botConfig.EVOLUTION_API_URL || !botConfig.EVOLUTION_API_KEY || !botConfig.INSTANCE_NAME) {
+    console.warn("API da Evolution não configurada para enviar mensagens.");
+    return;
+  }
+  try {
+    await evolutionAPI.post(`/message/sendText/${botConfig.INSTANCE_NAME}`, {
+      number: recipientJid,
+      text: message,
+      ...options
+    });
+  } catch (error) {
+    console.error(`Erro ao enviar mensagem para ${recipientJid}:`, error.response ? error.response.data : error.message);
   }
 }
