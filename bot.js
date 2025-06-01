@@ -20,6 +20,9 @@ const envConfig = process.env;
 const MESSAGES_FILE_PATH = path.join(__dirname, 'messages.json');
 const CONFIG_FILE_PATH = path.join(__dirname, 'config.json');
 
+// Array para armazenar informações sobre os cron jobs ativos e suas tasks
+let cronJobs = [];
+
 // Configurações padrão que podem ser sobrescritas pelo config.json e depois pelo .env
 let botConfig = { // These are the ultimate fallback defaults
   EVOLUTION_API_URL: 'https://evo.audiozap.app',
@@ -40,6 +43,27 @@ let botConfig = { // These are the ultimate fallback defaults
   CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"],
   CHAT_SUMMARY_COUNT_PER_DAY: 3
 };
+
+// Função parseTime mais robusta
+function parseTime(timeStr) { // Espera "HH:MM"
+  if (typeof timeStr !== 'string' || !timeStr.includes(':')) {
+    console.warn(`parseTime: Formato de tempo inválido ou não é string: '${timeStr}'. Usando 00:00 como padrão.`);
+    return { hour: 0, minute: 0 };
+  }
+  const parts = timeStr.split(':');
+  if (parts.length !== 2) {
+    console.warn(`parseTime: Formato de tempo inválido (número de partes incorreto): '${timeStr}'. Usando 00:00 como padrão.`);
+    return { hour: 0, minute: 0 };
+  }
+  const hour = parseInt(parts[0], 10);
+  const minute = parseInt(parts[1], 10);
+
+  if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    console.warn(`parseTime: Valor inválido ou NaN para hora/minuto de '${timeStr}'. Hora: ${hour}, Minuto: ${minute}. Usando 00:00 como padrão.`);
+    return { hour: 0, minute: 0 };
+  }
+  return { hour, minute };
+}
 
 function loadBotConfig() {
   // 1. Carregar de config.json
@@ -638,70 +662,187 @@ function logScheduledCronTask(cronExpression, description, messageOrAction, task
 
 function setupCronJobs() {
     console.log("Configurando/Reconfigurando cron jobs...");
-    scheduledCronTasks.forEach(task => {
-        if (task.job && typeof task.job.stop === 'function') {
-            task.job.stop();
+
+    // Parar e limpar cron jobs existentes
+    cronJobs.forEach(job => {
+        if (job.task && typeof job.task.stop === 'function') {
+            try {
+                job.task.stop();
+            } catch (e) {
+                console.warn(`Erro ao parar job ${job.name}: ${e.message}`);
+            }
         }
     });
-    scheduledCronTasks.length = 0; // Limpa a lista de tarefas antigas
+    cronJobs = []; // Limpa o array para preencher com as novas tasks
 
-    // Recarrega os detalhes de tempo caso tenham sido alterados
-    initializeTimeDetails();
+    console.log(`DEBUG setupCronJobs: botConfig.SERVER_OPEN_TIME = '${botConfig.SERVER_OPEN_TIME}', botConfig.SERVER_CLOSE_TIME = '${botConfig.SERVER_CLOSE_TIME}'`);
+    const { hour: openHour, minute: openMinute } = parseTime(botConfig.SERVER_OPEN_TIME);
+    const { hour: closeHour, minute: closeMinute } = parseTime(botConfig.SERVER_CLOSE_TIME);
 
-    logScheduledCronTask(`${oneHourBeforeOpenDetails.minute} ${oneHourBeforeOpenDetails.hour} * * *`, "Aviso: 1h para abrir", messages.status.openingSoon, triggerServerOpeningSoon);
-    logScheduledCronTask(`${openTimeDetails.minute} ${openTimeDetails.hour} * * *`, "Servidor Aberto", messages.status.open, triggerServerOpen);
-    logScheduledCronTask(`${closeTimeDetails.minute} ${closeTimeDetails.hour} * * *`, "Servidor Fechado", messages.status.closed, triggerServerClose);
-    logScheduledCronTask(`0 ${botConfig.DAYTIME_START_HOUR} * * *`, "Início Msgs Diurnas", "Iniciar ciclo de mensagens aleatórias diurnas", () => {
-      daytimeMessagesSent = 0; if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId); scheduleNextRandomMessage('daytime');
-    });
-    logScheduledCronTask(`0 ${botConfig.DAYTIME_END_HOUR} * * *`, "Fim Msgs Diurnas", "Parar ciclo de mensagens aleatórias diurnas", () => {
-      if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId); daytimeMessagesSent = botConfig.MESSAGES_DURING_DAYTIME;
-    });
-    logScheduledCronTask('0 20 * * 0', "Mensagem Dominical", messages.extras.sundayNight, async () => { await sendMessageToGroup(messages.extras.sundayNight); });
-    logScheduledCronTask('0 18 * * 5', "Mensagem de Sexta", messages.extras.friday, async () => { await sendMessageToGroup(messages.extras.friday); });
-    
-    // Agendamentos para resumo do chat
-    if (Array.isArray(botConfig.CHAT_SUMMARY_TIMES)) {
+    let warningHour = openHour;
+    let warningMinute = openMinute;
+
+    if (warningMinute === 0) {
+        warningMinute = 59; // Vai para o minuto 59 da hora anterior
+        warningHour = (warningHour === 0) ? 23 : warningHour - 1; // Ajusta a hora, considerando a virada do dia
+    } else {
+        warningMinute = warningMinute - 1; // Apenas subtrai um minuto
+         // Se warningMinute se tornar algo como 5 (para um horário :05), e quisermos 1h antes, a lógica precisa ser mais robusta.
+         // A lógica atual de subtrair 1 minuto do horário de abertura para o aviso pode não ser o que se espera para "1h antes".
+         // Para um aviso de "1 hora antes":
+         let tempWarningDate = new Date();
+         tempWarningDate.setHours(openHour, openMinute, 0, 0);
+         tempWarningDate.setHours(tempWarningDate.getHours() - 1);
+         warningHour = tempWarningDate.getHours();
+         warningMinute = tempWarningDate.getMinutes();
+    }
+    // Correção para aviso de 1 hora antes
+    if (openHour !== undefined && openMinute !== undefined) {
+        let warningDate = new Date();
+        warningDate.setHours(openHour, openMinute, 0, 0); // Define a hora de abertura
+        warningDate.setHours(warningDate.getHours() - 1); // Subtrai 1 hora
+        warningHour = warningDate.getHours();
+        warningMinute = warningDate.getMinutes();
+    }
+
+
+    console.log(`Horários de status inicializados: Abrir ${openHour}:${openMinute}, Fechar ${closeHour}:${closeMinute}, Aviso ${warningHour}:${warningMinute}`);
+
+    const scheduleJob = (name, cronExpression, action, actionDescription) => {
+        if (!cron.validate(cronExpression)) {
+            console.error(`Expressão cron inválida para ${name}: ${cronExpression}`);
+            cronJobs.push({ name, cron: cronExpression, actionDescription, task: null, error: "Expressão cron inválida" });
+            return;
+        }
+        try {
+            const task = cron.schedule(cronExpression, action, {
+                timezone: botConfig.TIMEZONE
+            });
+            cronJobs.push({ name, cron: cronExpression, actionDescription, task });
+        } catch (e) {
+            console.error(`Erro ao agendar tarefa "${name}" com cron "${cronExpression}": ${e.message}`);
+            cronJobs.push({ name, cron: cronExpression, actionDescription, task: null, error: e.message });
+        }
+    };
+
+    // Agendamento para abrir o servidor (aviso 1h antes)
+    if (openHour !== undefined && openMinute !== undefined && warningHour !== undefined && warningMinute !== undefined) {
+        const warningCron = `${warningMinute} ${warningHour} * * *`;
+        scheduleJob("Aviso: 1h para abrir", warningCron, async () => {
+            const message = getRandomElement(messages.status.openingSoon, messages.aiPrompts.status_openingSoon, messages.aiUsageSettings.status_openingSoon);
+            if (message) {
+                await updateGroupSubjectWithStatus("⏳");
+                await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+            }
+        }, "Aviso de abertura do servidor");
+
+        const openCron = `${openMinute} ${openHour} * * *`;
+        scheduleJob("Servidor Aberto", openCron, async () => {
+            const message = getRandomElement(messages.status.open, messages.aiPrompts.status_open, messages.aiUsageSettings.status_open);
+            if (message) {
+                await updateGroupSubjectWithStatus("🟢");
+                await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+                startRandomMessageCycle(botConfig.MESSAGES_DURING_SERVER_OPEN, 'inGameRandom');
+            }
+        }, "Abertura do servidor e início de mensagens in-game");
+    }
+
+    // Agendamento para fechar o servidor
+    if (closeHour !== undefined && closeMinute !== undefined) {
+        const closeCron = `${closeMinute} ${closeHour} * * *`;
+        scheduleJob("Servidor Fechado", closeCron, async () => {
+            const message = getRandomElement(messages.status.closed, messages.aiPrompts.status_closed, messages.aiUsageSettings.status_closed);
+            if (message) {
+                await updateGroupSubjectWithStatus("🚧");
+                await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+                stopRandomMessageCycle();
+            }
+        }, "Fechamento do servidor");
+    }
+
+    // Agendamento para mensagens aleatórias durante o dia
+    const daytimeStartCron = `0 ${botConfig.DAYTIME_START_HOUR} * * *`;
+    scheduleJob("Início Msgs Diurnas", daytimeStartCron, () => {
+        console.log("Iniciando ciclo de mensagens aleatórias diurnas.");
+        startRandomMessageCycle(botConfig.MESSAGES_DURING_DAYTIME, 'randomActive');
+    }, "Iniciar ciclo de mensagens aleatórias diurnas");
+
+    const daytimeEndCron = `0 ${botConfig.DAYTIME_END_HOUR} * * *`;
+    scheduleJob("Fim Msgs Diurnas", daytimeEndCron, () => {
+        console.log("Parando ciclo de mensagens aleatórias diurnas.");
+        stopRandomMessageCycle();
+    }, "Parar ciclo de mensagens aleatórias diurnas");
+
+    // Agendamento para mensagem de domingo à noite
+    const sundayNightCron = `0 20 * * 0`; // Domingo às 20:00
+    scheduleJob("Mensagem Dominical", sundayNightCron, async () => {
+        const message = getRandomElement(messages.extras.sundayNight, messages.aiPrompts.extras_sundayNight, messages.aiUsageSettings.extras_sundayNight);
+        if (message) await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+    }, "Mensagem especial de Domingo");
+
+    // Agendamento para mensagem de sexta-feira
+    const fridayCron = `0 18 * * 5`; // Sexta às 18:00
+    scheduleJob("Mensagem de Sexta", fridayCron, async () => {
+        const message = getRandomElement(messages.extras.friday, messages.aiPrompts.extras_friday, messages.aiUsageSettings.extras_friday);
+        if (message) await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+    }, "Mensagem especial de Sexta");
+
+    // Agendamento para resumos do chat
+    if (botConfig.CHAT_SUMMARY_TIMES && Array.isArray(botConfig.CHAT_SUMMARY_TIMES) && botConfig.CHAT_SUMMARY_TIMES.length > 0) {
         botConfig.CHAT_SUMMARY_TIMES.forEach(time => {
-            if (typeof time === 'string' && /^\d{1,2}:\d{2}$/.test(time)) {
-                const [hour, minute] = time.split(':');
-                logScheduledCronTask(`${minute} ${hour} * * *`, `Resumo do Chat (${hour}:${minute})`, "Gerar resumo do chat", triggerChatSummary);
+            const [hourStr, minuteStr] = time.split(':');
+            const hour = parseInt(hourStr, 10);
+            const minute = parseInt(minuteStr, 10);
+            if (!isNaN(hour) && !isNaN(minute)) {
+                const summaryCron = `${minute} ${hour} * * *`;
+                scheduleJob(`Resumo do Chat (${time})`, summaryCron, triggerChatSummary, `Disparar resumo do chat às ${time}`);
             } else {
-                console.warn(`Formato de hora inválido para CHAT_SUMMARY_TIMES: "${time}". Ignorando.`);
+                console.warn(`Formato de hora inválido para CHAT_SUMMARY_TIMES: ${time}`);
             }
         });
     }
-    
-    // Inicia os cron jobs recém configurados
-    scheduledCronTasks.forEach(task => task.job.start());
+
     console.log("Cron jobs configurados e iniciados.");
-    logCurrentCronSchedule(); // Log a nova programação
+    logCronJobs();
 }
 
-function logCurrentCronSchedule() {
+function logCronJobs() {
     console.log("\n--- AGENDAMENTOS CRON ATIVOS ---");
-    const nowForCronDisplay = new Date();
-    if (scheduledCronTasks.length === 0) {
-        console.log("Nenhum cron job agendado no momento.");
+    if (cronJobs.length === 0) {
+        console.log("Nenhum cron job configurado.");
+        console.log("--------------------------------\n");
+        return;
     }
-    scheduledCronTasks.forEach(task => {
-        let nextRunDisplay = "N/A";
-        try {
-            if (cronParser && task.job.running) { // Verifica se o job está rodando antes de tentar pegar nextDate
-                const interval = cronParser.parseExpression(task.cronExpression, { currentDate: nowForCronDisplay, tz: botConfig.TIMEZONE });
-                nextRunDisplay = interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
-            } else if (task.job.nextDates) { // Fallback se cronParser não estiver disponível ou job não rodando
-                const nextDates = task.job.nextDates(1); 
-                if (nextDates && nextDates.length > 0) {
-                    nextRunDisplay = nextDates[0].toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+    cronJobs.forEach(job => {
+        let nextExecution = "N/A";
+        let status = "Erro/Parada";
+
+        if (job.task === null && job.error) { // Erro durante o agendamento
+            status = `Falha no agendamento: ${job.error}`;
+        } else if (job.task && typeof job.task.stop === 'function') {
+            status = "Agendada";
+            if (cronParser) {
+                try {
+                    const nextDate = cronParser.parseExpression(job.cron, { tz: botConfig.TIMEZONE }).next().toDate();
+                    nextExecution = nextDate.toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+                } catch (e) {
+                    console.error(`Erro ao parsear cron "${job.cron}" para ${job.name} com fuso ${botConfig.TIMEZONE}: ${e.message}`);
+                    nextExecution = "Erro no parse";
+                    status = "Erro no cron";
                 }
+            } else {
+                nextExecution = "cron-parser não disponível";
             }
-        } catch (e) { 
-            nextRunDisplay = `(Erro ao calcular próxima execução: ${e.message.substring(0,30)}...)`; 
+        } else if (job.task === null && !job.error) { // Caso onde task é null mas sem erro registrado (ex: cron inválido não pego antes)
+            status = "Falha no agendamento (task nula)";
         }
-        let msgPrev = typeof task.messageOrAction === 'string' ? task.messageOrAction : 'Ação programada';
-        if (msgPrev.length > 60) msgPrev = msgPrev.substring(0, 57) + "...";
-        console.log(`- Tarefa: ${task.description}\n  Próxima: ${nextRunDisplay}\n  Msg/Ação: ${msgPrev}\n  Cron: ${task.cronExpression}\n  Rodando: ${task.job.running}`);
+
+
+        console.log(`- Tarefa: ${job.name}`);
+        console.log(`  Próxima: ${nextExecution}`);
+        console.log(`  Msg/Ação: ${job.actionDescription}`);
+        console.log(`  Cron: ${job.cron}`);
+        console.log(`  Status: ${status}`);
     });
     console.log("--------------------------------\n");
 }
