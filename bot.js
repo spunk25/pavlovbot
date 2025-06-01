@@ -1455,18 +1455,20 @@ function isFromMe(data) {
             text: messageContent,
             timestamp: new Date()
         });
+        // persiste nova mensagem
+        await saveChatHistory();
         // console.log(`[ChatHistory] Added: ${senderName}: ${messageContent.substring(0,30)}... Total: ${chatHistory.length}`);
     }
 
     const helpText = 
         "👋 Olá! Eu sou o " + (messages.botInfo?.name || "Bot Pavlov") + ".\n" +
         "Comandos disponíveis (apenas para admins, via MENSAGEM PRIVADA):\n\n" +      
-        "• !jogar?      – Enquete rápida de jogo\n" +          
+        "• !jogar?      – Enquete rápida para ver se alguém vai jogar Pavlov hoje\n" +          
         "• !random      – Mensagem aleatória (IA/Dica)\n" +
-        "• !abrir       – Mudar status para 'Servidor Aberto'\n" +
-        "• !fechar      – Mudar status para 'Servidor Fechado'\n" +    
-        "• !falar <msg>   – Envia msg customizada ao grupo\n" +
-        "• !audio <URL> – Enviar áudio narrado\n" +
+        "• !abrir       – Mudar status para 'Servidor Aberto 🟢'\n" +
+        "• !fechar      – Mudar status para 'Servidor Fechado 🔴'\n" +    
+        "• !falar <msg>   – Enviar uma mensagem customizada para o grupo\n" +
+        "• !audio <URL> – Enviar um áudio narrado para o grupo\n" +
         '• !enquete "Título" "Opção 1" "Opção 2" ... – Enquete customizada\n' +   
         "• !resumo      – Gera e envia o resumo do chat atual\n";
 
@@ -1973,3 +1975,37 @@ async function updateMessagesAndPrompts(updatedMessages) {
 
 let chatSummaryCountToday = 0;
 let lastChatSummaryDate = null;
+
+// --- Persistência do Chat History ---
+const CHAT_HISTORY_FILE_PATH = path.join(__dirname, 'chatHistory.json');
+
+async function loadChatHistory() {
+  try {
+    const data = await fs.promises.readFile(CHAT_HISTORY_FILE_PATH, 'utf8');
+    chatHistory = JSON.parse(data);
+    console.log(`ChatHistory carregado (${chatHistory.length} mensagens).`);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      chatHistory = [];
+      console.log('Nenhum histórico anterior. Iniciando vazio.');
+    } else {
+      console.error('Erro ao carregar chatHistory:', err);
+    }
+  }
+}
+
+async function saveChatHistory() {
+  try {
+    await fs.promises.writeFile(
+      CHAT_HISTORY_FILE_PATH,
+      JSON.stringify(chatHistory, null, 2),
+      'utf8'
+    );
+    console.log(`ChatHistory salvo (${chatHistory.length} mensagens).`);
+  } catch (err) {
+    console.error('Erro ao salvar chatHistory:', err);
+  }
+}
+
+// Carrega histórico ao iniciar
+loadChatHistory();
