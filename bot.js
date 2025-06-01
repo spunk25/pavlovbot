@@ -807,192 +807,256 @@ function isFromMe(data) {
 
   app.post('/webhook/messages-upsert', async (req, res) => {
     // console.log('[DEBUG /webhook/messages-upsert] req.body AT START:', JSON.stringify(req.body, null, 2));
-    // console.log('[DEBUG /webhook/messages-upsert] req._body AT START:', req._body);
-    // console.log('[DEBUG /webhook/messages-upsert] req.webhook_data AT START:', JSON.stringify(req.webhook_data, null, 2));
-
-    const fullReceivedPayload = req.body;           // { event, instance, data, … }
-    const data                 = fullReceivedPayload.data;
+    const fullReceivedPayload = req.body;
+    const data = fullReceivedPayload.data;
 
     if (!data) {
       console.warn("messages.upsert: data ausente", JSON.stringify(fullReceivedPayload, null, 2));
       return res.status(400).send("Payload inválido para messages.upsert.");
     }
   
-    // Se não houver data (already checked), ou não for a partir do grupo alvo, ou for mensagem do bot, ignora
-    if (
-      data.key.remoteJid !== botConfig.TARGET_GROUP_ID || // Check properties on the 'data' object
-      isFromMe(data)
-    ) {
-      return res.status(200).send('Ignorado: sem processamento.');
+    // 1. Ignore messages from the bot itself
+    if (isFromMe(data)) {
+      return res.status(200).send('Ignorado: mensagem do próprio bot.');
     }
   
-    // Extrai conteúdo e remetente
+    const remoteJid = data.key.remoteJid;
+    const isGroupMessage = remoteJid.endsWith('@g.us');
+    let actualSenderJid; // JID of the user who sent the command
+  
+    // 2. Determine if the message source is valid and identify the actual sender
+    if (isGroupMessage) {
+      if (remoteJid === botConfig.TARGET_GROUP_ID) {
+        actualSenderJid = data.key.participant; // Message from target group, sender is participant
+      } else {
+        // Message from another group, ignore
+        return res.status(200).send('Ignorado: mensagem de grupo não alvo.');
+      }
+    } else {
+      actualSenderJid = remoteJid; // Private message, sender is remoteJid (the user's JID)
+    }
+  
+    if (!actualSenderJid) {
+        console.warn("actualSenderJid não pôde ser determinado:", JSON.stringify(data, null, 2));
+        return res.status(200).send('Ignorado: sender não determinado.');
+    }
+  
+    // Extrai conteúdo
     const messageContent =
       data.message?.conversation ||
       data.message?.extendedTextMessage?.text ||
       "";
-    const senderJid = data.key.participant || data.key.remoteJid;
     const commandText = messageContent.trim().toLowerCase();
     const command = commandText.split(' ')[0];
     const args = commandText.split(' ').slice(1);
   
-    // Comandos que só admins podem usar
-    if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
-      const isAdmin = await isUserAdmin(botConfig.TARGET_GROUP_ID, senderJid);
-      if (isAdmin) {
-        if (command === '!teste') {
-          await sendMessageToGroup("Testado por admin!", botConfig.TARGET_GROUP_ID);
-        } else if (command === '!abrir') {
-          await triggerServerOpen();
-          // Pausar agendamentos automáticos de status
-          scheduledCronTasks.forEach(task => {
-            if (
-              ["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(
-                task.description
-              )
-            ) {
-              task.job.stop();
-            }
-          });
-          console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
-        } else if (command === '!fechar') {
-          await triggerServerClose();
-          scheduledCronTasks.forEach(task => {
-            if (
-              ["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(
-                task.description
-              )
-            ) {
-              task.job.stop();
-            }
-          });
-          console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
-        } else if (command === '!avisar') {
-          await triggerServerOpeningSoon();
-          scheduledCronTasks.forEach(task => {
-            if (
-              ["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(
-                task.description
-              )
-            ) {
-              task.job.stop();
-            }
-          });
-          console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
-        } else if (command === '!statusauto') {
-          scheduledCronTasks.forEach(task => {
-            if (
-              ["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(
-                task.description
-              )
-            ) {
-              task.job.start();
-            }
-          });
-          await sendMessageToGroup("Agendamentos automáticos de status REATIVADOS.", botConfig.TARGET_GROUP_ID);
-          console.log("Agendamentos automáticos de status REATIVADOS.");
-        }   
-     
-      }
-    }
-    // Comando para enviar mensagem aleatória
-    else if (command === '!random') {
-      const randomMsg = await getAIRandomMessage();
-      if (randomMsg) await sendMessageToGroup(randomMsg);
-    }
-    // Comando para criar enquete fixa
-    else if (command === '!jogar?') {
-      await sendPoll(
-        "Ei!! Você 🫵 vai jogar Pavlov hoje?",
-        ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
-        botConfig.TARGET_GROUP_ID
-      );
-    }
-    // Comando para enviar áudio narrado
-    else if (command === '!audio' && args.length > 0) {
-      const audioUrl = args[0];
-      if (audioUrl.startsWith('http')) {
-        await sendNarratedAudio(audioUrl, botConfig.TARGET_GROUP_ID);
-      } else {
-        await sendMessageToGroup("Uso: !audio <URL_DO_AUDIO>", senderJid);
-      }
-    }
-    // Comando para enquete customizada
-    else if (command === '!enquete' && args.length >= 2) {
-      let pollTitle = "";
-      let pollOptions = [];
-      let currentArg = "";
-      let inQuotes = false;
-      for (const part of args) {
-        if (part.startsWith('"') && !inQuotes) {
-          currentArg = part.substring(1);
-          inQuotes = true;
-          if (part.endsWith('"') && part.length > 1) {
-            currentArg = currentArg.slice(0, -1);
-            if (!pollTitle) pollTitle = currentArg;
-            else pollOptions.push(currentArg);
-            currentArg = "";
-            inQuotes = false;
-          }
-        } else if (part.endsWith('"') && inQuotes) {
-          currentArg += " " + part.slice(0, -1);
-          if (!pollTitle) pollTitle = currentArg;
-          else pollOptions.push(currentArg);
-          currentArg = "";
-          inQuotes = false;
-        } else if (inQuotes) {
-          currentArg += " " + part;
-        } else {
-          if (!pollTitle) pollTitle = part;
-          else pollOptions.push(part);
+    // 3. Perform admin check (is the sender an admin of TARGET_GROUP_ID?)
+    const isAdmin = await isUserAdmin(botConfig.TARGET_GROUP_ID, actualSenderJid);
+    
+    let replyTo = actualSenderJid; // Default: reply to where the command came from (PM or group if sender is the bot's JID in a group context)
+    if (isGroupMessage && remoteJid === botConfig.TARGET_GROUP_ID) {
+        replyTo = botConfig.TARGET_GROUP_ID; // If command is in target group, usually reply to group
+        if (isAdmin) { // If admin types in group, reply can be to group or PM based on command
+           // For most admin commands that give feedback, sending to actualSenderJid (PM) might be better if they typed in group.
+           // However, for simplicity and current setup, admin commands typed in group will reply to group or actualSenderJid based on specific command logic below.
+           // The `replyTo` variable will be adjusted by specific command logic if needed.
+           // For now, if admin types in group, replyTo is the group. If they type in PM, replyTo is their JID.
+           // Let's refine: if admin types in group, replyTo should be actualSenderJid for direct feedback,
+           // unless the command is inherently group-wide for its reply (like !jogar? confirmation)
+           // For now, let's keep replyTo as actualSenderJid for admin commands, and TARGET_GROUP_ID for public commands.
+           replyTo = actualSenderJid; // Admin commands reply to admin (PM or group where they typed)
         }
-      }
-      if (currentArg && inQuotes) {
-        if (!pollTitle) pollTitle = currentArg;
-        else pollOptions.push(currentArg);
-      }
-      if (pollTitle && pollOptions.length > 0) {
-        await sendPoll(pollTitle, pollOptions, botConfig.TARGET_GROUP_ID, pollOptions.length);
-      } else {
-        await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', senderJid);
-      }
     }
-    // Novo comando: lista todos os cron‐jobs e suas próximas execuções
-    else if (command === '!agendamentos' || command === '!jobs') {
-      let resp = '⏱️ *Agendamentos Ativos:* ⏱️\n';
-      const now = new Date();
-      scheduledCronTasks.forEach(task => {
-        let nextRun = 'N/A';
-        try {
-          if (cronParser) {
-            const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: botConfig.TIMEZONE });
-            nextRun = interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
-          } else if (task.job.nextDates) {
-            const nd = task.job.nextDates(1);
-            if (nd && nd.length) nextRun = nd[0].toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
-          }
-        } catch (e) {
-          nextRun = `Erro ao calcular`;
+
+    const helpText = 
+        "👋 Olá! Eu sou o Bot Pavlov.\n" +
+        "Comandos disponíveis:\n" +
+        "• !start       – Mostra esta ajuda\n" +
+        "• !abrir       – (Admin) Abrir servidor\n" +
+        "• !fechar      – (Admin) Fechar servidor\n" +
+        "• !avisar      – (Admin) Aviso 1h antes de abrir\n" +
+        "• !statusauto  – (Admin) Reativar status automático\n" +
+        "• !teste       – (Admin) Testa o bot\n" +
+        "• !random      – Mensagem aleatória (IA)\n" +
+        "• !jogar?      – Enquete rápida de jogo\n" +
+        "• !audio <URL> – (Admin) Enviar áudio narrado\n" +
+        '• !enquete "Título" "Op1" ... – (Admin) Enquete customizada\n' +
+        "• !agendamentos / !jobs – (Admin) Ver agendamentos";
+
+    // 4. Process commands
+    let commandProcessed = false;
+
+    if (command === '!start') {
+        await sendMessageToGroup(helpText, actualSenderJid); // Send help to where !start was typed
+        commandProcessed = true;
+    }
+    else if (isAdmin) {
+        // Admin commands reply to actualSenderJid (PM or group where admin typed)
+        // Group-affecting actions still target TARGET_GROUP_ID
+        if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
+            commandProcessed = true;
+            if (command === '!teste') {
+                await sendMessageToGroup("Testado por admin!", actualSenderJid);
+            } else if (command === '!abrir') {
+                await triggerServerOpen(); // Affects TARGET_GROUP_ID
+                scheduledCronTasks.forEach(task => {
+                    if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
+                        task.job.stop();
+                    }
+                });
+                console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
+                await sendMessageToGroup("Servidor aberto manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
+            } else if (command === '!fechar') {
+                await triggerServerClose(); // Affects TARGET_GROUP_ID
+                scheduledCronTasks.forEach(task => {
+                    if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
+                        task.job.stop();
+                    }
+                });
+                console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
+                await sendMessageToGroup("Servidor fechado manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
+            } else if (command === '!avisar') {
+                await triggerServerOpeningSoon(); // Affects TARGET_GROUP_ID
+                scheduledCronTasks.forEach(task => {
+                    if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
+                        task.job.stop();
+                    }
+                });
+                console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
+                await sendMessageToGroup("Aviso de abertura enviado manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
+            } else if (command === '!statusauto') {
+                scheduledCronTasks.forEach(task => {
+                    if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
+                        task.job.start();
+                    }
+                });
+                await sendMessageToGroup("Agendamentos automáticos de status (abrir/fechar/avisar) REATIVADOS.", actualSenderJid);
+                console.log("Agendamentos automáticos de status REATIVADOS.");
+            }
         }
-        resp += `• ${task.description}: ${nextRun}\n`;
-      });
-      await sendMessageToGroup(resp, senderJid);
+        else if (command === '!random') { // Admin version of !random
+            commandProcessed = true;
+            const randomMsg = await getAIRandomMessage();
+            if (randomMsg) await sendMessageToGroup(randomMsg, actualSenderJid);
+        }
+        else if (command === '!jogar?') { // Admin version of !jogar?
+            commandProcessed = true;
+            await sendPoll(
+                "Ei!! Você 🫵 vai jogar Pavlov hoje?",
+                ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
+                botConfig.TARGET_GROUP_ID // Poll always goes to the target group
+            );
+            // Confirm to admin where they sent it
+            await sendMessageToGroup("Enquete '!jogar?' enviada para o grupo.", actualSenderJid);
+        }
+        else if (command === '!audio' && args.length > 0) {
+            commandProcessed = true;
+            const audioUrl = args[0];
+            if (audioUrl.startsWith('http')) {
+                await sendNarratedAudio(audioUrl, botConfig.TARGET_GROUP_ID); // Audio to target group
+                await sendMessageToGroup(`Áudio enviado para o grupo: ${audioUrl}`, actualSenderJid);
+            } else {
+                await sendMessageToGroup("Uso: !audio <URL_DO_AUDIO>", actualSenderJid);
+            }
+        }
+        else if (command === '!enquete' && args.length >= 2) {
+            commandProcessed = true;
+            let pollTitle = "";
+            let pollOptions = [];
+            let currentArg = "";
+            let inQuotes = false;
+            for (const part of args) {
+                if (part.startsWith('"') && !inQuotes) {
+                    currentArg = part.substring(1);
+                    inQuotes = true;
+                    if (part.endsWith('"') && part.length > 1) {
+                        currentArg = currentArg.slice(0, -1);
+                        if (!pollTitle) pollTitle = currentArg;
+                        else pollOptions.push(currentArg);
+                        currentArg = "";
+                        inQuotes = false;
+                    }
+                } else if (part.endsWith('"') && inQuotes) {
+                    currentArg += " " + part.slice(0, -1);
+                    if (!pollTitle) pollTitle = currentArg;
+                    else pollOptions.push(currentArg);
+                    currentArg = "";
+                    inQuotes = false;
+                } else if (inQuotes) {
+                    currentArg += " " + part;
+                } else {
+                    if (!pollTitle) pollTitle = part;
+                    else pollOptions.push(part);
+                }
+            }
+            if (currentArg && inQuotes) { 
+                if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg);
+            }
+            if (pollTitle && pollOptions.length > 0) {
+                await sendPoll(pollTitle, pollOptions, botConfig.TARGET_GROUP_ID, pollOptions.length); // Poll to target group
+                await sendMessageToGroup(`Enquete "${pollTitle}" enviada para o grupo.`, actualSenderJid);
+            } else {
+                await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', actualSenderJid);
+            }
+        }
+        else if (command === '!agendamentos' || command === '!jobs') {
+            commandProcessed = true;
+            let resp = '⏱️ *Agendamentos Ativos:* ⏱️\n';
+            const now = new Date();
+            if (scheduledCronTasks.length === 0) {
+                resp += "Nenhum cron job agendado no momento.\n";
+            } else {
+                scheduledCronTasks.forEach(task => {
+                    let nextRun = 'N/A (parado ou erro)';
+                    try {
+                        if (task.job.running && cronParser) { 
+                            const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: botConfig.TIMEZONE });
+                            nextRun = interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+                        } else if (!task.job.running && cronParser) {
+                             const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: botConfig.TIMEZONE });
+                             nextRun = `(Parado) Próximo seria: ${interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE })}`;
+                        } else if (task.job.nextDates) { 
+                            const nd = task.job.nextDates(1);
+                            if (nd && nd.length) nextRun = nd[0].toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+                        }
+                    } catch (e) {
+                        nextRun = `Erro ao calcular (${e.message.substring(0,20)}...)`;
+                    }
+                    resp += `• ${task.description} (${task.job.running ? 'Rodando' : 'Parado'}): ${nextRun}\n  (${task.cronExpression})\n`;
+                });
+            }
+            await sendMessageToGroup(resp, actualSenderJid);
+        }
+        // If admin sent a PM and it wasn't any of the above commands
+        else if (!isGroupMessage && !commandProcessed && commandText.length > 0) {
+             await sendMessageToGroup(helpText, actualSenderJid);
+             commandProcessed = true; // Consider it processed by showing help
+        }
+    } 
+    // Public commands (for non-admins or if admin command didn't match in group and it's not a PM)
+    // These only work if sent in the TARGET_GROUP_ID
+    else if (isGroupMessage && remoteJid === botConfig.TARGET_GROUP_ID) {
+        if (command === '!random') {
+            commandProcessed = true;
+            const randomMsg = await getAIRandomMessage();
+            if (randomMsg) await sendMessageToGroup(randomMsg, botConfig.TARGET_GROUP_ID); // Reply to group
+        }
+        else if (command === '!jogar?') {
+            commandProcessed = true;
+            await sendPoll(
+                "Ei!! Você 🫵 vai jogar Pavlov hoje?",
+                ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
+                botConfig.TARGET_GROUP_ID // Poll to group
+            );
+            // No separate confirmation needed here as the poll itself is the action in the group
+        }
     }
-    // Novo: Comando !start (pode ser usado por qualquer um)
-    // else if (command === '!start') {
-    //   const helpText = 
-    //     "👋 Olá! Eu sou o Bot Pavlov.\n" +
-    //     "Comandos disponíveis:\n" +
-    //     "• !abrir       – Abrir servidor\n" +
-    //     "• !fechar      – Fechar servidor\n" +
-    //     "• !avisar      – Aviso 1h antes de abrir\n" +
-    //     "• !statusauto  – Reativar status automático\n" +
-    //     "• !random      – Mensagem aleatória\n" +
-    //     "• !jogar?      – Enquete rápida\n" +
-    //     "• !audio <URL> – Enviar áudio narrado\n" +
-    //     '• !enquete "Título" "Op1" "Op2" … – Enquete customizada\n';
-    //   await sendMessageToGroup(helpText, senderJid);
-    // }
+    
+    if (!commandProcessed && commandText.startsWith("!")) {
+        // Optional: Reply if it looked like a command but wasn't recognized
+        // await sendMessageToGroup(`Comando "${command}" não reconhecido. Digite !start para ajuda.`, actualSenderJid);
+    }
+
     return res.status(200).send('messages.upsert processado.');
   });
   
