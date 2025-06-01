@@ -408,9 +408,12 @@ app.post('/webhook', async (req, res) => {
   const payload = req.body;
   const event = payload.event;
   const data = payload.data;
+  const timestamp = new Date().toISOString();
+
 
   //salvar o payload em um arquivo json
-  fs.appendFileSync('payloads.json', JSON.stringify(payload, null, 2)); 
+  fs.appendFileSync('payloads.json', JSON.stringify({ timestamp, payload }, null, 2)); 
+  console.log("payload salvo em payloads.json");
 
   if (event === 'messages.upsert' && data && data.key && data.key.remoteJid === TARGET_GROUP_ID) {
     const messageContent = data.message?.conversation || data.message?.extendedTextMessage?.text || "";
