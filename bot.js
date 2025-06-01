@@ -360,14 +360,19 @@ loadMessages();
 
 // --- Funções da API Evolution ---
 
-async function sendMessageToGroup(messageText, recipientJid = botConfig.TARGET_GROUP_ID) {
+async function sendMessageToGroup(message, recipientJid = botConfig.TARGET_GROUP_ID, options = {}) {
+  if (!botConfig.EVOLUTION_API_URL || !botConfig.EVOLUTION_API_KEY || !botConfig.INSTANCE_NAME) {
+    console.warn("API da Evolution não configurada para enviar mensagens.");
+    return;
+  }
   try {
     await evolutionAPI.post(`/message/sendText/${botConfig.INSTANCE_NAME}`, {
       number: recipientJid,
-      text: messageText,
+      text: message,
+      ...options
     });
   } catch (error) {
-    console.error(`Erro ao enviar mensagem de texto para ${recipientJid}:`, error.response ? error.response.data : error.message);
+    console.error(`Erro ao enviar mensagem para ${recipientJid}:`, error.response ? error.response.data : error.message);
   }
 }
 
@@ -519,8 +524,19 @@ async function updateServerStatus(status, messageToSend) {
 }
 
 async function triggerServerOpen() {
+  if (currentServerStatus === '🟢') {
+    console.log("triggerServerOpen: status já 🟢, pulando.");
+    return;
+  }
   console.log("ACIONADO: Abertura do servidor.");
-  await updateServerStatus('🟢', messages.status.open);
+  // Pega um texto aleatório de abertura
+  const msg = getRandomElement(
+    messages.status.open,
+    messages.aiPrompts.status_open,
+    messages.aiUsageSettings.status_open
+  );
+  await updateServerStatus('🟢', msg);
+
   serverOpenMessagesSent = 0;
   if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId);
   console.log("Iniciando ciclo de mensagens aleatórias do servidor aberto.");
@@ -528,8 +544,19 @@ async function triggerServerOpen() {
 }
 
 async function triggerServerClose() {
+  if (currentServerStatus === '🔴') {
+    console.log("triggerServerClose: status já 🔴, pulando.");
+    return;
+  }
   console.log("ACIONADO: Fechamento do servidor.");
-  await updateServerStatus('🔴', messages.status.closed);
+  // Pega um texto aleatório de fechamento
+  const msg = getRandomElement(
+    messages.status.closed,
+    messages.aiPrompts.status_closed,
+    messages.aiUsageSettings.status_closed
+  );
+  await updateServerStatus('🔴', msg);
+
   if (serverOpenMessageTimeoutId) {
     clearTimeout(serverOpenMessageTimeoutId);
     serverOpenMessageTimeoutId = null;
@@ -538,8 +565,19 @@ async function triggerServerClose() {
 }
 
 async function triggerServerOpeningSoon() {
+  if (currentServerStatus === '🟡') {
+    console.log("triggerServerOpeningSoon: status já 🟡, pulando.");
+    return;
+  }
   console.log("ACIONADO: Aviso de 1h para abrir.");
-  await updateServerStatus('🟡', messages.status.openingSoon);
+  // Pega um texto aleatório de aviso
+  const msg = getRandomElement(
+    messages.status.openingSoon,
+    messages.aiPrompts.status_openingSoon,
+    messages.aiUsageSettings.status_openingSoon
+  );
+  await updateServerStatus('🟡', msg);
+
   // Ao avisar 1h antes da abertura, também envia enquete de jogar
   await sendPoll(
     "Ei!! Você 🫵 vai jogar Pavlov hoje?",
@@ -1758,22 +1796,6 @@ async function getGroupParticipants(groupId) {
   } catch (error) {
     console.error(`Erro ao buscar participantes do grupo ${groupId}:`, error.message);
     return [];
-  }
-}
-
-async function sendMessageToGroup(message, recipientJid, options = {}) {
-  if (!botConfig.EVOLUTION_API_URL || !botConfig.EVOLUTION_API_KEY || !botConfig.INSTANCE_NAME) {
-    console.warn("API da Evolution não configurada para enviar mensagens.");
-    return;
-  }
-  try {
-    await evolutionAPI.post(`/message/sendText/${botConfig.INSTANCE_NAME}`, {
-      number: recipientJid,
-      text: message,
-      ...options
-    });
-  } catch (error) {
-    console.error(`Erro ao enviar mensagem para ${recipientJid}:`, error.response ? error.response.data : error.message);
   }
 }
 
