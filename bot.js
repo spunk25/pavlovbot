@@ -384,36 +384,31 @@ async function sendNarratedAudio(audioUrlOrBase64, recipientJid = botConfig.TARG
   }
 }
 
-async function sendPoll(title, options, recipientJid, selectableCount = 1) {
+async function sendPoll(title, values, recipientJid, selectableCount = 1) {
   if (!botConfig.EVOLUTION_API_URL || !botConfig.EVOLUTION_API_KEY || !botConfig.INSTANCE_NAME) {
     console.warn("API da Evolution não configurada para enviar enquete.");
     return;
   }
+
   try {
-    const pollDetails = { // Renomeado de 'message' para 'pollDetails' para clareza
-      name: title,
-      values: options, // 'options' aqui é o array de strings das opções da enquete
-      selectableCount: selectableCount
-    };
-
-    let messageSendOptions = { // Opções para o envio da mensagem em si
-        delay: 1200,
-        presence: 'composing'
-    };
-
-    if (recipientJid.endsWith('@g.us')) { // Só tenta buscar participantes para grupos
-        const participants = await getGroupParticipants(recipientJid);
-        if (participants && participants.length > 0) { // Adicionada verificação se participants não é undefined/null
-            messageSendOptions.mentions = participants; // Mover mentions para as opções da mensagem
-            console.log(`Enquete para ${recipientJid} tentará incluir ${participants.length} menções.`);
-        }
-    }
-
+    // Monta payload no formato esperado pela Evolution API
     const payload = {
       number: recipientJid,
-      options: messageSendOptions, // Usar o objeto de opções da mensagem construído
-      poll: pollDetails // Usar 'poll' como chave para os detalhes da enquete
+      name: title,
+      values: values,
+      selectableCount: selectableCount,
+      delay: 1200,
+      linkPreview: true,
+      mentionsEveryOne: true
     };
+
+    // Para grupos, adiciona array de JIDs em `mentioned`
+    if (recipientJid.endsWith('@g.us')) {
+      const participants = await getGroupParticipants(recipientJid);
+      if (participants && participants.length > 0) {
+        payload.mentioned = participants;
+      }
+    }
 
     console.log(`[sendPoll] Enviando payload para ${recipientJid}:`, JSON.stringify(payload, null, 2));
 
@@ -421,15 +416,18 @@ async function sendPoll(title, options, recipientJid, selectableCount = 1) {
       `${botConfig.EVOLUTION_API_URL}/message/sendPoll/${botConfig.INSTANCE_NAME}`,
       payload,
       {
-        headers: { 'apikey': botConfig.EVOLUTION_API_KEY, 'Content-Type': 'application/json' }
+        headers: {
+          'apikey': botConfig.EVOLUTION_API_KEY,
+          'Content-Type': 'application/json'
+        }
       }
     );
-    console.log(`Enquete "${title}" enviada para ${recipientJid}. Resposta da API:`, response.status, response.data);
+
+    console.log(`Enquete "${title}" enviada com sucesso:`, response.status, response.data);
   } catch (error) {
-    console.error(`Erro ao enviar enquete para ${recipientJid}:`, error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
-    if (error.config && error.config.data) {
-        console.error("Payload que causou o erro:", error.config.data);
-    }
+    console.error(`Erro ao enviar enquete para ${recipientJid}:`,
+      error.response ? JSON.stringify(error.response.data, null, 2) : error.message
+    );
   }
 }
 
