@@ -37,7 +37,8 @@ let botConfig = { // These are the ultimate fallback defaults
   TIMEZONE: "America/Sao_Paulo",
   GROQ_API_KEY: '', // Prefer .env for sensitive keys
   BOT_PUBLIC_URL: '',
-  CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"]
+  CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"],
+  CHAT_SUMMARY_COUNT_PER_DAY: 3
 };
 
 function loadBotConfig() {
@@ -112,6 +113,7 @@ function loadBotConfig() {
   botConfig.DAYTIME_START_HOUR = parseInt(String(botConfig.DAYTIME_START_HOUR), 10) || 0;
   botConfig.DAYTIME_END_HOUR = parseInt(String(botConfig.DAYTIME_END_HOUR), 10) || 0;
   botConfig.BOT_WEBHOOK_PORT = parseInt(String(botConfig.BOT_WEBHOOK_PORT), 10) || 8080;
+  botConfig.CHAT_SUMMARY_COUNT_PER_DAY = parseInt(String(botConfig.CHAT_SUMMARY_COUNT_PER_DAY), 10) || 1;
  
   // Ensure CHAT_SUMMARY_TIMES is a valid array of HH:MM strings (final check after all sources)
   if (typeof botConfig.CHAT_SUMMARY_TIMES === 'string') { // If it's still a string (e.g. from config.json and no .env override)
@@ -175,7 +177,8 @@ async function saveBotConfig() {
       TIMEZONE: botConfig.TIMEZONE,
       // GROQ_API_KEY: botConfig.GROQ_API_KEY, // Only save if non-empty, prefer .env
       BOT_PUBLIC_URL: botConfig.BOT_PUBLIC_URL,
-      CHAT_SUMMARY_TIMES: Array.isArray(botConfig.CHAT_SUMMARY_TIMES) ? botConfig.CHAT_SUMMARY_TIMES : []
+      CHAT_SUMMARY_TIMES: Array.isArray(botConfig.CHAT_SUMMARY_TIMES) ? botConfig.CHAT_SUMMARY_TIMES : [],
+      CHAT_SUMMARY_COUNT_PER_DAY: botConfig.CHAT_SUMMARY_COUNT_PER_DAY
     };
  
     // Explicitly save API keys if they are present in botConfig (e.g., set via panel or loaded from a previous config.json)
@@ -872,7 +875,8 @@ app.post('/admin/api/config', express.json(), async (req, res) => {
     const allowedKeys = [
       "GROUP_BASE_NAME", "MESSAGES_DURING_SERVER_OPEN", "MESSAGES_DURING_DAYTIME",
       "DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME",
-      "CHAT_SUMMARY_TIMES", "TARGET_GROUP_ID" // <-- adicionado aqui
+      "CHAT_SUMMARY_TIMES", "TARGET_GROUP_ID",
+      "CHAT_SUMMARY_COUNT_PER_DAY"
     ];
 
     for (const key of allowedKeys) {
@@ -1569,6 +1573,17 @@ async function triggerChatSummary() {
     // Opcional: notificar o grupo sobre a falha
     // await sendMessageToGroup("A IA hoje não colaborou para o resumo. Mais sorte na próxima!", botConfig.TARGET_GROUP_ID);
   }
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (lastChatSummaryDate !== today) {
+    lastChatSummaryDate = today;
+    chatSummaryCountToday = 0;
+  }
+  if (chatSummaryCountToday >= botConfig.CHAT_SUMMARY_COUNT_PER_DAY) {
+    console.log("Limite diário de resumos do chat atingido.");
+    return;
+  }
+  chatSummaryCountToday++;
 }
 
 // --- Funções Auxiliares da API Evolution ---
@@ -1665,3 +1680,6 @@ async function updateMessagesAndPrompts(updatedMessages) {
   }
   return changed;
 }
+
+let chatSummaryCountToday = 0;
+let lastChatSummaryDate = null;

@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const configChatSummaryTimesInput = document.getElementById('config_CHAT_SUMMARY_TIMES');
     const configBotWebhookPortInput = document.getElementById('config_BOT_WEBHOOK_PORT');
     const configBotPublicUrlInput = document.getElementById('config_BOT_PUBLIC_URL');
+    const configChatSummaryCountPerDayInput = document.getElementById('config_CHAT_SUMMARY_COUNT_PER_DAY');
 
     const responseMessageGlobalDiv = document.getElementById('responseMessageGlobal');
 
@@ -82,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("configChatSummaryTimesInput:", configChatSummaryTimesInput);
     console.log("configBotWebhookPortInput:", configBotWebhookPortInput);
     console.log("configBotPublicUrlInput:", configBotPublicUrlInput);
+    console.log("configChatSummaryCountPerDayInput:", configChatSummaryCountPerDayInput);
     console.log("--- End Checking Config Input Elements ---");
     // --- END EXTENDED DEBUGGING ---
 
@@ -190,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (configChatSummaryTimesInput) configChatSummaryTimesInput.value = Array.isArray(config.CHAT_SUMMARY_TIMES) ? config.CHAT_SUMMARY_TIMES.join(',') : '';
             if (configBotWebhookPortInput) configBotWebhookPortInput.value = config.BOT_WEBHOOK_PORT || 8080;
             if (configBotPublicUrlInput) configBotPublicUrlInput.value = config.BOT_PUBLIC_URL || '';
+            if (configChatSummaryCountPerDayInput) configChatSummaryCountPerDayInput.value = config.CHAT_SUMMARY_COUNT_PER_DAY == null ? 3 : config.CHAT_SUMMARY_COUNT_PER_DAY;
 
         } catch (error) {
             console.error('Erro ao carregar configurações:', error);
@@ -277,7 +280,8 @@ document.addEventListener('DOMContentLoaded', () => {
             MESSAGES_DURING_DAYTIME: parseInt(configMessagesDuringDaytimeInput.value, 10),
             DAYTIME_START_HOUR: parseInt(configDaytimeStartHourInput.value, 10),
             DAYTIME_END_HOUR: parseInt(configDaytimeEndHourInput.value, 10),
-            CHAT_SUMMARY_TIMES: configChatSummaryTimesInput.value.trim()         
+            CHAT_SUMMARY_TIMES: configChatSummaryTimesInput.value.trim(),
+            CHAT_SUMMARY_COUNT_PER_DAY: parseInt(configChatSummaryCountPerDayInput.value, 10)
         };
         
         let validationError = false;
