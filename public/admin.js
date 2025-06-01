@@ -182,11 +182,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // Função genérica para lidar com cliques nos botões de gerar IA
     async function handleGenerateAIMessageClick(event) {
         const button = event.target;
-        const messageType = button.dataset.messageType; // 'randomActive' ou 'inGameRandom'
-        const targetTextarea = messageType === 'randomActive' ? randomActiveTextarea : inGameRandomTextarea;
-        const spinner = messageType === 'randomActive' ? aiMessageSpinner : aiMessageSpinnerInGameRandom;
+        const messageType = button.dataset.messageType; // e.g., "status_closed", "newMember", "randomActive"
+        
+        const targetElement = document.getElementById(messageType);
+        const spinner = document.getElementById(`aiSpinner_${messageType}`) || 
+                        (messageType === 'randomActive' ? aiMessageSpinner : null) || 
+                        (messageType === 'inGameRandom' ? aiMessageSpinnerInGameRandom : null);
 
-        spinner.style.display = 'inline-block';
+        if (!targetElement) {
+            console.error(`Elemento alvo não encontrado para messageType: ${messageType}`);
+            return;
+        }
+        if (!spinner) {
+            console.error(`Spinner não encontrado para messageType: ${messageType}`);
+            // Fallback para os spinners originais se os IDs dinâmicos não forem encontrados (para os botões já existentes)
+            if (messageType === 'randomActive') {
+                 // aiMessageSpinner já é o spinner correto
+            } else if (messageType === 'inGameRandom') {
+                // aiMessageSpinnerInGameRandom já é o spinner correto
+            } else {
+                return;
+            }
+        }
+        
+        const actualSpinner = spinner || (messageType === 'randomActive' ? aiMessageSpinner : aiMessageSpinnerInGameRandom);
+
+
+        actualSpinner.style.display = 'inline-block';
         button.disabled = true;
         responseMessageMessagesDiv.textContent = '';
         responseMessageMessagesDiv.className = 'response-message';
@@ -200,9 +222,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
 
             if (response.ok && result.success && result.message) {
-                const currentMessages = targetTextarea.value.trim();
-                targetTextarea.value = currentMessages ? `${currentMessages}\n${result.message}` : result.message;
-                showGlobalMessage(`Mensagem IA (${messageType}) gerada e adicionada! Não se esqueça de salvar.`);
+                if (targetElement.tagName === 'TEXTAREA') {
+                    const currentMessages = targetElement.value.trim();
+                    targetElement.value = currentMessages ? `${currentMessages}\n${result.message}` : result.message;
+                } else if (targetElement.tagName === 'INPUT') {
+                    targetElement.value = result.message; // Substitui o conteúdo para inputs
+                }
+                showGlobalMessage(`Mensagem IA (${messageType}) gerada! Não se esqueça de salvar.`);
             } else {
                 throw new Error(result.message || `Falha ao gerar mensagem IA (${messageType}).`);
             }
@@ -211,13 +237,25 @@ document.addEventListener('DOMContentLoaded', () => {
             responseMessageMessagesDiv.textContent = `Erro IA (${messageType}): ${error.message}`;
             responseMessageMessagesDiv.className = 'response-message error';
         } finally {
-            spinner.style.display = 'none';
+            actualSpinner.style.display = 'none';
             button.disabled = false;
         }
     }
 
     generateAIMessageBtn.addEventListener('click', handleGenerateAIMessageClick);
     generateAIInGameMessageBtn.addEventListener('click', handleGenerateAIMessageClick);
+
+    // Adicionar event listeners para todos os novos botões "Gerar com IA"
+    const allAIGenerateButtons = document.querySelectorAll('.generate-ai-btn');
+    allAIGenerateButtons.forEach(button => {
+        // Os botões originais já têm listeners, então podemos verificar se já foi adicionado
+        // ou simplesmente adicionar (não causará problemas se adicionado duas vezes para os mesmos)
+        // No entanto, para evitar duplicidade, vamos garantir que os IDs originais não sejam re-adicionados aqui
+        // se eles já foram pegos por getElementById.
+        if (button.id !== 'generateAIMessageBtn' && button.id !== 'generateAIInGameMessageBtn') {
+            button.addEventListener('click', handleGenerateAIMessageClick);
+        }
+    });
 
     // Carregar dados iniciais
     loadMessages();

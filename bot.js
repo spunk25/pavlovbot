@@ -673,7 +673,7 @@ async function callGroqAPI(prompt) {
 }
 
 app.post('/admin/api/generate-message', express.json(), async (req, res) => {
-  const { type } = req.body; // 'randomActive' ou 'inGameRandom'
+  const { type } = req.body; // e.g., 'randomActive', 'inGameRandom', 'status_closed', 'newMember'
 
   if (!botConfig.GROQ_API_KEY) {
     return res.status(500).json({ success: false, message: "Chave da API Groq não configurada no servidor." });
@@ -681,25 +681,66 @@ app.post('/admin/api/generate-message', express.json(), async (req, res) => {
 
   let exampleMessages = [];
   let basePrompt = "";
+  let singleExample = ""; // Para tipos que têm apenas uma string de exemplo
 
-  if (type === 'inGameRandom') {
-    exampleMessages = messages.inGameRandom || [];
-    basePrompt = "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão. ";
-  } else { // Default to 'randomActive'
-    exampleMessages = messages.randomActive || [];
-    basePrompt = "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida. ";
+  switch (type) {
+    case 'inGameRandom':
+      exampleMessages = messages.inGameRandom || [];
+      basePrompt = "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão. ";
+      break;
+    case 'randomActive':
+      exampleMessages = messages.randomActive || [];
+      basePrompt = "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida. ";
+      break;
+    case 'status_closed':
+      singleExample = messages.status?.closed;
+      basePrompt = "Gere uma mensagem curta e informativa para o status do grupo de Pavlov VR, indicando que o servidor está FECHADO. Exemplo: Servidor fechado por hoje, pessoal. Até amanhã!";
+      break;
+    case 'status_openingSoon':
+      singleExample = messages.status?.openingSoon;
+      basePrompt = "Gere uma mensagem curta e animada para o status do grupo de Pavlov VR, indicando que o servidor abrirá EM BREVE (ex: em 1 hora). Exemplo: Preparem-se! Servidor abrindo em 1 hora!";
+      break;
+    case 'status_open':
+      singleExample = messages.status?.open;
+      basePrompt = "Gere uma mensagem curta e convidativa para o status do grupo de Pavlov VR, indicando que o servidor está ABERTO. Exemplo: Servidor online! Bora pro tiroteio!";
+      break;
+    case 'newMember':
+      exampleMessages = messages.newMember || [];
+      basePrompt = "Gere uma mensagem de boas-vindas curta, amigável e divertida para um NOVO MEMBRO que acabou de entrar no grupo de Pavlov VR. Pode incluir um toque de humor ou referência ao jogo.";
+      break;
+    case 'memberLeft':
+      exampleMessages = messages.memberLeft || [];
+      basePrompt = "Gere uma mensagem curta, neutra ou levemente humorística para quando um MEMBRO SAI do grupo de Pavlov VR. Exemplo: Fulano desertou! Menos um pra dividir o loot.";
+      break;
+    case 'extras_sundayNight':
+      singleExample = messages.extras?.sundayNight;
+      basePrompt = "Gere uma mensagem curta e temática para ser enviada em um DOMINGO À NOITE para jogadores de Pavlov VR, talvez sobre o fim de semana ou a semana que começa, com um toque de Pavlov. Exemplo: Domingo acabando... última chance pra um headshot antes da segunda!";
+      break;
+    case 'extras_friday':
+      singleExample = messages.extras?.friday;
+      basePrompt = "Gere uma mensagem curta e animada para uma SEXTA-FEIRA para jogadores de Pavlov VR, celebrando o início do fim de semana e chamando para o jogo. Exemplo: Sextou, soldados! Pavlov liberado no final de semana!";
+      break;
+    default:
+      return res.status(400).json({ success: false, message: `Tipo de mensagem desconhecido: ${type}` });
   }
   
   let promptContext = basePrompt;
+
   if (exampleMessages.length > 0) {
-    const sampleSize = Math.min(exampleMessages.length, 2);
+    const sampleSize = Math.min(exampleMessages.length, 2); // Pega até 2 exemplos
     const samples = [];
+    // Pega amostras aleatórias para evitar sempre os mesmos exemplos
+    const shuffledExamples = [...exampleMessages].sort(() => 0.5 - Math.random());
     for (let i = 0; i < sampleSize; i++) {
-      samples.push(getRandomElement(exampleMessages));
+      if (shuffledExamples[i]) samples.push(shuffledExamples[i]);
     }
-    promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('"\n- "')}\n`;
+    if (samples.length > 0) {
+        promptContext += ` Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- "${samples.join('"\n- "')}"\n`;
+    }
+  } else if (singleExample) {
+    promptContext += ` Inspire-se neste exemplo (mas não o repita): "${singleExample}"\n`;
   }
-  promptContext += "A mensagem deve ser criativa e adequada. Evite ser repetitivo.";
+  promptContext += "A mensagem deve ser criativa e adequada ao contexto. Evite ser repetitivo.";
 
   try {
     const generatedMessage = await callGroqAPI(promptContext);

@@ -72,32 +72,42 @@
                 <div class="form-group">
                     <label for="status_closed">Fechado:</label>
                     <input type="text" id="status_closed" name="status_closed">
+                    <button type="button" class="generate-ai-btn" data-message-type="status_closed" style="margin-left: 10px;">Gerar com IA</button>
+                    <div id="aiSpinner_status_closed" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
                 </div>
                 <div class="form-group">
                     <label for="status_openingSoon">Abrindo em Breve:</label>
                     <input type="text" id="status_openingSoon" name="status_openingSoon">
+                    <button type="button" class="generate-ai-btn" data-message-type="status_openingSoon" style="margin-left: 10px;">Gerar com IA</button>
+                    <div id="aiSpinner_status_openingSoon" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
                 </div>
                 <div class="form-group">
                     <label for="status_open">Aberto:</label>
                     <input type="text" id="status_open" name="status_open">
+                    <button type="button" class="generate-ai-btn" data-message-type="status_open" style="margin-left: 10px;">Gerar com IA</button>
+                    <div id="aiSpinner_status_open" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
                 </div>
 
                 <h3>Boas-vindas e Despedidas</h3>
                 <div class="form-group">
                     <label for="newMember">Novo Membro (uma por linha):</label>
                     <textarea id="newMember" name="newMember" rows="5"></textarea>
+                    <button type="button" class="generate-ai-btn" data-message-type="newMember" style="margin-top: 10px;">Gerar com IA</button>
+                    <div id="aiSpinner_newMember" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
                 </div>
                 <div class="form-group">
                     <label for="memberLeft">Membro Saiu (uma por linha):</label>
                     <textarea id="memberLeft" name="memberLeft" rows="5"></textarea>
+                    <button type="button" class="generate-ai-btn" data-message-type="memberLeft" style="margin-top: 10px;">Gerar com IA</button>
+                    <div id="aiSpinner_memberLeft" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
                 </div>
 
                 <h3>Mensagens Aleatórias (Servidor Ativo)</h3>
                 <div class="form-group">
                     <label for="randomActive">Mensagens Aleatórias (uma por linha):</label>
                     <textarea id="randomActive" name="randomActive" rows="8"></textarea>
-                    <button type="button" id="generateAIMessageBtn" style="margin-top: 10px;">Gerar Mensagem com IA (Groq)</button>
-                    <div id="aiMessageSpinner" style="display: none; margin-top: 5px;">Gerando...</div>
+                    <button type="button" id="generateAIMessageBtn" class="generate-ai-btn" data-message-type="randomActive" style="margin-top: 10px;">Gerar Mensagem com IA (Groq)</button>
+                    <div id="aiMessageSpinner" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
                 </div>
 
                 
@@ -105,7 +115,7 @@
                 <div class="form-group">
                     <label for="inGameRandom">Mensagens (uma por linha) - Usadas quando o servidor está aberto:</label>
                     <textarea id="inGameRandom" name="inGameRandom" rows="8"></textarea>
-                    <button type="button" id="generateAIInGameMessageBtn" data-message-type="inGameRandom" style="margin-top: 10px;">Gerar Mensagem "Durante o Jogo" com IA</button>
+                    <button type="button" id="generateAIInGameMessageBtn" class="generate-ai-btn" data-message-type="inGameRandom" style="margin-top: 10px;">Gerar Mensagem "Durante o Jogo" com IA</button>
                     <div id="aiMessageSpinnerInGameRandom" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
                 </div>
 
@@ -114,10 +124,14 @@
                 <div class="form-group">
                     <label for="extras_sundayNight">Domingo à Noite:</label>
                     <input type="text" id="extras_sundayNight" name="extras_sundayNight">
+                    <button type="button" class="generate-ai-btn" data-message-type="extras_sundayNight" style="margin-left: 10px;">Gerar com IA</button>
+                    <div id="aiSpinner_extras_sundayNight" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
                 </div>
                 <div class="form-group">
                     <label for="extras_friday">Sexta-feira:</label>
                     <input type="text" id="extras_friday" name="extras_friday">
+                    <button type="button" class="generate-ai-btn" data-message-type="extras_friday" style="margin-left: 10px;">Gerar com IA</button>
+                    <div id="aiSpinner_extras_friday" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
                 </div>
 
                 <button type="submit">Salvar Mensagens</button>
