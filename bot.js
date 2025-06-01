@@ -206,16 +206,22 @@ async function triggerServerClose() {
 async function triggerServerOpeningSoon() {
   console.log("ACIONADO: Aviso de 1h para abrir.");
   await updateServerStatus('🟡', messages.status.openingSoon);
+  // Ao avisar 1h antes da abertura, também envia enquete de jogar
+  await sendPoll(
+    "Ei!! Você 🫵 vai jogar Pavlov hoje?",
+    ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
+    TARGET_GROUP_ID
+  );
 }
 
 // --- Lógica para Mensagens Aleatórias Espalhadas ---
-let serverOpenMessagesSent = 0;
-let daytimeMessagesSent = 0;
+let serverOpenMessagesSent   = 0;
+let daytimeMessagesSent      = 0;
 let serverOpenMessageTimeoutId = null;
-let daytimeMessageTimeoutId = null;
+let daytimeMessageTimeoutId    = null;
 
 function calculateRandomDelay(minMinutes, maxMinutes) {
-    return (Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes) * 60 * 1000;
+  return (Math.floor(Math.random() * (maxMinutes - minMinutes + 1)) + minMinutes) * 60 * 1000;
 }
 
 function getWindowMillis(startTimeDetails, endTimeDetails) {
@@ -243,54 +249,60 @@ function getWindowMillis(startTimeDetails, endTimeDetails) {
 }
 
 async function scheduleNextRandomMessage(type) {
-  let messagesSent, totalMessages, timeoutIdToClear, windowDetails, logPrefix, statusCheckFn;
+  let delay;
 
   if (type === 'serverOpen') {
-    messagesSent = serverOpenMessagesSent; totalMessages = MESSAGES_DURING_SERVER_OPEN; timeoutIdToClear = serverOpenMessageTimeoutId;
-    windowDetails = { start: openTimeDetails, end: closeTimeDetails }; logPrefix = "[MSG SRV]";
-    statusCheckFn = () => currentServerStatus === '🟢';
-  } else if (type === 'daytime') {
-    messagesSent = daytimeMessagesSent; totalMessages = MESSAGES_DURING_DAYTIME; timeoutIdToClear = daytimeMessageTimeoutId;
-    windowDetails = { start: { hour: DAYTIME_START_HOUR, minute: 0 }, end: { hour: DAYTIME_END_HOUR, minute: 0 } }; logPrefix = "[MSG DAY]";
-    statusCheckFn = () => { const h = new Date().getHours(); return h >= DAYTIME_START_HOUR && h < DAYTIME_END_HOUR; };
-  } else return;
+    if (serverOpenMessagesSent >= MESSAGES_DURING_SERVER_OPEN) {
+      console.log(`[DEBUG] [serverOpen] Limite de ${MESSAGES_DURING_SERVER_OPEN} mensagens atingido. Não agendando mais.`);
+      return;
+    }
+    // intervalo em minutos entre cada mensagem durante o servidor aberto
+    delay = calculateRandomDelay(10, 30);
+  } 
+  else if (type === 'daytime') {
+    if (daytimeMessagesSent >= MESSAGES_DURING_DAYTIME) {
+      console.log(`[DEBUG] [daytime] Limite de ${MESSAGES_DURING_DAYTIME} mensagens atingido. Não agendando mais.`);
+      return;
+    }
+    // intervalo em minutos entre cada mensagem de dia
+    delay = calculateRandomDelay(60, 120);
+  } 
+  else {
+    console.warn(`[DEBUG] scheduleNextRandomMessage recebeu tipo desconhecido: ${type}`);
+    return;
+  }
 
-  if (timeoutIdToClear) clearTimeout(timeoutIdToClear);
-  if (!statusCheckFn() || messagesSent >= totalMessages) return;
+  console.log(`[DEBUG] Agendando próxima mensagem '${type}' em aproximadamente ${Math.round(delay/60000)} minutos.`);
 
-  const remainingWindowMillis = getWindowMillis(windowDetails.start, windowDetails.end);
-  if (remainingWindowMillis <= 0) return;
+  const timeoutId = setTimeout(async () => {
+    console.log(`[DEBUG] Timeout de mensagem '${type}' disparado. Já enviadas: ${
+      type === 'serverOpen' ? serverOpenMessagesSent : daytimeMessagesSent
+    }`);
 
-  const remainingMessages = Math.max(1, totalMessages - messagesSent);
-  const avgDelayPerMessage = remainingWindowMillis / remainingMessages;
-  const minDelayFactor = 0.3; const maxDelayFactor = 1.7;
-  const minAbsDelay = (type === 'serverOpen' ? 5 : 15) * 60 * 1000;
+    const msg = getRandomElement(messages.randomActive);
+    if (msg) {
+      console.log(`[DEBUG] Enviando mensagem automática: "${msg}"`);
+      await sendMessageToGroup(msg);
+    } else {
+      console.warn(`[DEBUG] Nenhuma mensagem disponível em messages.randomActive`);
+    }
 
-  const minDelay = Math.max(minAbsDelay, avgDelayPerMessage * minDelayFactor);
-  // Max delay não deve ser maior que o tempo restante na janela, menos uma pequena margem
-  const maxDelay = Math.min(remainingWindowMillis - (1 * 60 * 1000), avgDelayPerMessage * maxDelayFactor);
-  let delay = calculateRandomDelay(minDelay / (60 * 1000), maxDelay / (60 * 1000));
-  delay = Math.max(delay, 1 * 60 * 1000); // Mínimo 1 minuto de delay absoluto
-
-  if (delay <= 0 || delay > remainingWindowMillis) return;
-
-  const nextSendTime = new Date(Date.now() + delay);
-  // console.log(`${logPrefix} Próxima em ${Math.round(delay / 60000)} min (${nextSendTime.toLocaleTimeString('pt-BR', {timeZone: TIMEZONE})}). (${messagesSent + 1}/${totalMessages})`);
-
-  const newTimeoutId = setTimeout(async () => {
-    if (statusCheckFn()) {
-      const randomMsg = getRandomElement(messages.randomActive);
-      if (randomMsg) {
-        await sendMessageToGroup(randomMsg);
-        if (type === 'serverOpen') serverOpenMessagesSent++; else daytimeMessagesSent++;
-        console.log(`${logPrefix} Enviada (${type === 'serverOpen' ? serverOpenMessagesSent : daytimeMessagesSent}/${totalMessages}): ${randomMsg.substring(0,30)}...`);
-      }
-      scheduleNextRandomMessage(type);
+    if (type === 'serverOpen') {
+      serverOpenMessagesSent++;
+      serverOpenMessageTimeoutId = null;
+      scheduleNextRandomMessage('serverOpen');
+    } else {
+      daytimeMessagesSent++;
+      daytimeMessageTimeoutId = null;
+      scheduleNextRandomMessage('daytime');
     }
   }, delay);
 
-  if (type === 'serverOpen') serverOpenMessageTimeoutId = newTimeoutId;
-  else daytimeMessageTimeoutId = newTimeoutId;
+  if (type === 'serverOpen') {
+    serverOpenMessageTimeoutId = timeoutId;
+  } else {
+    daytimeMessageTimeoutId = timeoutId;
+  }
 }
 
 // --- Agendamentos Cron ---
@@ -591,9 +603,11 @@ function isFromMe(data) {
     }
     // Comando para criar enquete fixa
     else if (command === '!jogar?') {
-      const pollTitle = "Quem vai jogar Pavlov hoje?";
-      const pollOptions = ["Eu! 👍", "Talvez mais tarde 🤔", "Hoje não 👎"];
-      await sendPoll(pollTitle, pollOptions, TARGET_GROUP_ID, pollOptions.length);
+      await sendPoll(
+        "Ei!! Você 🫵 vai jogar Pavlov hoje?",
+        ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
+        TARGET_GROUP_ID
+      );
     }
     // Comando para enviar áudio narrado
     else if (command === '!audio' && args.length > 0) {
@@ -644,7 +658,21 @@ function isFromMe(data) {
         await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', senderJid);
       }
     }
-  
+    // Novo: Comando !start (pode ser usado por qualquer um)
+    // else if (command === '!start') {
+    //   const helpText = 
+    //     "👋 Olá! Eu sou o Bot Pavlov.\n" +
+    //     "Comandos disponíveis:\n" +
+    //     "• !abrir       – Abrir servidor\n" +
+    //     "• !fechar      – Fechar servidor\n" +
+    //     "• !avisar      – Aviso 1h antes de abrir\n" +
+    //     "• !statusauto  – Reativar status automático\n" +
+    //     "• !random      – Mensagem aleatória\n" +
+    //     "• !jogar?      – Enquete rápida\n" +
+    //     "• !audio <URL> – Enviar áudio narrado\n" +
+    //     '• !enquete "Título" "Op1" "Op2" … – Enquete customizada\n';
+    //   await sendMessageToGroup(helpText, senderJid);
+    // }
     return res.status(200).send('messages.upsert processado.');
   });
   
