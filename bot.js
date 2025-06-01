@@ -490,6 +490,7 @@ async function startBot() {
   }
 
   await initializeBotStatus();
+  await sendMessageToGroup("Bot Pavlov iniciado e online! ✅");
 
   console.log("\n--- AGENDAMENTOS CRON ATIVOS ---");
   const nowForCronDisplay = new Date();
