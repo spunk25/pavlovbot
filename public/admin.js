@@ -40,10 +40,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const responseMessageGlobalDiv = document.getElementById('responseMessageGlobal');
 
-    // --- DEBUGGING ---
-    console.log("Attempting to find config_DAYTIME_END_HOUR element:", document.getElementById('config_DAYTIME_END_HOUR'));
-    console.log("configDaytimeEndHourInput variable:", configDaytimeEndHourInput);
-    // --- END DEBUGGING ---
+    // --- EXTENDED DEBUGGING ---
+    console.log("--- Checking Config Input Elements ---");
+    console.log("configEvolutionApiUrlInput:", configEvolutionApiUrlInput);
+    console.log("configInstanceNameInput:", configInstanceNameInput);
+    console.log("configEvolutionApiKeyInput:", configEvolutionApiKeyInput);
+    console.log("configGroqApiKeyInput:", configGroqApiKeyInput);
+    console.log("configTargetGroupIdInput:", configTargetGroupIdInput);
+    console.log("configGroupBaseNameInput:", configGroupBaseNameInput);
+    console.log("configServerOpenTimeInput:", configServerOpenTimeInput);
+    console.log("configServerCloseTimeInput:", configServerCloseTimeInput);
+    console.log("configTimezoneInput:", configTimezoneInput);
+    console.log("configMessagesDuringServerOpenInput:", configMessagesDuringServerOpenInput);
+    console.log("configMessagesDuringDaytimeInput:", configMessagesDuringDaytimeInput);
+    console.log("configDaytimeStartHourInput:", configDaytimeStartHourInput);
+    console.log("configDaytimeEndHourInput:", configDaytimeEndHourInput); // Previous specific debug
+    console.log("configChatSummaryTimesInput:", configChatSummaryTimesInput);
+    console.log("configBotWebhookPortInput:", configBotWebhookPortInput);
+    console.log("configBotPublicUrlInput:", configBotPublicUrlInput);
+    console.log("--- End Checking Config Input Elements ---");
+    // --- END EXTENDED DEBUGGING ---
 
     function showGlobalMessage(message, isError = false) {
         responseMessageGlobalDiv.textContent = message;
