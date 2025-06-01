@@ -230,25 +230,20 @@ async function getGroupMetadata(groupId) {
 
 // --- Lógica de Status do Servidor ---
 let currentServerStatus = '🔴';
-function getStatusTimeParts(timeStr) {
-    if (!timeStr || !timeStr.includes(':')) {
-        console.error(`Formato de hora inválido: "${timeStr}". Usando 00:00 como padrão.`);
-        return { hour: 0, minute: 0};
-    }
-    const parts = timeStr.split(':');
-    const hour = parseInt(parts[0]);
-    const minute = parseInt(parts[1]);
-    if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-        console.error(`Valores de hora/minuto inválidos em "${timeStr}". Usando 00:00 como padrão.`);
-        return { hour: 0, minute: 0 };
-    }
-    return { hour, minute };
+
+// Utilitário para converter "HH:MM" em objeto Date do dia atual no fuso horário
+function getStatusTimeDetails(timeStr) {
+  // timeStr: "19:00"
+  const [hour, minute] = timeStr.split(':').map(Number);
+  const now = new Date();
+  now.setHours(hour, minute, 0, 0);
+  return now;
 }
 
 let openTimeDetails, closeTimeDetails, oneHourBeforeOpenTimeDetails;
 
 function initializeTimeDetails() {
-    openTimeDetails = getStatusTimeParts(botConfig.SERVER_OPEN_TIME);
+    openTimeDetails = getStatusTimeDetails(botConfig.SERVER_OPEN_TIME);
     closeTimeDetails = getStatusTimeDetails(botConfig.SERVER_CLOSE_TIME);
     oneHourBeforeOpenTimeDetails = { ...openTimeDetails };
     oneHourBeforeOpenTimeDetails.hour -= 1;
