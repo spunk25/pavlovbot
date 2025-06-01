@@ -115,22 +115,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const config = await response.json();
 
-            configEvolutionApiUrlInput.value = config.EVOLUTION_API_URL || '';
-            configInstanceNameInput.value = config.INSTANCE_NAME || '';
-            configEvolutionApiKeyInput.value = config.EVOLUTION_API_KEY || '';
-            configGroqApiKeyInput.value = config.GROQ_API_KEY || '';
-            configTargetGroupIdInput.value = config.TARGET_GROUP_ID || '';
-            configGroupBaseNameInput.value = config.GROUP_BASE_NAME || '';
-            configServerOpenTimeInput.value = config.SERVER_OPEN_TIME || '19:00';
-            configServerCloseTimeInput.value = config.SERVER_CLOSE_TIME || '23:59';
-            configTimezoneInput.value = config.TIMEZONE || 'America/Sao_Paulo';
-            configMessagesDuringServerOpenInput.value = config.MESSAGES_DURING_SERVER_OPEN == null ? 0 : config.MESSAGES_DURING_SERVER_OPEN;
-            configMessagesDuringDaytimeInput.value = config.MESSAGES_DURING_DAYTIME == null ? 0 : config.MESSAGES_DURING_DAYTIME;
-            configDaytimeStartHourInput.value = config.DAYTIME_START_HOUR == null ? 0 : config.DAYTIME_START_HOUR;
-            configDaytimeEndHourInput.value = config.DAYTIME_END_HOUR == null ? 0 : config.DAYTIME_END_HOUR;
-            configChatSummaryTimesInput.value = Array.isArray(config.CHAT_SUMMARY_TIMES) ? config.CHAT_SUMMARY_TIMES.join(',') : '';
-            configBotWebhookPortInput.value = config.BOT_WEBHOOK_PORT || 8080;
-            configBotPublicUrlInput.value = config.BOT_PUBLIC_URL || '';
+            if (configEvolutionApiUrlInput) configEvolutionApiUrlInput.value = config.EVOLUTION_API_URL || '';
+            if (configInstanceNameInput) configInstanceNameInput.value = config.INSTANCE_NAME || '';
+            if (configEvolutionApiKeyInput) configEvolutionApiKeyInput.value = config.EVOLUTION_API_KEY || '';
+            if (configGroqApiKeyInput) configGroqApiKeyInput.value = config.GROQ_API_KEY || '';
+            if (configTargetGroupIdInput) configTargetGroupIdInput.value = config.TARGET_GROUP_ID || '';
+            if (configGroupBaseNameInput) configGroupBaseNameInput.value = config.GROUP_BASE_NAME || '';
+            if (configServerOpenTimeInput) configServerOpenTimeInput.value = config.SERVER_OPEN_TIME || '19:00';
+            if (configServerCloseTimeInput) configServerCloseTimeInput.value = config.SERVER_CLOSE_TIME || '23:59';
+            if (configTimezoneInput) configTimezoneInput.value = config.TIMEZONE || 'America/Sao_Paulo';
+            if (configMessagesDuringServerOpenInput) configMessagesDuringServerOpenInput.value = config.MESSAGES_DURING_SERVER_OPEN == null ? 0 : config.MESSAGES_DURING_SERVER_OPEN;
+            if (configMessagesDuringDaytimeInput) configMessagesDuringDaytimeInput.value = config.MESSAGES_DURING_DAYTIME == null ? 0 : config.MESSAGES_DURING_DAYTIME;
+            if (configDaytimeStartHourInput) configDaytimeStartHourInput.value = config.DAYTIME_START_HOUR == null ? 0 : config.DAYTIME_START_HOUR;
+            if (configDaytimeEndHourInput) configDaytimeEndHourInput.value = config.DAYTIME_END_HOUR == null ? 0 : config.DAYTIME_END_HOUR;
+            if (configChatSummaryTimesInput) configChatSummaryTimesInput.value = Array.isArray(config.CHAT_SUMMARY_TIMES) ? config.CHAT_SUMMARY_TIMES.join(',') : '';
+            if (configBotWebhookPortInput) configBotWebhookPortInput.value = config.BOT_WEBHOOK_PORT || 8080;
+            if (configBotPublicUrlInput) configBotPublicUrlInput.value = config.BOT_PUBLIC_URL || '';
 
         } catch (error) {
             console.error('Erro ao carregar configurações:', error);
