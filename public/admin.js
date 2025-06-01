@@ -103,18 +103,19 @@ document.addEventListener('DOMContentLoaded', () => {
             configServerOpenTimeInput.value = config.SERVER_OPEN_TIME || '19:00';
             configServerCloseTimeInput.value = config.SERVER_CLOSE_TIME || '23:59';
             configTimezoneInput.value = config.TIMEZONE || 'America/Sao_Paulo';
-            configMessagesDuringServerOpenInput.value = config.MESSAGES_DURING_SERVER_OPEN || 0;
-            configMessagesDuringDaytimeInput.value = config.MESSAGES_DURING_DAYTIME || 0;
-            configDaytimeStartHourInput.value = config.DAYTIME_START_HOUR || 0;
-            configDaytimeEndHourInput.value = config.DAYTIME_END_HOUR || 0;
+            configMessagesDuringServerOpenInput.value = config.MESSAGES_DURING_SERVER_OPEN == null ? 0 : config.MESSAGES_DURING_SERVER_OPEN;
+            configMessagesDuringDaytimeInput.value = config.MESSAGES_DURING_DAYTIME == null ? 0 : config.MESSAGES_DURING_DAYTIME;
+            configDaytimeStartHourInput.value = config.DAYTIME_START_HOUR == null ? 0 : config.DAYTIME_START_HOUR;
+            configDaytimeEndHourInput.value = config.DAYTIME_END_HOUR == null ? 0 : config.DAYTIME_END_HOUR;
             configChatSummaryTimesInput.value = Array.isArray(config.CHAT_SUMMARY_TIMES) ? config.CHAT_SUMMARY_TIMES.join(',') : '';
             configBotWebhookPortInput.value = config.BOT_WEBHOOK_PORT || 8080;
             configBotPublicUrlInput.value = config.BOT_PUBLIC_URL || '';
 
         } catch (error) {
             console.error('Erro ao carregar configurações:', error);
-            responseMessageConfigDiv.textContent = 'Erro ao carregar configurações do servidor.';
-            responseMessageConfigDiv.className = 'response-message error';
+            responseMessageConfigDiv.textContent = 'Erro ao carregar configurações do servidor. Verifique o console do bot e do navegador.';
+            responseMessageConfigDiv.className = 'mt-4 p-3 rounded-md text-center bg-red-100 text-red-700';
+            responseMessageConfigDiv.classList.remove('hidden');
         }
     }
 
@@ -160,8 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     configForm.addEventListener('submit', async (event) => {
         event.preventDefault();
+        responseMessageConfigDiv.classList.add('hidden');
         responseMessageConfigDiv.textContent = '';
-        responseMessageConfigDiv.className = 'response-message';
 
         const updatedConfig = {
             EVOLUTION_API_URL: configEvolutionApiUrlInput.value.trim(),
@@ -182,24 +183,21 @@ document.addEventListener('DOMContentLoaded', () => {
             BOT_PUBLIC_URL: configBotPublicUrlInput.value.trim(),
         };
         
-        // Validar horas
+        let validationError = false;
         if (updatedConfig.DAYTIME_START_HOUR < 0 || updatedConfig.DAYTIME_START_HOUR > 23 ||
             updatedConfig.DAYTIME_END_HOUR < 0 || updatedConfig.DAYTIME_END_HOUR > 23) {
-            responseMessageConfigDiv.textContent = 'Hora diurna deve ser entre 0 e 23.';
-            responseMessageConfigDiv.className = 'response-message error';
-            return;
+            showFormMessage(responseMessageConfigDiv, 'Hora diurna deve ser entre 0 e 23.', true);
+            validationError = true;
         }
         if (updatedConfig.MESSAGES_DURING_SERVER_OPEN < 0 || updatedConfig.MESSAGES_DURING_DAYTIME < 0) {
-             responseMessageConfigDiv.textContent = 'Quantidade de mensagens não pode ser negativa.';
-            responseMessageConfigDiv.className = 'response-message error';
-            return;
+            showFormMessage(responseMessageConfigDiv, 'Quantidade de mensagens não pode ser negativa.', true);
+            validationError = true;
         }
-        if (updatedConfig.BOT_WEBHOOK_PORT < 1024 || updatedConfig.BOT_WEBHOOK_PORT > 65535) {
-            responseMessageConfigDiv.textContent = 'Porta do Webhook deve ser entre 1024 e 65535.';
-            responseMessageConfigDiv.className = 'response-message error';
-            return;
+        if (isNaN(updatedConfig.BOT_WEBHOOK_PORT) || updatedConfig.BOT_WEBHOOK_PORT < 1024 || updatedConfig.BOT_WEBHOOK_PORT > 65535) {
+            showFormMessage(responseMessageConfigDiv, 'Porta do Webhook deve ser um número entre 1024 e 65535.', true);
+            validationError = true;
         }
-
+        if (validationError) return;
 
         try {
             const response = await fetch('/admin/api/config', {
