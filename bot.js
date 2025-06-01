@@ -479,13 +479,16 @@ function isFromMe(data) {
   
     // Mapeia event → rota interna
     if (event === 'messages.upsert') {
-      // Chama internamente /webhook/messages-upsert
-      // req.body ainda será o payload completo original para as rotas internas,
-      // o que é bom, pois elas esperam acessar req.body.data ou req.body.payload.data
-      return app._router.handle(req, res, next, '/webhook/messages-upsert');
+      req.url = '/webhook/messages-upsert'; // Modify req.url for re-routing
+      // Pass the request to the app's main handler.
+      // 'next' here is the callback for the /webhook route's layer.
+      // If app.handle dispatches successfully and the sub-route responds,
+      // this 'next' should not be called by the sub-route.
+      return app.handle(req, res, next); 
     }
     if (event === 'group.participants.update') {
-      return app._router.handle(req, res, next, '/webhook/group-participants-update');
+      req.url = '/webhook/group-participants-update'; // Modify req.url for re-routing
+      return app.handle(req, res, next);
     }
     // Caso nenhum case, devolve 200 normal
     console.log("Evento não mapeado ou não habilitado. Evento recebido:", event);
