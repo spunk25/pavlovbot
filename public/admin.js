@@ -272,15 +272,15 @@ document.addEventListener('DOMContentLoaded', () => {
         responseMessageConfigDiv.textContent = '';
 
         const updatedConfig = {           
-            TARGET_GROUP_ID: configTargetGroupIdInput.value.trim(),
-            GROUP_BASE_NAME: configGroupBaseNameInput.value.trim(),
-            SERVER_OPEN_TIME: configServerOpenTimeInput.value,
-            SERVER_CLOSE_TIME: configServerCloseTimeInput.value,
-            MESSAGES_DURING_SERVER_OPEN: parseInt(configMessagesDuringServerOpenInput.value, 10),
-            MESSAGES_DURING_DAYTIME: parseInt(configMessagesDuringDaytimeInput.value, 10),
-            DAYTIME_START_HOUR: parseInt(configDaytimeStartHourInput.value, 10),
-            DAYTIME_END_HOUR: parseInt(configDaytimeEndHourInput.value, 10),
-            CHAT_SUMMARY_TIMES: configChatSummaryTimesInput.value.trim(),
+            TARGET_GROUP_ID: configTargetGroupIdInput ? configTargetGroupIdInput.value.trim() : '',
+            GROUP_BASE_NAME: configGroupBaseNameInput ? configGroupBaseNameInput.value.trim() : '',
+            SERVER_OPEN_TIME: configServerOpenTimeInput ? configServerOpenTimeInput.value : '19:00',
+            SERVER_CLOSE_TIME: configServerCloseTimeInput ? configServerCloseTimeInput.value : '23:59',
+            MESSAGES_DURING_SERVER_OPEN: configMessagesDuringServerOpenInput ? parseInt(configMessagesDuringServerOpenInput.value, 10) : 0,
+            MESSAGES_DURING_DAYTIME: configMessagesDuringDaytimeInput ? parseInt(configMessagesDuringDaytimeInput.value, 10) : 0,
+            DAYTIME_START_HOUR: configDaytimeStartHourInput ? parseInt(configDaytimeStartHourInput.value, 10) : 0,
+            DAYTIME_END_HOUR: configDaytimeEndHourInput ? parseInt(configDaytimeEndHourInput.value, 10) : 0,
+            CHAT_SUMMARY_TIMES: configChatSummaryTimesInput ? configChatSummaryTimesInput.value.trim() : '',
             CHAT_SUMMARY_COUNT_PER_DAY: configChatSummaryCountPerDayInput ? parseInt(configChatSummaryCountPerDayInput.value, 10) : 3
         };
         
