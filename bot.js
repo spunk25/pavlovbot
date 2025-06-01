@@ -1,6 +1,8 @@
 // bot.js
 require('dotenv').config();
 const axios = require('axios');
+// Declaramos evolutionAPI aqui para que loadBotConfig possa usá-la sem erro de TDZ
+let evolutionAPI;
 const cron = require('node-cron');
 const fs = require('fs');
 const path = require('path');
@@ -357,13 +359,6 @@ async function saveMessages() {
 loadMessages();
 
 // --- Funções da API Evolution ---
-let evolutionAPI = axios.create({ // Movido para ser atualizável
-  baseURL: botConfig.EVOLUTION_API_URL,
-  headers: {
-    'apikey': botConfig.EVOLUTION_API_KEY,
-    'Content-Type': 'application/json'
-  }
-});
 
 async function sendMessageToGroup(messageText, recipientJid = botConfig.TARGET_GROUP_ID) {
   try {
