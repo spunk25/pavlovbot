@@ -387,9 +387,39 @@ async function initializeBotStatus() {
 // --- Servidor Webhook ---
 const express = require('express');
 const app = express();
-app.use(express.json());
 
+// Modify express.json() to capture the raw body using the verify option
+app.use(express.json({
+  verify: (req, res, buf, encoding) => {
+    if (buf && buf.length) {
+      req.rawBody = buf.toString(encoding || 'utf8');
+    }
+  }
+}));
 
+// Add an error-handling middleware specifically for JSON parsing errors
+// This should be placed AFTER express.json() and BEFORE your routes that rely on req.body
+app.use((err, req, res, next) => {
+  // Check if the error is a SyntaxError thrown by body-parser (express.json)
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err && err.type === 'entity.parse.failed') {
+    console.error('Error parsing JSON request body:');
+    if (req.rawBody) {
+      console.error('Raw Body:', req.rawBody); // Log the raw body to see the malformed JSON
+    } else {
+      console.error('Raw body not available. Error message:', err.message);
+    }
+    // Send a 400 Bad Request response to the client that sent the malformed JSON
+    res.status(400).json({
+      error: {
+        message: 'Malformed JSON in request body. Please check the JSON payload sent to the webhook.',
+        details: err.message
+      }
+    });
+  } else {
+    // If it's not a JSON parsing error, pass it to the next error handler in the stack
+    next(err);
+  }
+});
 
 async function isUserAdmin(groupId, userId) {
     const groupInfo = await getGroupMetadata(groupId);
@@ -456,11 +486,12 @@ function isFromMe(data) {
     const data = payload.data;
   
     // Salva o payload em payloads.json (auditoria/debug)
+    // Changed to JSON Lines format (one JSON object per line)
     try {
       const timestamp = new Date().toISOString();
       fs.appendFileSync(
         'payloads.json',
-        JSON.stringify({ timestamp, payload }, null, 2) + ',\n'
+        JSON.stringify({ timestamp, payload }, null, 2) + '\n' // Use newline instead of ',\n'
       );
       console.log("Payload messages.upsert salvo em payloads.json");
     } catch (error) {
@@ -619,11 +650,12 @@ function isFromMe(data) {
     const data = payload.data;
   
     // Salva o payload em payloads.json (auditoria/debug)
+    // Changed to JSON Lines format (one JSON object per line)
     try {
       const timestamp = new Date().toISOString();
       fs.appendFileSync(
         'payloads.json',
-        JSON.stringify({ timestamp, payload }, null, 2) + ',\n'
+        JSON.stringify({ timestamp, payload }, null, 2) + '\n' // Use newline instead of ',\n'
       );
       console.log("Payload group.participants.update salvo em payloads.json");
     } catch (error) {
