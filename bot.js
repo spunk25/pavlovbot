@@ -503,7 +503,7 @@ function isFromMe(data) {
     const fullReceivedPayload = req.body; 
     
     if (!fullReceivedPayload || !fullReceivedPayload.payload || !fullReceivedPayload.payload.data) {
-        console.warn("messages.upsert: Payload inválido ou 'data' ausente.", JSON.stringify(fullReceivedPayload, null, 2));
+        console.warn("messages.upsert: Payload inválido ou 'data' ausente.", !fullReceivedPayload , !fullReceivedPayload.payload , !fullReceivedPayload.payload.data);
         return res.status(400).send("Payload inválido para messages.upsert.");
     }
     const data = fullReceivedPayload.payload.data; // Acessa data corretamente
