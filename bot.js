@@ -648,7 +648,7 @@ async function callGroqAPI(prompt) {
   }
   try {
     const groqResponse = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model: "llama3-8b-8192", // Ou outro modelo de sua preferência: mixtral-8x7b-32768
+      model: "mistral-saba-24b", // Ou outro modelo de sua preferência: mixtral-8x7b-32768
       messages: [
         { role: "system", content: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR. Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo." },
         { role: "user", content: prompt }
@@ -675,7 +675,7 @@ async function callGroqAPI(prompt) {
 app.post('/admin/api/generate-message', express.json(), async (req, res) => {
   const existingMessages = messages.randomActive || [];
   const examples = existingMessages.length > 0 ? 
-    `Aqui estão alguns exemplos de mensagens existentes para você ter uma ideia do tom (tente não repetir):\n- "${getRandomElement(existingMessages)}"\n- "${getRandomElement(existingMessages)}"` 
+    `Aqui estão alguns exemplos de mensagens existentes para você ter uma ideia do tom (tente não repetir):\n- ${getRandomElement(existingMessages)}\n- ${getRandomElement(existingMessages)}` 
     : "Gere uma mensagem curta e divertida sobre o jogo Pavlov VR.";
 
   const prompt = `Gere uma nova mensagem aleatória para o bot. ${examples} A mensagem deve ser original e criativa.`;
@@ -1013,7 +1013,7 @@ async function getAIRandomMessage() {
     for (let i = 0; i < sampleSize; i++) {
       samples.push(getRandomElement(exampleMessages));
     }
-    promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- "${samples.join('"\n- "')}"\n`;
+    promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('"\n- "')}\n`;
   }
   promptContext += "A mensagem deve ser criativa e adequada para um ambiente de jogo online. Evite ser repetitivo em relação a mensagens anteriores que você possa ter gerado.";
 
