@@ -886,75 +886,42 @@ function logCronJobs() {
 
 // --- Inicialização do Bot e Status ---
 async function initializeBotStatus() {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    let initialStatus = '🔴';
+  const now = new Date();
+  const timeNow = now.getHours() * 60 + now.getMinutes();
 
-    const openH = openTimeDetails.hour; const openM = openTimeDetails.minute;
-    const closeH = closeTimeDetails.hour; const closeM = closeTimeDetails.minute;
-    const oneHourBeforeOpenH = oneHourBeforeOpenDetails.hour; const oneHourBeforeOpenM = oneHourBeforeOpenDetails.minute;
+  const openTime = openTimeDetails.hour * 60 + openTimeDetails.minute;
+  const closeTime = closeTimeDetails.hour * 60 + closeTimeDetails.minute;
+  const warningTime = oneHourBeforeOpenDetails.hour * 60 + oneHourBeforeOpenDetails.minute;
 
-    const timeNow = currentHour * 60 + currentMinute;
-    const timeOneHourBefore = oneHourBeforeOpenH * 60 + oneHourBeforeOpenM;
-    const timeOpen = openH * 60 + openM;
-    const timeClose = closeH * 60 + closeM;
+  // Verifica "aberto" considerando cruzamento de meia-noite
+  const inOpenWindow = openTime < closeTime
+    ? (timeNow >= openTime && timeNow < closeTime)
+    : (timeNow >= openTime || timeNow < closeTime);
 
-    if (timeOpen > timeClose) { // Cruza meia-noite (ex: Abre 22:00 (1320), Fecha 02:00 (120) do dia seguinte)
-        if (timeNow >= timeOpen || timeNow < timeClose) {
-            initialStatus = '🟢';
-        }
-        if (timeNow >= timeOneHourBefore && timeNow < timeOpen && timeOneHourBefore >= timeClose) { // 1h antes ainda no dia "de abertura"
-             initialStatus = '🟡';
-        } else if (timeNow >= timeOneHourBefore && timeOneHourBefore < timeOpen && timeOneHourBefore < timeClose) { // 1h antes no dia "de fechamento" mas antes de abrir
-             initialStatus = '🟡';
-        }
+  // Verifica "1h antes" considerando cruzamento de meia-noite
+  const inWarningWindow = warningTime < openTime
+    ? (timeNow >= warningTime && timeNow < openTime)
+    : (timeNow >= warningTime || timeNow < openTime);
 
-    } else { // Mesmo dia (ex: Abre 19:00 (1140), Fecha 23:00 (1380))
-        if (timeNow >= timeOpen && timeNow < timeClose) {
-            initialStatus = '🟢';
-        }
-        if (timeNow >= timeOneHourBefore && timeNow < timeOpen) {
-            initialStatus = '🟡';
-        }
-    }
-     // Ajuste final para garantir que se estiver 1h antes, seja amarelo, lidando com cruzamento de meia-noite
-    if (oneHourBeforeOpenH === 23 && openH === 0) { // 1h antes é 23:xx, abre 00:xx
-        if(currentHour === 23 && currentMinute >= oneHourBeforeOpenM) initialStatus = '🟡';
-    } else if (currentHour === oneHourBeforeOpenH && currentMinute >= oneHourBeforeOpenM && currentHour < openH) { // Caso normal 1h antes
-        initialStatus = '🟡';
-    } else if (currentHour === openH && currentMinute < openM && currentHour === oneHourBeforeOpenH && currentMinute >= oneHourBeforeOpenM) { // Exatamente no início da janela de 1h antes
-        initialStatus = '🟡';
-    }
+  console.log(`initializeBotStatus: now=${timeNow}, warningWindow=[${warningTime}-${openTime}), openWindow=[${openTime}-${closeTime})`);
 
-    // Se o status foi definido para amarelo, mas já passou da hora de abrir (e ainda não fechou), então deve ser verde.
-    if (initialStatus === '🟡') {
-        if (timeOpen > timeClose) { // Cruza meia-noite
-            if (timeNow >= timeOpen || timeNow < timeClose) initialStatus = '🟢';
-        } else { // Mesmo dia
-            if (timeNow >= timeOpen && timeNow < timeClose) initialStatus = '🟢';
-        }
-    }
+  if (inWarningWindow) {
+    console.log("Inicialização: dentro da janela de aviso (1h antes). Disparando aviso com enquete.");
+    await triggerServerOpeningSoon();
+  } else if (inOpenWindow) {
+    console.log("Inicialização: já dentro do horário de abertura. Disparando status aberto e ciclo.");
+    await triggerServerOpen();
+  } else {
+    currentServerStatus = '🔴';
+    console.log("Status inicial 'fechado' detectado fora de horário. Nome do grupo NÃO será alterado.");
+  }
 
-    // Ao iniciar, dispara o comportamento completo correspondente:
-    if (initialStatus === '🟡') {
-      console.log("Inicialização: dentro da janela de aviso (1h antes). Disparando aviso com enquete.");
-      await triggerServerOpeningSoon();
-    } else if (initialStatus === '🟢') {
-      console.log("Inicialização: já dentro do horário de abertura. Disparando status aberto.");
-      await triggerServerOpen();
-    } else {
-      // Fora de qualquer janela de abertura/aviso → mantém fechado sem notificação
-      currentServerStatus = '🔴';
-      console.log("Status inicial 'fechado' detectado fora de horário. Nome do grupo NÃO será alterado.");
-    }
-
-    // Mensagens aleatórias diurnas (se estiver dentro da janela diurna)
-    const currentHourNow = new Date().getHours();
-    if (currentHourNow >= botConfig.DAYTIME_START_HOUR && currentHourNow < botConfig.DAYTIME_END_HOUR) {
-      daytimeMessagesSent = 0;
-      scheduleNextRandomMessage('daytime');
-    }
+  // Mensagens aleatórias diurnas (se estiver dentro da janela diurna)
+  const currentHourNow = now.getHours();
+  if (currentHourNow >= botConfig.DAYTIME_START_HOUR && currentHourNow < botConfig.DAYTIME_END_HOUR) {
+    daytimeMessagesSent = 0;
+    scheduleNextRandomMessage('daytime');
+  }
 }
 
 // --- Servidor Webhook ---
