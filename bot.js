@@ -928,7 +928,8 @@ function isFromMe(data) {
         "• !jogar?      – Enquete rápida de jogo\n" +
         "• !audio <URL> – (Admin) Enviar áudio narrado\n" +
         '• !enquete "Título" "Op1" ... – (Admin) Enquete customizada\n' +
-        "• !agendamentos / !jobs – (Admin) Ver agendamentos";
+        "• !agendamentos / !jobs – (Admin) Ver agendamentos\n" +
+        "• !resumoagora – (Admin) Gera e envia o resumo do chat atual";
 
     // 4. Process commands
     let commandProcessed = false;
@@ -1087,6 +1088,20 @@ function isFromMe(data) {
                 }
             } else {
                 await sendMessageToGroup("⚠️ Uso: !say <sua mensagem>", actualSenderJid);
+            }
+        }
+        // Novo comando: !resumoagora para gerar resumo do chat manualmente
+        else if (command === '!resumoagora' || command === '!summarynow') {
+            commandProcessed = true;
+            if (chatHistory.length > 0) {
+                await sendMessageToGroup("⏳ Gerando resumo do chat sob demanda...", actualSenderJid);
+                await triggerChatSummary(); // Chama a função que gera e envia o resumo
+                // A função triggerChatSummary já envia para o TARGET_GROUP_ID
+                // e já limpa o chatHistory.
+                // Podemos enviar uma confirmação para o admin.
+                await sendMessageToGroup("✅ Resumo do chat solicitado enviado para o grupo.", actualSenderJid);
+            } else {
+                await sendMessageToGroup("ℹ️ Não há mensagens no histórico para resumir no momento.", actualSenderJid);
             }
         }
         // If admin sent a PM and it wasn't any of the above commands
