@@ -21,7 +21,8 @@ const MESSAGES_FILE_PATH = path.join(__dirname, 'messages.json');
 const CONFIG_FILE_PATH = path.join(__dirname, 'config.json');
 
 // Array para armazenar informações sobre os cron jobs ativos e suas tasks
-let cronJobs = [];
+let cronJobs = []; // Este array armazena os objetos cron.schedule
+let scheduledCronTasks = []; // Este array armazena descrições e referências aos jobs
 
 // Configurações padrão que podem ser sobrescritas pelo config.json e depois pelo .env
 let botConfig = { // These are the ultimate fallback defaults
@@ -181,6 +182,18 @@ function loadBotConfig() {
       EVOLUTION_API_KEY: botConfig.EVOLUTION_API_KEY ? '***' : '', 
       GROQ_API_KEY: botConfig.GROQ_API_KEY ? '***' : '' 
   });
+
+  // Recriar o cliente da API Evolution se a URL ou a chave mudarem
+  // Nota: Isso é uma simplificação. Em um cenário real, você pode querer
+  // verificar se os valores realmente mudaram antes de recriar.
+  evolutionAPI = axios.create({
+    baseURL: botConfig.EVOLUTION_API_URL,
+    headers: {
+      'apikey': botConfig.EVOLUTION_API_KEY,
+      'Content-Type': 'application/json'
+    }
+  });
+  console.log("Cliente da Evolution API atualizado com as novas configurações, se houver.");
 }
 
 async function saveBotConfig() {
@@ -344,7 +357,7 @@ async function saveMessages() {
 loadMessages();
 
 // --- Funções da API Evolution ---
-const evolutionAPI = axios.create({
+let evolutionAPI = axios.create({ // Movido para ser atualizável
   baseURL: botConfig.EVOLUTION_API_URL,
   headers: {
     'apikey': botConfig.EVOLUTION_API_KEY,
@@ -644,156 +657,161 @@ async function scheduleNextRandomMessage(type) {
 }
 
 // --- Agendamentos Cron ---
-const scheduledCronTasks = [];
 function logScheduledCronTask(cronExpression, description, messageOrAction, taskFn) {
   const job = cron.schedule(cronExpression, taskFn, { timezone: botConfig.TIMEZONE, scheduled: false });
   scheduledCronTasks.push({ job, description, cronExpression, messageOrAction, originalTaskFn: taskFn });
 }
 
 function setupCronJobs() {
-    console.log("Configurando/Reconfigurando cron jobs...");
+  console.log("Configurando cron jobs...");
 
-    // Parar e limpar cron jobs existentes
+  // Parar e limpar cron jobs existentes
+  if (cronJobs.length > 0) {
+    console.log("Limpando cron jobs antigos...");
     cronJobs.forEach(job => {
-        if (job.task && typeof job.task.stop === 'function') {
-            try {
-                job.task.stop();
-            } catch (e) {
-                console.warn(`Erro ao parar job ${job.name}: ${e.message}`);
-            }
-        }
+      if (job && typeof job.stop === 'function') {
+        job.stop();
+      }
     });
-    cronJobs = []; // Limpa o array para preencher com as novas tasks
+    cronJobs = []; // Limpa o array de jobs
+  }
+  scheduledCronTasks = []; // Limpa o array de descrições de tasks
 
-    console.log(`DEBUG setupCronJobs: botConfig.SERVER_OPEN_TIME = '${botConfig.SERVER_OPEN_TIME}', botConfig.SERVER_CLOSE_TIME = '${botConfig.SERVER_CLOSE_TIME}'`);
-    const { hour: openHour, minute: openMinute } = parseTime(botConfig.SERVER_OPEN_TIME);
-    const { hour: closeHour, minute: closeMinute } = parseTime(botConfig.SERVER_CLOSE_TIME);
+  const {
+    SERVER_OPEN_TIME, SERVER_CLOSE_TIME, TIMEZONE,
+    MESSAGES_DURING_SERVER_OPEN, MESSAGES_DURING_DAYTIME,
+    DAYTIME_START_HOUR, DAYTIME_END_HOUR, CHAT_SUMMARY_TIMES
+  } = botConfig;
 
-    let warningHour = openHour;
-    let warningMinute = openMinute;
+  const { hour: openHour, minute: openMinute } = parseTime(SERVER_OPEN_TIME);
+  const { hour: closeHour, minute: closeMinute } = parseTime(SERVER_CLOSE_TIME);
+  const { hour: oneHourBeforeOpenHour, minute: oneHourBeforeOpenMinute } = parseTime(oneHourBeforeOpenDetails.hour + ':' + oneHourBeforeOpenDetails.minute);
 
-    if (warningMinute === 0) {
-        warningMinute = 59; // Vai para o minuto 59 da hora anterior
-        warningHour = (warningHour === 0) ? 23 : warningHour - 1; // Ajusta a hora, considerando a virada do dia
-    } else {
-        warningMinute = warningMinute - 1; // Apenas subtrai um minuto
-         // Se warningMinute se tornar algo como 5 (para um horário :05), e quisermos 1h antes, a lógica precisa ser mais robusta.
-         // A lógica atual de subtrair 1 minuto do horário de abertura para o aviso pode não ser o que se espera para "1h antes".
-         // Para um aviso de "1 hora antes":
-         let tempWarningDate = new Date();
-         tempWarningDate.setHours(openHour, openMinute, 0, 0);
-         tempWarningDate.setHours(tempWarningDate.getHours() - 1);
-         warningHour = tempWarningDate.getHours();
-         warningMinute = tempWarningDate.getMinutes();
-    }
-    // Correção para aviso de 1 hora antes
-    if (openHour !== undefined && openMinute !== undefined) {
-        let warningDate = new Date();
-        warningDate.setHours(openHour, openMinute, 0, 0); // Define a hora de abertura
-        warningDate.setHours(warningDate.getHours() - 1); // Subtrai 1 hora
-        warningHour = warningDate.getHours();
-        warningMinute = warningDate.getMinutes();
-    }
+  let warningHour = openHour;
+  let warningMinute = openMinute;
+
+  if (warningMinute === 0) {
+      warningMinute = 59; // Vai para o minuto 59 da hora anterior
+      warningHour = (warningHour === 0) ? 23 : warningHour - 1; // Ajusta a hora, considerando a virada do dia
+  } else {
+      warningMinute = warningMinute - 1; // Apenas subtrai um minuto
+       // Se warningMinute se tornar algo como 5 (para um horário :05), e quisermos 1h antes, a lógica precisa ser mais robusta.
+       // A lógica atual de subtrair 1 minuto do horário de abertura para o aviso pode não ser o que se espera para "1h antes".
+       // Para um aviso de "1 hora antes":
+       let tempWarningDate = new Date();
+       tempWarningDate.setHours(openHour, openMinute, 0, 0);
+       tempWarningDate.setHours(tempWarningDate.getHours() - 1);
+       warningHour = tempWarningDate.getHours();
+       warningMinute = tempWarningDate.getMinutes();
+  }
+  // Correção para aviso de 1 hora antes
+  if (openHour !== undefined && openMinute !== undefined) {
+      let warningDate = new Date();
+      warningDate.setHours(openHour, openMinute, 0, 0); // Define a hora de abertura
+      warningDate.setHours(warningDate.getHours() - 1); // Subtrai 1 hora
+      warningHour = warningDate.getHours();
+      warningMinute = warningDate.getMinutes();
+  }
 
 
-    console.log(`Horários de status inicializados: Abrir ${openHour}:${openMinute}, Fechar ${closeHour}:${closeMinute}, Aviso ${warningHour}:${warningMinute}`);
+  console.log(`Horários de status inicializados: Abrir ${openHour}:${openMinute}, Fechar ${closeHour}:${closeMinute}, Aviso ${warningHour}:${warningMinute}`);
 
-    const scheduleJob = (name, cronExpression, action, actionDescription) => {
-        if (!cron.validate(cronExpression)) {
-            console.error(`Expressão cron inválida para ${name}: ${cronExpression}`);
-            cronJobs.push({ name, cron: cronExpression, actionDescription, task: null, error: "Expressão cron inválida" });
-            return;
-        }
-        try {
-            const task = cron.schedule(cronExpression, action, {
-                timezone: botConfig.TIMEZONE
-            });
-            cronJobs.push({ name, cron: cronExpression, actionDescription, task });
-        } catch (e) {
-            console.error(`Erro ao agendar tarefa "${name}" com cron "${cronExpression}": ${e.message}`);
-            cronJobs.push({ name, cron: cronExpression, actionDescription, task: null, error: e.message });
-        }
-    };
+  const scheduleJob = (name, cronExpression, action, actionDescription) => {
+      if (!cron.validate(cronExpression)) {
+          console.error(`Expressão cron inválida para ${name}: ${cronExpression}`);
+          cronJobs.push({ name, cron: cronExpression, actionDescription, task: null, error: "Expressão cron inválida" });
+          return;
+      }
+      try {
+          const task = cron.schedule(cronExpression, action, {
+              timezone: botConfig.TIMEZONE
+          });
+          cronJobs.push({ name, cron: cronExpression, actionDescription, task });
+      } catch (e) {
+          console.error(`Erro ao agendar tarefa "${name}" com cron "${cronExpression}": ${e.message}`);
+          cronJobs.push({ name, cron: cronExpression, actionDescription, task: null, error: e.message });
+      }
+  };
 
-    // Agendamento para abrir o servidor (aviso 1h antes)
-    if (openHour !== undefined && openMinute !== undefined && warningHour !== undefined && warningMinute !== undefined) {
-        const warningCron = `${warningMinute} ${warningHour} * * *`;
-        scheduleJob("Aviso: 1h para abrir", warningCron, async () => {
-            const message = getRandomElement(messages.status.openingSoon, messages.aiPrompts.status_openingSoon, messages.aiUsageSettings.status_openingSoon);
-            if (message) {
-                await updateGroupSubjectWithStatus("⏳");
-                await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
-            }
-        }, "Aviso de abertura do servidor");
+  // Agendamento para abrir o servidor (aviso 1h antes)
+  if (openHour !== undefined && openMinute !== undefined && warningHour !== undefined && warningMinute !== undefined) {
+      const warningCron = `${warningMinute} ${warningHour} * * *`;
+      scheduleJob("Aviso: 1h para abrir", warningCron, async () => {
+          const message = getRandomElement(messages.status.openingSoon, messages.aiPrompts.status_openingSoon, messages.aiUsageSettings.status_openingSoon);
+          if (message) {
+              await updateGroupSubjectWithStatus("⏳");
+              await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+          }
+      }, "Aviso de abertura do servidor");
 
-        const openCron = `${openMinute} ${openHour} * * *`;
-        scheduleJob("Servidor Aberto", openCron, async () => {
-            const message = getRandomElement(messages.status.open, messages.aiPrompts.status_open, messages.aiUsageSettings.status_open);
-            if (message) {
-                await updateGroupSubjectWithStatus("🟢");
-                await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
-                startRandomMessageCycle(botConfig.MESSAGES_DURING_SERVER_OPEN, 'inGameRandom');
-            }
-        }, "Abertura do servidor e início de mensagens in-game");
-    }
+      const openCron = `${openMinute} ${openHour} * * *`;
+      scheduleJob("Servidor Aberto", openCron, async () => {
+          const message = getRandomElement(messages.status.open, messages.aiPrompts.status_open, messages.aiUsageSettings.status_open);
+          if (message) {
+              await updateGroupSubjectWithStatus("🟢");
+              await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+              startRandomMessageCycle(botConfig.MESSAGES_DURING_SERVER_OPEN, 'inGameRandom');
+          }
+      }, "Abertura do servidor e início de mensagens in-game");
+  }
 
-    // Agendamento para fechar o servidor
-    if (closeHour !== undefined && closeMinute !== undefined) {
-        const closeCron = `${closeMinute} ${closeHour} * * *`;
-        scheduleJob("Servidor Fechado", closeCron, async () => {
-            const message = getRandomElement(messages.status.closed, messages.aiPrompts.status_closed, messages.aiUsageSettings.status_closed);
-            if (message) {
-                await updateGroupSubjectWithStatus("🚧");
-                await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
-                stopRandomMessageCycle();
-            }
-        }, "Fechamento do servidor");
-    }
+  // Agendamento para fechar o servidor
+  if (closeHour !== undefined && closeMinute !== undefined) {
+      const closeCron = `${closeMinute} ${closeHour} * * *`;
+      scheduleJob("Servidor Fechado", closeCron, async () => {
+          const message = getRandomElement(messages.status.closed, messages.aiPrompts.status_closed, messages.aiUsageSettings.status_closed);
+          if (message) {
+              await updateGroupSubjectWithStatus("🚧");
+              await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+              stopRandomMessageCycle();
+          }
+      }, "Fechamento do servidor");
+  }
 
-    // Agendamento para mensagens aleatórias durante o dia
-    const daytimeStartCron = `0 ${botConfig.DAYTIME_START_HOUR} * * *`;
-    scheduleJob("Início Msgs Diurnas", daytimeStartCron, () => {
-        console.log("Iniciando ciclo de mensagens aleatórias diurnas.");
-        startRandomMessageCycle(botConfig.MESSAGES_DURING_DAYTIME, 'randomActive');
-    }, "Iniciar ciclo de mensagens aleatórias diurnas");
+  // Agendamento para mensagens aleatórias durante o dia
+  const daytimeStartCron = `0 ${DAYTIME_START_HOUR} * * *`;
+  scheduleJob("Início Msgs Diurnas", daytimeStartCron, () => {
+      console.log("Iniciando ciclo de mensagens aleatórias diurnas.");
+      startRandomMessageCycle(botConfig.MESSAGES_DURING_DAYTIME, 'randomActive');
+  }, "Iniciar ciclo de mensagens aleatórias diurnas");
 
-    const daytimeEndCron = `0 ${botConfig.DAYTIME_END_HOUR} * * *`;
-    scheduleJob("Fim Msgs Diurnas", daytimeEndCron, () => {
-        console.log("Parando ciclo de mensagens aleatórias diurnas.");
-        stopRandomMessageCycle();
-    }, "Parar ciclo de mensagens aleatórias diurnas");
+  const daytimeEndCron = `0 ${DAYTIME_END_HOUR} * * *`;
+  scheduleJob("Fim Msgs Diurnas", daytimeEndCron, () => {
+      console.log("Parando ciclo de mensagens aleatórias diurnas.");
+      stopRandomMessageCycle();
+  }, "Parar ciclo de mensagens aleatórias diurnas");
 
-    // Agendamento para mensagem de domingo à noite
-    const sundayNightCron = `0 20 * * 0`; // Domingo às 20:00
-    scheduleJob("Mensagem Dominical", sundayNightCron, async () => {
-        const message = getRandomElement(messages.extras.sundayNight, messages.aiPrompts.extras_sundayNight, messages.aiUsageSettings.extras_sundayNight);
-        if (message) await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
-    }, "Mensagem especial de Domingo");
+  // Agendamento para mensagem de domingo à noite
+  const sundayNightCron = `0 20 * * 0`; // Domingo às 20:00
+  scheduleJob("Mensagem Dominical", sundayNightCron, async () => {
+      const message = getRandomElement(messages.extras.sundayNight, messages.aiPrompts.extras_sundayNight, messages.aiUsageSettings.extras_sundayNight);
+      if (message) await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+  }, "Mensagem especial de Domingo");
 
-    // Agendamento para mensagem de sexta-feira
-    const fridayCron = `0 18 * * 5`; // Sexta às 18:00
-    scheduleJob("Mensagem de Sexta", fridayCron, async () => {
-        const message = getRandomElement(messages.extras.friday, messages.aiPrompts.extras_friday, messages.aiUsageSettings.extras_friday);
-        if (message) await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
-    }, "Mensagem especial de Sexta");
+  // Agendamento para mensagem de sexta-feira
+  const fridayCron = `0 18 * * 5`; // Sexta às 18:00
+  scheduleJob("Mensagem de Sexta", fridayCron, async () => {
+      const message = getRandomElement(messages.extras.friday, messages.aiPrompts.extras_friday, messages.aiUsageSettings.extras_friday);
+      if (message) await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
+  }, "Mensagem especial de Sexta");
 
-    // Agendamento para resumos do chat
-    if (botConfig.CHAT_SUMMARY_TIMES && Array.isArray(botConfig.CHAT_SUMMARY_TIMES) && botConfig.CHAT_SUMMARY_TIMES.length > 0) {
-        botConfig.CHAT_SUMMARY_TIMES.forEach(time => {
-            const [hourStr, minuteStr] = time.split(':');
-            const hour = parseInt(hourStr, 10);
-            const minute = parseInt(minuteStr, 10);
-            if (!isNaN(hour) && !isNaN(minute)) {
-                const summaryCron = `${minute} ${hour} * * *`;
-                scheduleJob(`Resumo do Chat (${time})`, summaryCron, triggerChatSummary, `Disparar resumo do chat às ${time}`);
-            } else {
-                console.warn(`Formato de hora inválido para CHAT_SUMMARY_TIMES: ${time}`);
-            }
-        });
-    }
+  // Agendamento para resumos do chat
+  if (CHAT_SUMMARY_TIMES && Array.isArray(CHAT_SUMMARY_TIMES) && CHAT_SUMMARY_TIMES.length > 0) {
+      CHAT_SUMMARY_TIMES.forEach(time => {
+          const [hourStr, minuteStr] = time.split(':');
+          const hour = parseInt(hourStr, 10);
+          const minute = parseInt(minuteStr, 10);
+          if (!isNaN(hour) && !isNaN(minute)) {
+              const summaryCron = `${minute} ${hour} * * *`;
+              scheduleJob(`Resumo do Chat (${time})`, summaryCron, triggerChatSummary, `Disparar resumo do chat às ${time}`);
+          } else {
+              console.warn(`Formato de hora inválido para CHAT_SUMMARY_TIMES: ${time}`);
+          }
+      });
+  }
 
-    console.log("Cron jobs configurados e iniciados.");
-    logCronJobs();
+  console.log("Cron jobs configurados e iniciados.");
+  logCronJobs();
 }
 
 function logCronJobs() {
@@ -1772,6 +1790,46 @@ async function sendMessageToGroup(message, recipientJid, options = {}) {
 async function updateMessagesAndPrompts(updatedMessages) {
   let changed = false;
   // ... (lógica existente para status, newMember, etc.)
+
+  // Atualiza mensagens de status
+  if (updatedMessages.status) {
+    if (!messages.status) messages.status = {};
+    for (const key of ['closed', 'openingSoon', 'open']) {
+      if (updatedMessages.status[key] !== undefined) {
+        const newStatusMessages = Array.isArray(updatedMessages.status[key]) ? updatedMessages.status[key] : [updatedMessages.status[key]].filter(Boolean);
+        if (JSON.stringify(messages.status[key] || []) !== JSON.stringify(newStatusMessages)) {
+          messages.status[key] = newStatusMessages;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  // Atualiza newMember, memberLeft, randomActive, inGameRandom, gameTips
+  for (const key of ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips']) {
+    if (updatedMessages[key] !== undefined) {
+      const newArrayMessages = Array.isArray(updatedMessages[key]) ? updatedMessages[key] : [updatedMessages[key]].filter(Boolean);
+      if (JSON.stringify(messages[key] || []) !== JSON.stringify(newArrayMessages)) {
+        messages[key] = newArrayMessages;
+        changed = true;
+      }
+    }
+  }
+
+  // Atualiza extras
+  if (updatedMessages.extras) {
+    if (!messages.extras) messages.extras = {};
+    for (const key of ['sundayNight', 'friday']) {
+      if (updatedMessages.extras[key] !== undefined) {
+        const newExtraMessages = Array.isArray(updatedMessages.extras[key]) ? updatedMessages.extras[key] : [updatedMessages.extras[key]].filter(Boolean);
+        if (JSON.stringify(messages.extras[key] || []) !== JSON.stringify(newExtraMessages)) {
+          messages.extras[key] = newExtraMessages;
+          changed = true;
+        }
+      }
+    }
+  }
+
 
   // Atualiza os prompts da IA, incluindo o systemPrompt
   if (updatedMessages.aiPrompts) {
