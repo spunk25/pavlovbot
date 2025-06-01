@@ -818,13 +818,32 @@ function setupCronJobs() {
           return;
       }
       try {
-          const task = cron.schedule(cronExpression, action, {
-              timezone: botConfig.TIMEZONE
+          const currentTZ = botConfig.TIMEZONE;
+          console.log(`[scheduleJob] Tentando agendar "${name}". Cron: "${cronExpression}". Timezone configurado: "${currentTZ}"`);
+
+          // MODIFICAÇÃO: Removendo a opção timezone temporariamente para teste
+          console.warn(`[scheduleJob] ATENÇÃO: Agendando "${name}" SEM a opção timezone explícita devido a erros. Usará o timezone do sistema.`);
+          const job = cron.schedule(cronExpression, async () => {
+            try {
+              console.log(`Executando tarefa agendada: ${name} (${actionDescription || 'Sem descrição'})`);
+              await action();
+              console.log(`Tarefa "${name}" concluída.`);
+            } catch (taskError) {
+              console.error(`Erro durante a execução da tarefa agendada "${name}":`, taskError);
+            }
           });
-          cronJobs.push({ name, cron: cronExpression, actionDescription, task });
+
+          if (job) {
+            activeCrons.push({ name, job, cronExpression, description: actionDescription, nextInvocation: () => job.nextDate().toString(), status: "Agendado (timezone do sistema)" });
+            console.log(`Tarefa "${name}" agendada (usando timezone do sistema) para ${job.nextDate().toString()}`);
+          } else {
+            console.error(`[scheduleJob] ERRO CRÍTICO: cron.schedule retornou null/undefined para "${name}" mesmo sem timezone explícito.`);
+            activeCrons.push({ name, cronExpression, description, status: "Falha Crítica no Agendamento" });
+          }
+
       } catch (e) {
-          console.error(`Erro ao agendar tarefa "${name}" com cron "${cronExpression}": ${e.message}`);
-          cronJobs.push({ name, cron: cronExpression, actionDescription, task: null, error: e.message });
+          console.error(`Erro CRÍTICO ao tentar agendar tarefa "${name}" com cron "${cronExpression}": ${e.message}`);
+          activeCrons.push({ name, cronExpression, description, status: "Erro no agendamento", error: e.message });
       }
   };
 
