@@ -383,7 +383,21 @@ async function initializeBotStatus() {
         scheduleNextRandomMessage('daytime');
     }
 }
+app.post('/webhook', (req, res, next) => {
+  const payload = req.body;
+  const event = (payload.event || '').toLowerCase();
 
+  // Mapeia event → rota interna
+  if (event === 'messages.upsert') {
+    // Chama internamente /webhook/messages-upsert
+    return app._router.handle(req, res, next, '/webhook/messages-upsert');
+  }
+  if (event === 'group.participants.update') {
+    return app._router.handle(req, res, next, '/webhook/group-participants-update');
+  }
+  // Caso nenhum case, devolve 200 normal
+  return res.status(200).send('Evento não mapeado ou não habilitado.');
+});
 // --- Servidor Webhook ---
 const express = require('express');
 const app = express();
@@ -432,13 +446,7 @@ function isFromMe(data) {
     return false;
   }
   
-  /*
-    -------------------------------------------------------------------------------------------------
-    1) Rota para MESSAGES_UPSERT
-    URL esperada (com webhook_by_events=true):
-      POST https://seu-dominio.com/webhook/messages-upsert
-    -------------------------------------------------------------------------------------------------
-  */
+
   app.post('/webhook/messages-upsert', async (req, res) => {
     const payload = req.body;
     const data = payload.data;
@@ -601,13 +609,7 @@ function isFromMe(data) {
     return res.status(200).send('messages.upsert processado.');
   });
   
-  /*
-    -------------------------------------------------------------------------------------------------
-    2) Rota para GROUP_PARTICIPANTS_UPDATE
-    URL esperada (com webhook_by_events=true):
-      POST https://seu-dominio.com/webhook/group-participants-update
-    -------------------------------------------------------------------------------------------------
-  */
+
   app.post('/webhook/group-participants-update', async (req, res) => {
     const payload = req.body;
     const data = payload.data;
@@ -645,13 +647,7 @@ function isFromMe(data) {
     return res.status(200).send('group.participants.update processado.');
   });
   
-  /*
-    -------------------------------------------------------------------------------------------------
-    3) (Opcional) Exemplo de rota para CONNECTION_UPDATE
-    URL esperada (com webhook_by_events=true):
-      POST https://seu-dominio.com/webhook/connection-update
-    -------------------------------------------------------------------------------------------------
-  */
+
   app.post('/webhook/connection-update', async (req, res) => {
     const payload = req.body;
     console.log("Evento connection.update recebido:", JSON.stringify(payload, null, 2));
