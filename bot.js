@@ -482,6 +482,7 @@ let currentServerStatus = '🔴';
 let openTimeDetails = { hour: 19, minute: 0 }; // Padrão
 let closeTimeDetails = { hour: 23, minute: 59 }; // Padrão
 let oneHourBeforeOpenDetails = { hour: 18, minute: 0 }; // Padrão
+let fiveMinBeforeOpenDetails = { hour: 18, minute: 55 }; // Padrão
 
 // NOVA FUNÇÃO ADICIONADA
 function getStatusTimeDetails(timeString) {
@@ -510,7 +511,23 @@ function initializeTimeDetails() {
   }
   oneHourBeforeOpenDetails = { hour: oneHourBeforeHour, minute: oneHourBeforeMinute };
 
-  console.log(`Horários de status inicializados: Abrir ${openTimeDetails.hour}:${openTimeDetails.minute}, Fechar ${closeTimeDetails.hour}:${closeTimeDetails.minute}, Aviso ${oneHourBeforeOpenDetails.hour}:${oneHourBeforeOpenDetails.minute}`);
+  // Calcula "5 minutos antes de abrir"
+  let fiveMinBeforeHour = openTimeDetails.hour;
+  let fiveMinBeforeMinute = openTimeDetails.minute - 5;
+  if (fiveMinBeforeMinute < 0) {
+    fiveMinBeforeHour -= 1;
+    fiveMinBeforeMinute += 60;
+    if (fiveMinBeforeHour < 0) {
+      fiveMinBeforeHour = 23;
+    }
+  }
+  fiveMinBeforeOpenDetails = { hour: fiveMinBeforeHour, minute: fiveMinBeforeMinute };
+
+  console.log(`Horários de status inicializados:`);
+  console.log(`  - Abrir: ${openTimeDetails.hour}:${String(openTimeDetails.minute).padStart(2,'0')}`);
+  console.log(`  - Fechar: ${closeTimeDetails.hour}:${String(closeTimeDetails.minute).padStart(2,'0')}`);
+  console.log(`  - Aviso 1h: ${oneHourBeforeOpenDetails.hour}:${String(oneHourBeforeOpenDetails.minute).padStart(2,'0')}`);
+  console.log(`  - Aviso 5min: ${fiveMinBeforeOpenDetails.hour}:${String(fiveMinBeforeOpenDetails.minute).padStart(2,'0')}`);
 }
 
 async function updateServerStatus(status, messageToSend) {
@@ -608,6 +625,28 @@ async function triggerServerOpeningSoon() {
     ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
     botConfig.TARGET_GROUP_ID
   );
+}
+
+// Adicione esta função junto com as outras trigger functions:
+async function triggerServerOpeningIn5Min() {
+  console.log("ACIONADO: Aviso de 5 minutos para abrir.");
+  
+  // Seleciona mensagem de 5 minutos
+  let msg;
+  const useAI = messages.aiUsageSettings && messages.aiUsageSettings.status_opening5min && botConfig.GROQ_API_KEY;
+  
+  if (useAI) {
+    msg = await callGroqAPI(messages.aiPrompts?.status_opening5min || "Gere uma mensagem animada avisando que o servidor Pavlov VR vai abrir em 5 minutos");
+    if (!msg || msg.startsWith("Erro") || msg.length < 5) {
+      msg = getRandomElement(messages.status?.opening5min) || "🚨 ATENÇÃO! Servidor abre em 5 MINUTOS! Preparem-se! 🎮";
+    }
+  } else {
+    msg = getRandomElement(messages.status?.opening5min) || "🚨 ATENÇÃO! Servidor abre em 5 MINUTOS! Preparem-se! 🎮";
+  }
+  
+  // Apenas envia mensagem, mantém o status 🟡
+  await sendMessageToGroup(msg);
+  console.log("Aviso de 5 minutos enviado.");
 }
 
 // --- Lógica para Mensagens Aleatórias Espalhadas ---
@@ -741,6 +780,7 @@ function setupCronJobs() {
   const { hour: openHour, minute: openMinute } = parseTime(SERVER_OPEN_TIME);
   const { hour: closeHour, minute: closeMinute } = parseTime(SERVER_CLOSE_TIME);
   const { hour: oneHourBeforeOpenHour, minute: oneHourBeforeOpenMinute } = parseTime(oneHourBeforeOpenDetails.hour + ':' + oneHourBeforeOpenDetails.minute);
+  const { hour: fiveMinBeforeOpenHour, minute: fiveMinBeforeOpenMinute } = parseTime(fiveMinBeforeOpenDetails.hour + ':' + fiveMinBeforeOpenDetails.minute);
 
   let warningHour = openHour;
   let warningMinute = openMinute;
@@ -863,6 +903,10 @@ function setupCronJobs() {
       });
   }
 
+  // Aviso 5 minutos antes de abrir
+  const fiveMinBeforeCron = `${fiveMinBeforeOpenDetails.minute} ${fiveMinBeforeOpenDetails.hour} * * *`;
+  scheduleJob("Aviso 5min Abertura", fiveMinBeforeCron, triggerServerOpeningIn5Min, "Avisar que servidor abre em 5 minutos");
+
   console.log("Cron jobs configurados e iniciados.");
   logCronJobs();
 }
@@ -963,16 +1007,19 @@ async function initializeBotStatus() {
   }
 
   console.log(`Windows: warning=${inWarningWindow}, open=${inOpenWindow}, expectedStatus=${expectedStatus}`);
+  console.log(`Status atual: ${currentServerStatus}`);
 
-  // DISPARA AS AÇÕES APROPRIADAS BASEADAS NO HORÁRIO ATUAL
-  if (inWarningWindow && !inOpenWindow) {
-    console.log("Inicialização: dentro da janela de aviso. Disparando triggerServerOpeningSoon.");
+  // SÓ EXECUTA AÇÕES SE O STATUS ATUAL FOR DIFERENTE DO ESPERADO
+  if (currentServerStatus === expectedStatus) {
+    console.log(`Inicialização: já está no status correto (${expectedStatus}). Nada a fazer.`);
+  } else if (inWarningWindow && !inOpenWindow) {
+    console.log("Inicialização: precisa mudar para status de aviso. Disparando triggerServerOpeningSoon.");
     await triggerServerOpeningSoon();
   } else if (inOpenWindow) {
-    console.log("Inicialização: dentro do horário de abertura. Disparando triggerServerOpen.");
+    console.log("Inicialização: precisa mudar para status aberto. Disparando triggerServerOpen.");
     await triggerServerOpen();
   } else {
-    console.log("Inicialização: fora de qualquer janela especial. Definindo status fechado.");
+    console.log("Inicialização: precisa mudar para status fechado. Definindo status fechado.");
     currentServerStatus = '🔴';
     const newGroupName = `[🔴${botConfig.GROUP_BASE_NAME}]`;
     await setGroupName(newGroupName);
