@@ -21,27 +21,47 @@ document.addEventListener('DOMContentLoaded', () => {
     // Formulário de Configurações Gerais
     const configForm = document.getElementById('configForm');
     const responseMessageConfigDiv = document.getElementById('responseMessageConfig');
+    const configEvolutionApiUrlInput = document.getElementById('config_EVOLUTION_API_URL');
+    const configInstanceNameInput = document.getElementById('config_INSTANCE_NAME');
+    const configEvolutionApiKeyInput = document.getElementById('config_EVOLUTION_API_KEY');
+    const configGroqApiKeyInput = document.getElementById('config_GROQ_API_KEY');
+    const configTargetGroupIdInput = document.getElementById('config_TARGET_GROUP_ID');
     const configGroupBaseNameInput = document.getElementById('config_GROUP_BASE_NAME');
     const configServerOpenTimeInput = document.getElementById('config_SERVER_OPEN_TIME');
     const configServerCloseTimeInput = document.getElementById('config_SERVER_CLOSE_TIME');
+    const configTimezoneInput = document.getElementById('config_TIMEZONE');
     const configMessagesDuringServerOpenInput = document.getElementById('config_MESSAGES_DURING_SERVER_OPEN');
     const configMessagesDuringDaytimeInput = document.getElementById('config_MESSAGES_DURING_DAYTIME');
     const configDaytimeStartHourInput = document.getElementById('config_DAYTIME_START_HOUR');
     const configDaytimeEndHourInput = document.getElementById('config_DAYTIME_END_HOUR');
-    // const configGroqApiKeyInput = document.getElementById('config_GROQ_API_KEY'); // Se for usar
+    const configChatSummaryTimesInput = document.getElementById('config_CHAT_SUMMARY_TIMES');
+    const configBotWebhookPortInput = document.getElementById('config_BOT_WEBHOOK_PORT');
+    const configBotPublicUrlInput = document.getElementById('config_BOT_PUBLIC_URL');
 
     const responseMessageGlobalDiv = document.getElementById('responseMessageGlobal');
 
-
-    function showGlobalMessage(message, type = 'success') {
+    function showGlobalMessage(message, isError = false) {
         responseMessageGlobalDiv.textContent = message;
-        responseMessageGlobalDiv.className = `response-message ${type}`;
+        responseMessageGlobalDiv.className = `mb-4 p-3 rounded-md text-center ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+        responseMessageGlobalDiv.classList.remove('hidden');
         setTimeout(() => {
-            responseMessageGlobalDiv.textContent = '';
-            responseMessageGlobalDiv.className = 'response-message';
+            responseMessageGlobalDiv.classList.add('hidden');
         }, 5000);
     }
     
+    function showFormMessage(div, message, isError = false) {
+        div.textContent = message;
+        div.className = `mt-4 p-3 rounded-md text-center ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+        div.classList.remove('hidden');
+    }
+    
+    function toggleSpinner(spinnerId, show) {
+        const spinner = document.getElementById(spinnerId);
+        if (spinner) {
+            spinner.classList.toggle('hidden', !show);
+        }
+    }
+
     async function loadMessages() {
         try {
             const response = await fetch('/admin/api/messages');
@@ -74,14 +94,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const config = await response.json();
 
+            configEvolutionApiUrlInput.value = config.EVOLUTION_API_URL || '';
+            configInstanceNameInput.value = config.INSTANCE_NAME || '';
+            configEvolutionApiKeyInput.value = config.EVOLUTION_API_KEY || '';
+            configGroqApiKeyInput.value = config.GROQ_API_KEY || '';
+            configTargetGroupIdInput.value = config.TARGET_GROUP_ID || '';
             configGroupBaseNameInput.value = config.GROUP_BASE_NAME || '';
             configServerOpenTimeInput.value = config.SERVER_OPEN_TIME || '19:00';
             configServerCloseTimeInput.value = config.SERVER_CLOSE_TIME || '23:59';
-            configMessagesDuringServerOpenInput.value = config.MESSAGES_DURING_SERVER_OPEN || 4;
-            configMessagesDuringDaytimeInput.value = config.MESSAGES_DURING_DAYTIME || 4;
-            configDaytimeStartHourInput.value = config.DAYTIME_START_HOUR || 8;
-            configDaytimeEndHourInput.value = config.DAYTIME_END_HOUR || 17;
-            // if (configGroqApiKeyInput) configGroqApiKeyInput.value = config.GROQ_API_KEY || '';
+            configTimezoneInput.value = config.TIMEZONE || 'America/Sao_Paulo';
+            configMessagesDuringServerOpenInput.value = config.MESSAGES_DURING_SERVER_OPEN || 0;
+            configMessagesDuringDaytimeInput.value = config.MESSAGES_DURING_DAYTIME || 0;
+            configDaytimeStartHourInput.value = config.DAYTIME_START_HOUR || 0;
+            configDaytimeEndHourInput.value = config.DAYTIME_END_HOUR || 0;
+            configChatSummaryTimesInput.value = Array.isArray(config.CHAT_SUMMARY_TIMES) ? config.CHAT_SUMMARY_TIMES.join(',') : '';
+            configBotWebhookPortInput.value = config.BOT_WEBHOOK_PORT || 8080;
+            configBotPublicUrlInput.value = config.BOT_PUBLIC_URL || '';
 
         } catch (error) {
             console.error('Erro ao carregar configurações:', error);
@@ -136,14 +164,22 @@ document.addEventListener('DOMContentLoaded', () => {
         responseMessageConfigDiv.className = 'response-message';
 
         const updatedConfig = {
+            EVOLUTION_API_URL: configEvolutionApiUrlInput.value.trim(),
+            INSTANCE_NAME: configInstanceNameInput.value.trim(),
+            EVOLUTION_API_KEY: configEvolutionApiKeyInput.value,
+            GROQ_API_KEY: configGroqApiKeyInput.value,
+            TARGET_GROUP_ID: configTargetGroupIdInput.value.trim(),
             GROUP_BASE_NAME: configGroupBaseNameInput.value.trim(),
             SERVER_OPEN_TIME: configServerOpenTimeInput.value,
             SERVER_CLOSE_TIME: configServerCloseTimeInput.value,
+            TIMEZONE: configTimezoneInput.value.trim(),
             MESSAGES_DURING_SERVER_OPEN: parseInt(configMessagesDuringServerOpenInput.value, 10),
             MESSAGES_DURING_DAYTIME: parseInt(configMessagesDuringDaytimeInput.value, 10),
             DAYTIME_START_HOUR: parseInt(configDaytimeStartHourInput.value, 10),
             DAYTIME_END_HOUR: parseInt(configDaytimeEndHourInput.value, 10),
-            // GROQ_API_KEY: configGroqApiKeyInput ? configGroqApiKeyInput.value.trim() : undefined
+            CHAT_SUMMARY_TIMES: configChatSummaryTimesInput.value.trim(),
+            BOT_WEBHOOK_PORT: parseInt(configBotWebhookPortInput.value, 10),
+            BOT_PUBLIC_URL: configBotPublicUrlInput.value.trim(),
         };
         
         // Validar horas
@@ -158,6 +194,11 @@ document.addEventListener('DOMContentLoaded', () => {
             responseMessageConfigDiv.className = 'response-message error';
             return;
         }
+        if (updatedConfig.BOT_WEBHOOK_PORT < 1024 || updatedConfig.BOT_WEBHOOK_PORT > 65535) {
+            responseMessageConfigDiv.textContent = 'Porta do Webhook deve ser entre 1024 e 65535.';
+            responseMessageConfigDiv.className = 'response-message error';
+            return;
+        }
 
 
         try {
@@ -169,6 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             if (response.ok && result.success) {
                 showGlobalMessage(result.message || 'Configurações salvas com sucesso!');
+                loadConfig();
             } else {
                 throw new Error(result.message || 'Falha ao salvar configurações.');
             }

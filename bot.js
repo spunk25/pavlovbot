@@ -22,11 +22,11 @@ const CONFIG_FILE_PATH = path.join(__dirname, 'config.json');
 
 // Configurações padrão que podem ser sobrescritas pelo config.json e depois pelo .env
 let botConfig = {
-  EVOLUTION_API_URL: '',
-  EVOLUTION_API_KEY: '',
-  INSTANCE_NAME: '',
-  TARGET_GROUP_ID: '',
-  BOT_WEBHOOK_PORT: 8080, // Default port
+  EVOLUTION_API_URL: 'https://evo.audiozap.app',
+  EVOLUTION_API_KEY: 'EEaQ1NXIlAW5Ss2bMliJNfEf3qUU2v8z',
+  INSTANCE_NAME: 'asda',
+  TARGET_GROUP_ID: '120363420105678428@g.us', // Added for panel config
+  BOT_WEBHOOK_PORT: 8080,
   SERVER_OPEN_TIME: '19:00',
   SERVER_CLOSE_TIME: '23:59',
   GROUP_BASE_NAME: "BRASIL PAVLOV SND 6/24",
@@ -34,19 +34,19 @@ let botConfig = {
   MESSAGES_DURING_DAYTIME: 4,
   DAYTIME_START_HOUR: 8,
   DAYTIME_END_HOUR: 17,
-  TIMEZONE: "America/Sao_Paulo",
-  GROQ_API_KEY: '',
-  BOT_PUBLIC_URL: 'http://localhost:8080', // Default public URL
-  CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"] // Default times for chat summary
+  TIMEZONE: "America/Sao_Paulo", // Added for panel config
+  GROQ_API_KEY: '', // Added for panel config
+  BOT_PUBLIC_URL: '', // Added for panel config
+  CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"]
 };
 
 function loadBotConfig() {
   // 1. Carregar de config.json
+  let jsonConfig = {};
   if (fs.existsSync(CONFIG_FILE_PATH)) {
     try {
       const fileContent = fs.readFileSync(CONFIG_FILE_PATH, 'utf-8');
-      const jsonConfig = JSON.parse(fileContent);
-      botConfig = { ...botConfig, ...jsonConfig };
+      jsonConfig = JSON.parse(fileContent);
       console.log("Configurações carregadas de config.json");
     } catch (error) {
       console.error("Erro ao carregar config.json, usando padrões e .env:", error);
@@ -54,63 +54,121 @@ function loadBotConfig() {
   } else {
     console.warn("config.json não encontrado. Usando padrões e .env. O arquivo será criado ao salvar configurações pelo painel.");
   }
+  
+  // Merge defaults with jsonConfig
+  botConfig = { ...botConfig, ...jsonConfig };
 
   // 2. Sobrescrever com variáveis de ambiente (elas têm maior precedência)
   for (const key in botConfig) {
     if (envConfig[key] !== undefined) {
       // Tratar números e booleanos que podem vir como string do .env
-      if (!isNaN(parseFloat(envConfig[key])) && isFinite(envConfig[key])) {
+      if (key === 'CHAT_SUMMARY_TIMES') { // Special handling for CHAT_SUMMARY_TIMES from .env
+          if (typeof envConfig[key] === 'string') {
+              try {
+                  let parsedTimes = JSON.parse(envConfig[key]);
+                  if (Array.isArray(parsedTimes) && parsedTimes.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
+                      botConfig[key] = parsedTimes;
+                  } else {
+                      throw new Error("Not a valid JSON array of HH:MM strings");
+                  }
+              } catch (e) {
+                  botConfig[key] = envConfig[key].split(',')
+                      .map(s => s.trim())
+                      .filter(s => s.match(/^\d{2}:\d{2}$/));
+                  if (botConfig[key].length === 0 && envConfig[key].trim() !== "") {
+                      console.warn(`CHAT_SUMMARY_TIMES from .env ("${envConfig[key]}") could not be parsed correctly. Using default or config.json value.`);
+                      // Revert to jsonConfig or default if parsing .env string fails badly
+                      botConfig[key] = jsonConfig[key] || ["10:00", "16:00", "21:00"];
+                  }
+              }
+          } else if (Array.isArray(envConfig[key])) { // Should not happen with .env but good practice
+              botConfig[key] = envConfig[key].filter(s => typeof s === 'string' && s.match(/^\d{2}:\d{2}$/));
+          }
+      } else if (!isNaN(parseFloat(envConfig[key])) && isFinite(envConfig[key]) && typeof botConfig[key] === 'number') {
         botConfig[key] = parseFloat(envConfig[key]);
-      } else if (envConfig[key].toLowerCase() === 'true' || envConfig[key].toLowerCase() === 'false') {
+      } else if ((envConfig[key].toLowerCase() === 'true' || envConfig[key].toLowerCase() === 'false') && typeof botConfig[key] === 'boolean') {
         botConfig[key] = envConfig[key].toLowerCase() === 'true';
       } else {
         botConfig[key] = envConfig[key];
       }
     }
   }
-   // Garante que as horas sejam strings
+
+   // Garante que as horas sejam strings e números sejam parseados corretamente
    botConfig.SERVER_OPEN_TIME = String(botConfig.SERVER_OPEN_TIME);
    botConfig.SERVER_CLOSE_TIME = String(botConfig.SERVER_CLOSE_TIME);
    botConfig.DAYTIME_START_HOUR = parseInt(botConfig.DAYTIME_START_HOUR, 10);
    botConfig.DAYTIME_END_HOUR = parseInt(botConfig.DAYTIME_END_HOUR, 10);
    botConfig.MESSAGES_DURING_SERVER_OPEN = parseInt(botConfig.MESSAGES_DURING_SERVER_OPEN, 10);
    botConfig.MESSAGES_DURING_DAYTIME = parseInt(botConfig.MESSAGES_DURING_DAYTIME, 10);
+   botConfig.BOT_WEBHOOK_PORT = parseInt(botConfig.BOT_WEBHOOK_PORT, 10);
 
-   // Ensure CHAT_SUMMARY_TIMES is an array of strings
-   if (botConfig.CHAT_SUMMARY_TIMES && typeof botConfig.CHAT_SUMMARY_TIMES === 'string') {
+   // Ensure CHAT_SUMMARY_TIMES is an array of strings (final check after all sources)
+   if (typeof botConfig.CHAT_SUMMARY_TIMES === 'string') { // If it's still a string (e.g. from config.json and no .env override)
      try {
-       botConfig.CHAT_SUMMARY_TIMES = JSON.parse(botConfig.CHAT_SUMMARY_TIMES);
+       let parsedTimes = JSON.parse(botConfig.CHAT_SUMMARY_TIMES);
+       if (Array.isArray(parsedTimes) && parsedTimes.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
+           botConfig.CHAT_SUMMARY_TIMES = parsedTimes;
+       } else {
+           throw new Error("Not a valid JSON array of HH:MM strings");
+       }
      } catch (e) {
-       console.warn("Formato inválido para CHAT_SUMMARY_TIMES em .env/config.json, usando padrão. Deve ser um array JSON de strings, ex: [\"10:00\", \"16:00\"]");
-       botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"];
+       botConfig.CHAT_SUMMARY_TIMES = botConfig.CHAT_SUMMARY_TIMES.split(',')
+           .map(s => s.trim())
+           .filter(s => s.match(/^\d{2}:\d{2}$/));
+       if (botConfig.CHAT_SUMMARY_TIMES.length === 0 && typeof botConfig.CHAT_SUMMARY_TIMES === 'string' && botConfig.CHAT_SUMMARY_TIMES.trim() !== "") {
+            console.warn("CHAT_SUMMARY_TIMES from config.json string could not be parsed. Using default.");
+            botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"];
+       }
      }
    }
-   if (!Array.isArray(botConfig.CHAT_SUMMARY_TIMES)) {
-       console.warn("CHAT_SUMMARY_TIMES não é um array, usando padrão.");
+   if (!Array.isArray(botConfig.CHAT_SUMMARY_TIMES) || !botConfig.CHAT_SUMMARY_TIMES.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
+       console.warn("CHAT_SUMMARY_TIMES is not a valid array of HH:MM strings after all parsing. Using default.");
        botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"];
    }
 
-  console.log("Configurações finais do bot:", { ...botConfig, EVOLUTION_API_KEY: '***', GROQ_API_KEY: '***' }); // Não logar chaves
+
+  console.log("Configurações finais do bot:", { 
+      ...botConfig, 
+      EVOLUTION_API_KEY: botConfig.EVOLUTION_API_KEY ? '***' : '', 
+      GROQ_API_KEY: botConfig.GROQ_API_KEY ? '***' : '' 
+  });
 }
 
 async function saveBotConfig() {
   try {
-    // Salva apenas as chaves que estão no config.json original ou que são relevantes para ele
-    // Não salva chaves de API ou URLs da Evolution API que devem vir do .env
+    // Salva todas as configurações que estão em botConfig e são relevantes para config.json
+    // Chaves sensíveis como API keys serão salvas se o usuário as inserir pelo painel.
+    // A prioridade do .env na função loadBotConfig() garante que as variáveis de ambiente
+    // ainda possam sobrescrever o que está em config.json.
     const configToSave = {
-      GROUP_BASE_NAME: botConfig.GROUP_BASE_NAME,
-      MESSAGES_DURING_SERVER_OPEN: botConfig.MESSAGES_DURING_SERVER_OPEN,
-      MESSAGES_DURING_DAYTIME: botConfig.MESSAGES_DURING_DAYTIME,
-      DAYTIME_START_HOUR: botConfig.DAYTIME_START_HOUR,
-      DAYTIME_END_HOUR: botConfig.DAYTIME_END_HOUR,
+      EVOLUTION_API_URL: botConfig.EVOLUTION_API_URL,
+      // EVOLUTION_API_KEY: botConfig.EVOLUTION_API_KEY, // Prefer .env, but save if panel sets it
+      INSTANCE_NAME: botConfig.INSTANCE_NAME,
+      TARGET_GROUP_ID: botConfig.TARGET_GROUP_ID,
+      BOT_WEBHOOK_PORT: parseInt(botConfig.BOT_WEBHOOK_PORT, 10),
       SERVER_OPEN_TIME: botConfig.SERVER_OPEN_TIME,
       SERVER_CLOSE_TIME: botConfig.SERVER_CLOSE_TIME,
-      // O GROQ_API_KEY pode ser salvo se o usuário o inserir pelo painel,
-      // mas é mais seguro mantê-lo apenas no .env.
-      // Se você quiser permitir salvar pelo painel, descomente a linha abaixo.
-      // GROQ_API_KEY: botConfig.GROQ_API_KEY
-      CHAT_SUMMARY_TIMES: botConfig.CHAT_SUMMARY_TIMES // Salvar os horários do resumo
+      GROUP_BASE_NAME: botConfig.GROUP_BASE_NAME,
+      MESSAGES_DURING_SERVER_OPEN: parseInt(botConfig.MESSAGES_DURING_SERVER_OPEN, 10),
+      MESSAGES_DURING_DAYTIME: parseInt(botConfig.MESSAGES_DURING_DAYTIME, 10),
+      DAYTIME_START_HOUR: parseInt(botConfig.DAYTIME_START_HOUR, 10),
+      DAYTIME_END_HOUR: parseInt(botConfig.DAYTIME_END_HOUR, 10),
+      TIMEZONE: botConfig.TIMEZONE,
+      // GROQ_API_KEY: botConfig.GROQ_API_KEY, // Prefer .env, but save if panel sets it
+      BOT_PUBLIC_URL: botConfig.BOT_PUBLIC_URL,
+      CHAT_SUMMARY_TIMES: Array.isArray(botConfig.CHAT_SUMMARY_TIMES) ? botConfig.CHAT_SUMMARY_TIMES : []
     };
+
+    // Explicitly save API keys if they are present in botConfig and potentially set via panel
+    // This allows panel override if .env is not set for these.
+    if (botConfig.EVOLUTION_API_KEY) {
+        configToSave.EVOLUTION_API_KEY = botConfig.EVOLUTION_API_KEY;
+    }
+    if (botConfig.GROQ_API_KEY) {
+        configToSave.GROQ_API_KEY = botConfig.GROQ_API_KEY;
+    }
+
     await fs.promises.writeFile(CONFIG_FILE_PATH, JSON.stringify(configToSave, null, 2), 'utf-8');
     console.log("Configurações salvas em config.json");
   } catch (error) {
@@ -971,197 +1029,191 @@ function isFromMe(data) {
 
     const helpText = 
         "👋 Olá! Eu sou o " + (messages.botInfo?.name || "Bot Pavlov") + ".\n" +
-        "Comandos disponíveis (apenas para admins):\n\n" +      
+        "Comandos disponíveis (apenas para admins, via MENSAGEM PRIVADA):\n\n" +      
         "• !jogar?      – Enquete rápida de jogo\n" +          
         "• !random      – Mensagem aleatória (IA/Dica)\n" +
-        "• !abrir       – Abrir servidor\n" +
-        "• !fechar      – Fechar servidor\n" +
-        "• !say <msg>   – Envia msg customizada ao grupo\n" +
+        "• !abrir       – Mudar status para 'Servidor Aberto'\n" +
+        "• !fechar      – Mudar status para 'Servidor Fechado'\n" +    
+        "• !falar <msg>   – Envia msg customizada ao grupo\n" +
         "• !audio <URL> – Enviar áudio narrado\n" +
         '• !enquete "Título" "Opção 1" "Opção 2" ... – Enquete customizada\n' +   
         "• !resumo      – Gera e envia o resumo do chat atual\n";
-        // Comandos removidos: !votemap, !sortear
 
     let commandProcessed = false;
 
-    if (isAdmin) {
-        if (command === '!start') {
-            await sendMessageToGroup(helpText, actualSenderJid); // Send help to admin
-            commandProcessed = true;
-        }
-        else if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
-            commandProcessed = true;
-            if (command === '!teste') {
-                await sendMessageToGroup("Testado por admin!", actualSenderJid);
-            } else if (command === '!abrir') {
-                await triggerServerOpen();
-                scheduledCronTasks.forEach(task => {
-                    if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
-                        task.job.stop();
-                    }
-                });
-                console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
-                await sendMessageToGroup("Servidor aberto manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
-            } else if (command === '!fechar') {
-                await triggerServerClose();
-                scheduledCronTasks.forEach(task => {
-                    if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
-                        task.job.stop();
-                    }
-                });
-                console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
-                await sendMessageToGroup("Servidor fechado manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
-            } else if (command === '!avisar') {
-                await triggerServerOpeningSoon();
-                scheduledCronTasks.forEach(task => {
-                    if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
-                        task.job.stop();
-                    }
-                });
-                console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
-                await sendMessageToGroup("Aviso de abertura enviado manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
-            } else if (command === '!statusauto') {
-                scheduledCronTasks.forEach(task => {
-                    if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
-                        task.job.start();
-                    }
-                });
-                await sendMessageToGroup("Agendamentos automáticos de status (abrir/fechar/avisar) REATIVADOS.", actualSenderJid);
-                console.log("Agendamentos automáticos de status REATIVADOS.");
-            }
-        }
-        else if (command === '!random') {
-            commandProcessed = true;
-            const randomMsg = await getAIRandomMessage(); // This now can return a tip or AI message
-            if (randomMsg) await sendMessageToGroup(randomMsg, botConfig.TARGET_GROUP_ID); // Send to group
-            await sendMessageToGroup("Mensagem aleatória enviada para o grupo.", actualSenderJid); // Confirm to admin
-        }
-        else if (command === '!jogar?') {
-            commandProcessed = true;
-            await sendPoll(
-                "Ei!! Você 🫵 vai jogar Pavlov hoje?",
-                ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
-                botConfig.TARGET_GROUP_ID // Poll always goes to the target group
-            );
-            await sendMessageToGroup("Enquete '!jogar?' enviada para o grupo.", actualSenderJid);
-        }
-        else if (command === '!audio' && args.length > 0) {
-            commandProcessed = true;
-            const audioUrl = args[0];
-            if (audioUrl.startsWith('http')) {
-                await sendNarratedAudio(audioUrl, botConfig.TARGET_GROUP_ID); // Audio to target group
-                await sendMessageToGroup(`Áudio enviado para o grupo: ${audioUrl}`, actualSenderJid);
-            } else {
-                await sendMessageToGroup("Uso: !audio <URL_DO_AUDIO>", actualSenderJid);
-            }
-        }
-        else if (command === '!enquete' && args.length >= 2) {
-            commandProcessed = true;
-            let pollTitle = "";
-            let pollOptions = [];
-            let currentArg = "";
-            let inQuotes = false;
-            for (const part of args) {
-                if (part.startsWith('"') && !inQuotes) {
-                    currentArg = part.substring(1);
-                    inQuotes = true;
-                    if (part.endsWith('"') && part.length > 1) {
-                        currentArg = currentArg.slice(0, -1);
-                        if (!pollTitle) pollTitle = currentArg;
-                        else pollOptions.push(currentArg);
-                        currentArg = "";
-                        inQuotes = false;
-                    }
-                } else if (part.endsWith('"') && inQuotes) {
-                    currentArg += " " + part.slice(0, -1);
-                    if (!pollTitle) pollTitle = currentArg;
-                    else pollOptions.push(currentArg);
-                    currentArg = "";
-                    inQuotes = false;
-                } else if (inQuotes) {
-                    currentArg += " " + part;
-                } else {
-                    if (!pollTitle) pollTitle = part;
-                    else pollOptions.push(part);
+    if (commandText.startsWith("!")) { // Check if it's intended as a command
+        if (!isGroupMessage) { // Command is from a Private Message
+            if (isAdmin) {
+                // Admin commands are processed here. All replies/confirmations go to actualSenderJid (admin's PM).
+                // Actions that affect the group (e.g., !falar, !jogar?) still target botConfig.TARGET_GROUP_ID.
+                if (command === '!start') {
+                    await sendMessageToGroup(helpText, actualSenderJid);
+                    commandProcessed = true;
                 }
-            }
-            if (currentArg && inQuotes) { 
-                if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg);
-            }
-            if (pollTitle && pollOptions.length > 0) {
-                await sendPoll(pollTitle, pollOptions, botConfig.TARGET_GROUP_ID, pollOptions.length); // Poll to target group
-                await sendMessageToGroup(`Enquete "${pollTitle}" enviada para o grupo.`, actualSenderJid);
-            } else {
-                await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', actualSenderJid);
-            }
-        }
-        else if (command === '!agendamentos' || command === '!jobs') {
-            commandProcessed = true;
-            let resp = '⏱️ *Agendamentos Ativos:* ⏱️\n';
-            const now = new Date();
-            if (scheduledCronTasks.length === 0) {
-                resp += "Nenhum cron job agendado no momento.\n";
-            } else {
-                scheduledCronTasks.forEach(task => {
-                    let nextRun = 'N/A (parado ou erro)';
-                    try {
-                        if (task.job.running && cronParser) { 
-                            const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: botConfig.TIMEZONE });
-                            nextRun = interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
-                        } else if (!task.job.running && cronParser) {
-                             const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: botConfig.TIMEZONE });
-                             nextRun = `(Parado) Próximo seria: ${interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE })}`;
-                        } else if (task.job.nextDates) { 
-                            const nd = task.job.nextDates(1);
-                            if (nd && nd.length) nextRun = nd[0].toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+                else if (['!abrir', '!fechar', '!teste'].includes(command)) {
+                    commandProcessed = true;
+                    if (command === '!teste') {
+                        await sendMessageToGroup("Testado por admin!", actualSenderJid);
+                    } else if (command === '!abrir') {
+                        await triggerServerOpen(); // Affects TARGET_GROUP_ID
+                        scheduledCronTasks.forEach(task => {
+                            if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
+                                task.job.stop();
+                            }
+                        });
+                        console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
+                        await sendMessageToGroup("Servidor aberto manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
+                    } else if (command === '!fechar') {
+                        await triggerServerClose(); // Affects TARGET_GROUP_ID
+                        scheduledCronTasks.forEach(task => {
+                            if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
+                                task.job.stop();
+                            }
+                        });
+                        console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
+                        await sendMessageToGroup("Servidor fechado manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
+                    }
+                }
+                else if (command === '!random') {
+                    commandProcessed = true;
+                    const randomMsg = await getAIRandomMessage();
+                    if (randomMsg) await sendMessageToGroup(randomMsg, botConfig.TARGET_GROUP_ID); // Send to group
+                    await sendMessageToGroup("Mensagem aleatória enviada para o grupo.", actualSenderJid); // Confirm to admin in PM
+                }
+                else if (command === '!jogar?') {
+                    commandProcessed = true;
+                    await sendPoll(
+                        "Ei!! Você 🫵 vai jogar Pavlov hoje?",
+                        ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
+                        botConfig.TARGET_GROUP_ID // Poll always goes to the target group
+                    );
+                    await sendMessageToGroup("Enquete '!jogar?' enviada para o grupo.", actualSenderJid); // Confirm to admin in PM
+                }
+                else if (command === '!audio' && args.length > 0) {
+                    commandProcessed = true;
+                    const audioUrl = args[0];
+                    if (audioUrl.startsWith('http')) {
+                        await sendNarratedAudio(audioUrl, botConfig.TARGET_GROUP_ID); // Audio to target group
+                        await sendMessageToGroup(`Áudio enviado para o grupo: ${audioUrl}`, actualSenderJid); // Confirm to admin in PM
+                    } else {
+                        await sendMessageToGroup("Uso: !audio <URL_DO_AUDIO>", actualSenderJid);
+                    }
+                }
+                else if (command === '!enquete' && args.length >= 2) {
+                    commandProcessed = true;
+                    let pollTitle = "";
+                    let pollOptions = [];
+                    let currentArg = "";
+                    let inQuotes = false;
+                    for (const part of args) {
+                        if (part.startsWith('"') && !inQuotes) {
+                            currentArg = part.substring(1);
+                            inQuotes = true;
+                            if (part.endsWith('"') && part.length > 1) {
+                                currentArg = currentArg.slice(0, -1);
+                                if (!pollTitle) pollTitle = currentArg;
+                                else pollOptions.push(currentArg);
+                                currentArg = "";
+                                inQuotes = false;
+                            }
+                        } else if (part.endsWith('"') && inQuotes) {
+                            currentArg += " " + part.slice(0, -1);
+                            if (!pollTitle) pollTitle = currentArg;
+                            else pollOptions.push(currentArg);
+                            currentArg = "";
+                            inQuotes = false;
+                        } else if (inQuotes) {
+                            currentArg += " " + part;
+                        } else {
+                            if (!pollTitle) pollTitle = part;
+                            else pollOptions.push(part);
                         }
-                    } catch (e) {
-                        nextRun = `Erro ao calcular (${e.message.substring(0,20)}...)`;
                     }
-                    resp += `• ${task.description} (${task.job.running ? 'Rodando' : 'Parado'}): ${nextRun}\n  (${task.cronExpression})\n`;
-                });
-            }
-            await sendMessageToGroup(resp, actualSenderJid);
-        }
-        else if (command === '!say' || command === '!anunciar') {
-            commandProcessed = true;
-            if (args.length > 0) {
-                const messageToSend = messageContent.substring(command.length + 1).trim();
-                if (messageToSend) {
-                    await sendMessageToGroup(messageToSend, botConfig.TARGET_GROUP_ID);
-                    await sendMessageToGroup("✅ Mensagem enviada para o grupo.", actualSenderJid);
-                } else {
-                    await sendMessageToGroup("⚠️ Por favor, forneça uma mensagem para enviar. Uso: !say <sua mensagem>", actualSenderJid);
+                    if (currentArg && inQuotes) { 
+                        if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg);
+                    }
+                    if (pollTitle && pollOptions.length > 0) {
+                        await sendPoll(pollTitle, pollOptions, botConfig.TARGET_GROUP_ID, pollOptions.length); // Poll to target group
+                        await sendMessageToGroup(`Enquete "${pollTitle}" enviada para o grupo.`, actualSenderJid); // Confirm to admin in PM
+                    } else {
+                        await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', actualSenderJid);
+                    }
                 }
+                else if (command === '!agendamentos' || command === '!jobs') {
+                    commandProcessed = true;
+                    let resp = '⏱️ *Agendamentos Ativos:* ⏱️\n';
+                    const now = new Date();
+                    if (scheduledCronTasks.length === 0) {
+                        resp += "Nenhum cron job agendado no momento.\n";
+                    } else {
+                        scheduledCronTasks.forEach(task => {
+                            let nextRun = 'N/A (parado ou erro)';
+                            try {
+                                if (task.job.running && cronParser) { 
+                                    const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: botConfig.TIMEZONE });
+                                    nextRun = interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+                                } else if (!task.job.running && cronParser) {
+                                     const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: botConfig.TIMEZONE });
+                                     nextRun = `(Parado) Próximo seria: ${interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE })}`;
+                                } else if (task.job.nextDates) { 
+                                    const nd = task.job.nextDates(1);
+                                    if (nd && nd.length) nextRun = nd[0].toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+                                }
+                            } catch (e) {
+                                nextRun = `Erro ao calcular (${e.message.substring(0,20)}...)`;
+                            }
+                            resp += `• ${task.description} (${task.job.running ? 'Rodando' : 'Parado'}): ${nextRun}\n  (${task.cronExpression})\n`;
+                        });
+                    }
+                    await sendMessageToGroup(resp, actualSenderJid);
+                }
+                else if (command === '!falar' || command === '!anunciar') {
+                    commandProcessed = true;
+                    if (args.length > 0) {
+                        const messageToSend = messageContent.substring(command.length + 1).trim();
+                        if (messageToSend) {
+                            await sendMessageToGroup(messageToSend, botConfig.TARGET_GROUP_ID); // Action to group
+                            await sendMessageToGroup("✅ Mensagem enviada para o grupo.", actualSenderJid); // Confirmation to admin in PM
+                        } else {
+                            await sendMessageToGroup("⚠️ Por favor, forneça uma mensagem para enviar. Uso: !falar <sua mensagem>", actualSenderJid);
+                        }
+                    } else {
+                        await sendMessageToGroup("⚠️ Uso: !falar <sua mensagem>", actualSenderJid);
+                    }
+                }
+                else if (command === '!resumo' || command === '!summarynow') {
+                    commandProcessed = true;
+                    if (chatHistory.length > 0) {
+                        await sendMessageToGroup("⏳ Gerando resumo do chat sob demanda...", actualSenderJid);
+                        await triggerChatSummary(); // This sends to TARGET_GROUP_ID
+                        await sendMessageToGroup("✅ Resumo do chat solicitado enviado para o grupo.", actualSenderJid); // Confirm to admin in PM
+                    } else {
+                        await sendMessageToGroup("ℹ️ Não há mensagens no histórico para resumir no momento.", actualSenderJid);
+                    }
+                }
+                // Unrecognized admin command in PM
+                else { // if no other command matched and it started with "!"
+                    await sendMessageToGroup(`Comando "${command}" não reconhecido. Digite !start para a lista de comandos.`, actualSenderJid);
+                    commandProcessed = true;
+                }
+            } else { // Non-admin sent a command in PM
+                await sendMessageToGroup("Você não tem permissão para usar comandos. Contate um administrador.", actualSenderJid);
+                commandProcessed = true;
+            }
+        } else { // Command is from a Group Message (remoteJid === botConfig.TARGET_GROUP_ID as per earlier checks)
+            // We already checked commandText.startsWith("!") at the beginning of this block.
+            if (isAdmin) {
+                // Admin tried to use a command in the group
+                await sendMessageToGroup("Por favor, envie comandos para mim em uma mensagem privada (PV).", actualSenderJid); // Inform admin in their PM
+                commandProcessed = true;
             } else {
-                await sendMessageToGroup("⚠️ Uso: !say <sua mensagem>", actualSenderJid);
+                // Non-admin tried to use a command in the group - silently ignore
+                console.log(`Comando '${commandText}' de usuário não-admin ${actualSenderJid} no grupo ${remoteJid} ignorado.`);
+                commandProcessed = true;
             }
         }
-        else if (command === '!resumo' || command === '!summarynow') {
-            commandProcessed = true;
-            if (chatHistory.length > 0) {
-                await sendMessageToGroup("⏳ Gerando resumo do chat sob demanda...", actualSenderJid);
-                await triggerChatSummary();
-                await sendMessageToGroup("✅ Resumo do chat solicitado enviado para o grupo.", actualSenderJid);
-            } else {
-                await sendMessageToGroup("ℹ️ Não há mensagens no histórico para resumir no momento.", actualSenderJid);
-            }
-        }
-        // Admin typed an unrecognized command
-        else if (commandText.startsWith("!")) {
-            await sendMessageToGroup(`Comando "${command}" não reconhecido. Digite !start para a lista de comandos de admin.`, actualSenderJid);
-            commandProcessed = true;
-        }
-    } 
-    // Non-admin typed a command
-    else if (commandText.startsWith("!")) {
-        // Silently ignore commands from non-admins, or send a "permission denied" message.
-        // For now, let's ignore.
-        console.log(`Comando '${commandText}' de usuário não-admin ${actualSenderJid} ignorado.`);
-        commandProcessed = true; // Mark as processed to prevent any other handling
     }
-    
-    // No need for the old `if (!commandProcessed && commandText.startsWith("!"))` as all cases are handled.
+    // If commandProcessed is false here, it means it wasn't a command starting with "!" or it was a non-command group message already handled by chat history.
 
     return res.status(200).send('messages.upsert processado.');
   });
@@ -1364,7 +1416,7 @@ async function triggerChatSummary() {
   const currentChatToSummarize = [...chatHistory];
   chatHistory = []; 
 
-  const prompt = `Você é um comentarista de e-sports para o jogo Pavlov VR, conhecido por seu humor e por capturar a essência das conversas dos jogadores. Analise o seguinte bate-papo do grupo de WhatsApp e crie um resumo curto (2-4 frases), divertido e temático sobre os principais tópicos discutidos. Imagine que você está fazendo um 'resumo da zoeira do lobby' ou 'os destaques da resenha'. Não liste mensagens individuais, crie uma narrativa coesa e engraçada. Se for relevante para o resumo ou para dar um toque especial ao comentário, você pode mencionar o nome de quem disse algo marcante (por exemplo, 'Parece que o [NomeDoJogador] estava inspirado hoje!' ou 'O [NomeDoJogador] soltou a pérola do dia:'). Use os nomes com moderação e apenas se agregar valor. Seja criativo!\n\nChat dos Jogadores:\n${formatChatForSummary(currentChatToSummarize)}\n\nResumo Criativo do Comentarista:`;
+  const prompt = `Você é um comentarista de e-sports para o jogo Pavlov VR, conhecido por seu humor e por capturar a essência das conversas dos jogadores. Analise o seguinte bate-papo do grupo de WhatsApp e crie um resumo curto (2-4 frases) ou ate onde for necessário para resumir as melhores partes do chat, divertido e temático sobre os principais tópicos discutidos. Imagine que você está fazendo um 'resumo da zoeira do lobby' ou 'os destaques da resenha'. Não liste mensagens individuais, crie uma narrativa coesa e engraçada. Se for relevante para o resumo ou para dar um toque especial ao comentário, você pode mencionar o nome de quem disse algo marcante (por exemplo, 'Parece que o [NomeDoJogador] estava inspirado hoje!' ou 'O [NomeDoJogador] soltou a pérola do dia:'). Use os nomes com moderação e apenas se agregar valor. Seja criativo!\n\nChat dos Jogadores:\n${formatChatForSummary(currentChatToSummarize)}\n\nResumo Criativo do Comentarista:`;
 
   console.log(`Tentando gerar resumo para ${currentChatToSummarize.length} mensagens.`);
   const summary = await callGroqAPI(prompt);

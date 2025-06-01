@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Administração do Bot Pavlov</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for textareas if needed */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .ai-spinner {
+            display: inline-block;
+            border: 2px solid #f3f3f3; /* Light grey */
+            border-top: 2px solid #3498db; /* Blue */
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            margin-left: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-700">Painel de Administração do Bot Pavlov</h1>
+        </header>
+
+        <div id="responseMessageGlobal" class="mb-4 p-3 rounded-md text-center hidden"></div>
+
+        <!-- Configurações Gerais do Bot -->
+        <section id="configSection" class="mb-8 p-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-700 border-b pb-2">Configurações Gerais</h2>
+            <form id="configForm" class="space-y-6">
+
+                <!-- Evolution API Settings -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-2">API Evolution</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="config_EVOLUTION_API_URL" class="block text-sm font-medium text-gray-700">URL da API Evolution:</label>
+                            <input type="text" id="config_EVOLUTION_API_URL" name="EVOLUTION_API_URL" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_INSTANCE_NAME" class="block text-sm font-medium text-gray-700">Nome da Instância:</label>
+                            <input type="text" id="config_INSTANCE_NAME" name="INSTANCE_NAME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="config_EVOLUTION_API_KEY" class="block text-sm font-medium text-gray-700">Chave da API Evolution:</label>
+                            <input type="password" id="config_EVOLUTION_API_KEY" name="EVOLUTION_API_KEY" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <p class="mt-1 text-xs text-red-500">Sensível! Preferível configurar via .env.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Groq AI Settings -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-2">IA (Groq)</h3>
+                    <div>
+                        <label for="config_GROQ_API_KEY" class="block text-sm font-medium text-gray-700">Chave da API Groq:</label>
+                        <input type="password" id="config_GROQ_API_KEY" name="GROQ_API_KEY" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <p class="mt-1 text-xs text-red-500">Sensível! Preferível configurar via .env.</p>
+                    </div>
+                </div>
+                
+                <!-- Server and Group Settings -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-2">Servidor e Grupo</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="config_TARGET_GROUP_ID" class="block text-sm font-medium text-gray-700">ID do Grupo Alvo (ex: 123...@g.us):</label>
+                            <input type="text" id="config_TARGET_GROUP_ID" name="TARGET_GROUP_ID" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_GROUP_BASE_NAME" class="block text-sm font-medium text-gray-700">Nome Base do Grupo (para título):</label>
+                            <input type="text" id="config_GROUP_BASE_NAME" name="GROUP_BASE_NAME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_SERVER_OPEN_TIME" class="block text-sm font-medium text-gray-700">Hora Abertura Servidor (HH:MM):</label>
+                            <input type="time" id="config_SERVER_OPEN_TIME" name="SERVER_OPEN_TIME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_SERVER_CLOSE_TIME" class="block text-sm font-medium text-gray-700">Hora Fechamento Servidor (HH:MM):</label>
+                            <input type="time" id="config_SERVER_CLOSE_TIME" name="SERVER_CLOSE_TIME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                         <div>
+                            <label for="config_TIMEZONE" class="block text-sm font-medium text-gray-700">Fuso Horário (ex: America/Sao_Paulo):</label>
+                            <input type="text" id="config_TIMEZONE" name="TIMEZONE" placeholder="America/Sao_Paulo" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Message Frequency -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-2">Frequência de Mensagens Automáticas</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="config_MESSAGES_DURING_SERVER_OPEN" class="block text-sm font-medium text-gray-700">Qtd. (Servidor Aberto):</label>
+                            <input type="number" id="config_MESSAGES_DURING_SERVER_OPEN" name="MESSAGES_DURING_SERVER_OPEN" min="0" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_MESSAGES_DURING_DAYTIME" class="block text-sm font-medium text-gray-700">Qtd. (Diurnas):</label>
+                            <input type="number" id="config_MESSAGES_DURING_DAYTIME" name="MESSAGES_DURING_DAYTIME" min="0" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_DAYTIME_START_HOUR" class="block text-sm font-medium text-gray-700">Início Horário Diurno (0-23):</label>
+                            <input type="number" id="config_DAYTIME_START_HOUR" name="DAYTIME_START_HOUR" min="0" max="23" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_DAYTIME_END_HOUR" class="block text-sm font-medium text-gray-700">Fim Horário Diurno (0-23):</label>
+                            <input type="number" id="config_DAYTIME_END_HOUR" name="DAYTIME_END_HOUR" min="0" max="23" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chat Summary -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-2">Resumo do Chat</h3>
+                    <div>
+                        <label for="config_CHAT_SUMMARY_TIMES" class="block text-sm font-medium text-gray-700">Horários para Resumo (HH:MM, separado por vírgula):</label>
+                        <input type="text" id="config_CHAT_SUMMARY_TIMES" name="CHAT_SUMMARY_TIMES" placeholder="10:00,16:00,21:00" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                </div>
+
+                <!-- Webhook Settings -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-2">Webhook do Bot</h3>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="config_BOT_WEBHOOK_PORT" class="block text-sm font-medium text-gray-700">Porta do Webhook:</label>
+                            <input type="number" id="config_BOT_WEBHOOK_PORT" name="BOT_WEBHOOK_PORT" min="1024" max="65535" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_BOT_PUBLIC_URL" class="block text-sm font-medium text-gray-700">URL Pública do Bot (para API Evolution):</label>
+                            <input type="text" id="config_BOT_PUBLIC_URL" name="BOT_PUBLIC_URL" placeholder="http://seu.dominio.com:PORTA" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                             <p class="mt-1 text-xs text-gray-500">Ex: http://meudominio.com:8080 ou https://meudominio.com (se usar proxy reverso)</p>
+                        </div>
+                    </div>
+                </div>
+
+
+                <button type="submit" class="w-full mt-6 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Salvar Configurações Gerais
+                </button>
+            </form>
+            <div id="responseMessageConfig" class="mt-4 p-3 rounded-md text-center hidden"></div>
+        </section>
+
+        <hr class="my-10 border-gray-300">
+
+        <!-- Gerenciamento de Mensagens -->
+        <section id="messagesSection" class="mb-8 p-6 bg-white rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-700 border-b pb-2">Gerenciamento de Mensagens</h2>
+            <p class="text-sm text-gray-600 mb-2">Edite as mensagens que o bot utiliza. Clique em "Salvar Mensagens" após as alterações.</p>
+            <p class="text-sm text-gray-600 mb-4"><strong>Nota:</strong> Para listas (ex: "Novo Membro"), adicione cada mensagem em uma nova linha.</p>
+
+            <form id="messagesForm" class="space-y-6">
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-3">Status do Servidor</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="status_closed" class="block text-sm font-medium text-gray-700">Fechado:</label>
+                            <div class="flex items-center mt-1">
+                                <input type="text" id="status_closed" name="status_closed" class="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <button type="button" class="generate-ai-btn ml-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="status_closed">Gerar IA</button>
+                                <div id="aiSpinner_status_closed" class="ai-spinner hidden"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="status_openingSoon" class="block text-sm font-medium text-gray-700">Abrindo em Breve:</label>
+                             <div class="flex items-center mt-1">
+                                <input type="text" id="status_openingSoon" name="status_openingSoon" class="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <button type="button" class="generate-ai-btn ml-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="status_openingSoon">Gerar IA</button>
+                                <div id="aiSpinner_status_openingSoon" class="ai-spinner hidden"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="status_open" class="block text-sm font-medium text-gray-700">Aberto:</label>
+                            <div class="flex items-center mt-1">
+                                <input type="text" id="status_open" name="status_open" class="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <button type="button" class="generate-ai-btn ml-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="status_open">Gerar IA</button>
+                                <div id="aiSpinner_status_open" class="ai-spinner hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-3">Boas-vindas e Despedidas</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="newMember" class="block text-sm font-medium text-gray-700">Novo Membro (uma por linha):</label>
+                            <textarea id="newMember" name="newMember" rows="4" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                            <button type="button" class="generate-ai-btn mt-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="newMember">Gerar IA (Adicionar)</button>
+                            <div id="aiSpinner_newMember" class="ai-spinner hidden"></div>
+                        </div>
+                        <div>
+                            <label for="memberLeft" class="block text-sm font-medium text-gray-700">Membro Saiu (uma por linha):</label>
+                            <textarea id="memberLeft" name="memberLeft" rows="4" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                            <button type="button" class="generate-ai-btn mt-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="memberLeft">Gerar IA (Adicionar)</button>
+                            <div id="aiSpinner_memberLeft" class="ai-spinner hidden"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-3">Mensagens Aleatórias Gerais</h3>
+                    <div>
+                        <label for="randomActive" class="block text-sm font-medium text-gray-700">Mensagens (uma por linha):</label>
+                        <textarea id="randomActive" name="randomActive" rows="5" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                        <button type="button" id="generateAIMessageBtn" class="generate-ai-btn mt-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="randomActive">Gerar IA (Adicionar)</button>
+                        <div id="aiSpinner_randomActive" class="ai-spinner hidden"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-3">Mensagens Aleatórias (Durante o Jogo)</h3>
+                    <div>
+                        <label for="inGameRandom" class="block text-sm font-medium text-gray-700">Mensagens (uma por linha):</label>
+                        <textarea id="inGameRandom" name="inGameRandom" rows="5" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                        <button type="button" id="generateAIInGameMessageBtn" class="generate-ai-btn mt-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="inGameRandom">Gerar IA (Adicionar)</button>
+                        <div id="aiSpinner_inGameRandom" class="ai-spinner hidden"></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-3">Dicas de Jogo (Pavlov)</h3>
+                    <div>
+                        <label for="gameTips" class="block text-sm font-medium text-gray-700">Dicas (uma por linha):</label>
+                        <textarea id="gameTips" name="gameTips" rows="5" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                        <button type="button" class="generate-ai-btn mt-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="gameTips">Gerar IA (Adicionar Dica)</button>
+                        <div id="aiSpinner_gameTips" class="ai-spinner hidden"></div>
+                    </div>
+                </div>
+
+
+                <div>
+                    <h3 class="text-lg font-medium text-gray-600 mb-3">Extras (Ocasionais)</h3>
+                     <div class="space-y-4">
+                        <div>
+                            <label for="extras_sundayNight" class="block text-sm font-medium text-gray-700">Domingo à Noite:</label>
+                            <div class="flex items-center mt-1">
+                                <input type="text" id="extras_sundayNight" name="extras_sundayNight" class="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <button type="button" class="generate-ai-btn ml-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="extras_sundayNight">Gerar IA</button>
+                                <div id="aiSpinner_extras_sundayNight" class="ai-spinner hidden"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="extras_friday" class="block text-sm font-medium text-gray-700">Sexta-feira:</label>
+                            <div class="flex items-center mt-1">
+                                <input type="text" id="extras_friday" name="extras_friday" class="flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <button type="button" class="generate-ai-btn ml-2 py-2 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-500 hover:bg-blue-600" data-message-type="extras_friday">Gerar IA</button>
+                                <div id="aiSpinner_extras_friday" class="ai-spinner hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full mt-6 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    Salvar Mensagens
+                </button>
+            </form>
+            <div id="responseMessageMessages" class="mt-4 p-3 rounded-md text-center hidden"></div>
+        </section>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html> 
