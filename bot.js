@@ -465,7 +465,8 @@ function isFromMe(data) {
   }
 
   app.post('/webhook', (req, res, next) => {
-    const payload = req.body;
+    const payload = req.body.payload;
+
     const event = (payload.event || '').toLowerCase();
   
     // Mapeia event → rota interna
