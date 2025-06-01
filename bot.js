@@ -382,56 +382,46 @@ async function sendPoll(title, options, recipientJid, selectableCount = 1) {
     return;
   }
   try {
-    const message = {
+    const pollDetails = { // Renomeado de 'message' para 'pollDetails' para clareza
       name: title,
-      values: options,
+      values: options, // 'options' aqui é o array de strings das opções da enquete
       selectableCount: selectableCount
     };
 
-    let mentionOptions = {};
+    let messageSendOptions = { // Opções para o envio da mensagem em si
+        delay: 1200,
+        presence: 'composing'
+    };
+
     if (recipientJid.endsWith('@g.us')) { // Só tenta buscar participantes para grupos
         const participants = await getGroupParticipants(recipientJid);
-        if (participants.length > 0) {
-            mentionOptions.mentions = participants;
-            console.log(`Enquete para ${recipientJid} incluirá ${participants.length} menções invisíveis.`);
+        if (participants && participants.length > 0) { // Adicionada verificação se participants não é undefined/null
+            messageSendOptions.mentions = participants; // Mover mentions para as opções da mensagem
+            console.log(`Enquete para ${recipientJid} tentará incluir ${participants.length} menções.`);
         }
     }
 
-    await axios.post(
+    const payload = {
+      number: recipientJid,
+      options: messageSendOptions, // Usar o objeto de opções da mensagem construído
+      poll: pollDetails // Usar 'poll' como chave para os detalhes da enquete
+    };
+
+    console.log(`[sendPoll] Enviando payload para ${recipientJid}:`, JSON.stringify(payload, null, 2));
+
+    const response = await axios.post(
       `${botConfig.EVOLUTION_API_URL}/message/sendPoll/${botConfig.INSTANCE_NAME}`,
-      {
-        number: recipientJid,
-        options: {
-            delay: 1200,
-            presence: 'composing',
-            // Não precisa de "mentions" aqui se a API da Evolution não suportar no corpo principal para sendPoll
-            // e sim como um parâmetro separado ou se for inferido pelo options.mentions abaixo.
-            // Verifique a documentação da sua API.
-        },
-        message: message,
-        // Adicionando as menções aqui se a API suportar desta forma para sendPoll
-        // Se a API da Evolution espera 'mentions' dentro do objeto 'options' da mensagem,
-        // você precisará ajustar. Por enquanto, estou assumindo que pode ser um parâmetro de alto nível
-        // ou que a função sendMessageToGroup (se sendPoll usasse ela) lidaria com isso.
-        // Como estamos chamando diretamente o endpoint sendPoll, precisamos ver onde 'mentions' se encaixa.
-        // Se o endpoint sendPoll não suportar menções diretamente, uma alternativa seria enviar
-        // a enquete e, em seguida, uma mensagem de texto vazia ou um "." com as menções,
-        // mas isso é menos ideal.
-        // Vamos assumir que podemos passar como parte do payload principal para sendPoll,
-        // ou que a API da Evolution é inteligente o suficiente para pegar de um campo `extraOptions` ou similar.
-        // Se o endpoint sendPoll não tiver um campo direto para mentions,
-        // esta abordagem de menção invisível pode não funcionar para enquetes.
-        // A forma mais comum é que `mentions` seja parte de um objeto `options` ou `extraParams`.
-        // Vamos tentar adicioná-lo ao objeto principal do payload, que é uma suposição.
-        ...(mentionOptions.mentions && { mentions: mentionOptions.mentions }) // Adiciona se houver menções
-      },
+      payload,
       {
         headers: { 'apikey': botConfig.EVOLUTION_API_KEY, 'Content-Type': 'application/json' }
       }
     );
-    console.log(`Enquete "${title}" enviada para ${recipientJid}.`);
+    console.log(`Enquete "${title}" enviada para ${recipientJid}. Resposta da API:`, response.status, response.data);
   } catch (error) {
-    console.error(`Erro ao enviar enquete para ${recipientJid}:`, error.response ? error.response.data : error.message);
+    console.error(`Erro ao enviar enquete para ${recipientJid}:`, error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+    if (error.config && error.config.data) {
+        console.error("Payload que causou o erro:", error.config.data);
+    }
   }
 }
 
@@ -1349,22 +1339,10 @@ function isFromMe(data) {
                     if (command === '!teste') {
                         await sendMessageToGroup("Testado por admin!", actualSenderJid);
                     } else if (command === '!abrir') {
-                        await triggerServerOpen(); // Affects TARGET_GROUP_ID
-                        scheduledCronTasks.forEach(task => {
-                            if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
-                                task.job.stop();
-                            }
-                        });
-                        console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
+                        await triggerServerOpen(); // Affects TARGET_GROUP_ID    
                         await sendMessageToGroup("Servidor aberto manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
                     } else if (command === '!fechar') {
-                        await triggerServerClose(); // Affects TARGET_GROUP_ID
-                        scheduledCronTasks.forEach(task => {
-                            if (["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
-                                task.job.stop();
-                            }
-                        });
-                        console.log("Agendamentos automáticos de status (abrir/fechar/avisar) PAUSADOS por comando manual.");
+                        await triggerServerClose(); // Affects TARGET_GROUP_ID  
                         await sendMessageToGroup("Servidor fechado manualmente. Agendamentos de status (abrir/fechar/avisar) pausados.", actualSenderJid);
                     }
                 }

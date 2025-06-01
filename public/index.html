@@ -183,6 +183,20 @@
                     </div>
                 </div>
 
+                <h3>Dicas do Jogo (Pavlov Tips)</h3>
+                <div class="message-config-group">
+                    <label for="gameTips" class="message-type-label">Dicas (uma por linha):</label>
+                    <textarea id="gameTips" name="gameTips" rows="8" placeholder="Digite as dicas do jogo aqui, uma por linha..."></textarea>
+                    <!-- Opcional: Botão de IA para dicas, se desejado no futuro -->
+                    <!--
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="gameTip">Sugerir Dica com IA</button>
+                            <div id="aiSpinner_gameTip" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                    </div>
+                    -->
+                </div>
 
                 <h3>Extras</h3>
                 <div class="message-config-group">
@@ -224,53 +238,51 @@
         <section id="aiPromptsSection">
             <h2>Prompts da Inteligência Artificial</h2>
             <p>Edite os prompts base usados para gerar mensagens com IA. Estes serão usados tanto pelas funções automáticas do bot quanto pelos botões "Gerar com IA" acima.</p>
-            <form id="aiPromptsForm">
-                <div class="form-group">
-                    <label for="aiPrompt_systemPrompt">Prompt Mestre do Sistema (Persona do Bot):</label>
-                    <textarea id="aiPrompt_systemPrompt" name="aiPrompt_systemPrompt" rows="8" placeholder="Defina aqui a personalidade principal, contexto e instruções gerais para a IA do bot Audozappo..."></textarea>
-                </div>
-                <hr class="prompt-separator">
-                <div class="form-group">
-                    <label for="aiPrompt_randomActive">Prompt para "Mensagem Aleatória (Geral)":</label>
-                    <textarea id="aiPrompt_randomActive" name="aiPrompt_randomActive" rows="4"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_inGameRandom">Prompt para "Mensagem Aleatória (Durante o Jogo)":</label>
-                    <textarea id="aiPrompt_inGameRandom" name="aiPrompt_inGameRandom" rows="4"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_chatSummary">Prompt para "Resumo do Chat": (Use {CHAT_PLACEHOLDER} onde o chat deve ser inserido)</label>
-                    <textarea id="aiPrompt_chatSummary" name="aiPrompt_chatSummary" rows="6"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_status_closed">Prompt para IA de "Status Fechado":</label>
-                    <textarea id="aiPrompt_status_closed" name="aiPrompt_status_closed" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_status_openingSoon">Prompt para IA de "Status Abrindo em Breve":</label>
-                    <textarea id="aiPrompt_status_openingSoon" name="aiPrompt_status_openingSoon" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_status_open">Prompt para IA de "Status Aberto":</label>
-                    <textarea id="aiPrompt_status_open" name="aiPrompt_status_open" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_newMember">Prompt para IA de "Novo Membro":</label>
-                    <textarea id="aiPrompt_newMember" name="aiPrompt_newMember" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_memberLeft">Prompt para IA de "Membro Saiu":</label>
-                    <textarea id="aiPrompt_memberLeft" name="aiPrompt_memberLeft" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_extras_sundayNight">Prompt para IA de "Extra: Domingo à Noite":</label>
-                    <textarea id="aiPrompt_extras_sundayNight" name="aiPrompt_extras_sundayNight" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="aiPrompt_extras_friday">Prompt para IA de "Extra: Sexta-feira":</label>
-                    <textarea id="aiPrompt_extras_friday" name="aiPrompt_extras_friday" rows="3"></textarea>
-                </div>
-            </form>
+            <p><strong>Lembre-se:</strong> Os prompts são salvos juntamente com as outras mensagens e configurações de IA através do botão "Salvar Mensagens e Configurações de IA" na seção anterior.</p>
+            <div class="form-group">
+                <label for="aiPrompt_systemPrompt">Prompt Mestre do Sistema (Persona do Bot):</label>
+                <textarea id="aiPrompt_systemPrompt" name="aiPrompt_systemPrompt" rows="8" placeholder="Defina aqui a personalidade principal, contexto e instruções gerais para a IA do bot Audozappo..."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_randomActive">Prompt para "Mensagem Aleatória (Geral)":</label>
+                <textarea id="aiPrompt_randomActive" name="aiPrompt_randomActive" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_inGameRandom">Prompt para "Mensagem Aleatória (Durante o Jogo)":</label>
+                <textarea id="aiPrompt_inGameRandom" name="aiPrompt_inGameRandom" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_chatSummary">Prompt para "Resumo do Chat": (Use {CHAT_PLACEHOLDER} onde o chat deve ser inserido)</label>
+                <textarea id="aiPrompt_chatSummary" name="aiPrompt_chatSummary" rows="6"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_status_closed">Prompt para IA de "Status Fechado":</label>
+                <textarea id="aiPrompt_status_closed" name="aiPrompt_status_closed" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_status_openingSoon">Prompt para IA de "Status Abrindo em Breve":</label>
+                <textarea id="aiPrompt_status_openingSoon" name="aiPrompt_status_openingSoon" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_status_open">Prompt para IA de "Status Aberto":</label>
+                <textarea id="aiPrompt_status_open" name="aiPrompt_status_open" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_newMember">Prompt para IA de "Novo Membro":</label>
+                <textarea id="aiPrompt_newMember" name="aiPrompt_newMember" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_memberLeft">Prompt para IA de "Membro Saiu":</label>
+                <textarea id="aiPrompt_memberLeft" name="aiPrompt_memberLeft" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_extras_sundayNight">Prompt para IA de "Extra: Domingo à Noite":</label>
+                <textarea id="aiPrompt_extras_sundayNight" name="aiPrompt_extras_sundayNight" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_extras_friday">Prompt para IA de "Extra: Sexta-feira":</label>
+                <textarea id="aiPrompt_extras_friday" name="aiPrompt_extras_friday" rows="3"></textarea>
+            </div>
         </section>
 
     </div>

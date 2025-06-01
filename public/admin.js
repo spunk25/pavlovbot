@@ -18,6 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateAIInGameMessageBtn = document.getElementById('generateAIInGameMessageBtn');
     const aiMessageSpinnerInGameRandom = document.getElementById('aiMessageSpinnerInGameRandom');
 
+    // Novo campo para gameTips
+    const gameTipsTextarea = document.getElementById('gameTips');
+
     // Seletores para os textareas dos prompts de IA
     const aiPromptRandomActiveTextarea = document.getElementById('aiPrompt_randomActive');
     const aiPromptInGameRandomTextarea = document.getElementById('aiPrompt_inGameRandom');
@@ -128,6 +131,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 extrasSundayNightInput.value = Array.isArray(messages.extras.sundayNight) ? messages.extras.sundayNight.join('\n') : (messages.extras.sundayNight || '');
                 extrasFridayInput.value = Array.isArray(messages.extras.friday) ? messages.extras.friday.join('\n') : (messages.extras.friday || '');
             }
+            if (gameTipsTextarea && messages.gameTips) {
+                gameTipsTextarea.value = Array.isArray(messages.gameTips) ? messages.gameTips.join('\n') : '';
+            }
 
             // Carregar prompts da IA
             if (messages.aiPrompts) {
@@ -217,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
             memberLeft: memberLeftTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             randomActive: randomActiveTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             inGameRandom: inGameRandomTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
+            gameTips: gameTipsTextarea ? gameTipsTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
             extras: {
                 sundayNight: extrasSundayNightInput.value.split('\n').map(s => s.trim()).filter(s => s),
                 friday: extrasFridayInput.value.split('\n').map(s => s.trim()).filter(s => s),
