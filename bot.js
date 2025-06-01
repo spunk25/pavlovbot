@@ -381,10 +381,17 @@ async function initializeBotStatus() {
         }
     }
 
+    // Só atualiza nome do grupo se estiver em openingSoon (🟡) ou open (🟢)
+    if (initialStatus !== '🔴') {
+        await updateServerStatus(initialStatus, null);
+        console.log(`Status inicial do bot definido para: ${initialStatus}`);
+    } else {
+        // mantém apenas o status interno, sem mexer no nome
+        currentServerStatus = initialStatus;
+        console.log(`Status inicial 'fechado' detectado fora de horário. Nome do grupo NÃO será alterado.`);
+    }
 
-    await updateServerStatus(initialStatus, null);
-    console.log(`Status inicial do bot definido para: ${initialStatus}`);
-
+    // se já estiver aberto, inicia as mensagens automáticas
     if (initialStatus === '🟢') {
         serverOpenMessagesSent = 0;
         scheduleNextRandomMessage('serverOpen');
@@ -657,6 +664,27 @@ function isFromMe(data) {
       } else {
         await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', senderJid);
       }
+    }
+    // Novo comando: lista todos os cron‐jobs e suas próximas execuções
+    else if (command === '!agendamentos' || command === '!jobs') {
+      let resp = '⏱️ *Agendamentos Ativos:* ⏱️\n';
+      const now = new Date();
+      scheduledCronTasks.forEach(task => {
+        let nextRun = 'N/A';
+        try {
+          if (cronParser) {
+            const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: TIMEZONE });
+            nextRun = interval.next().toDate().toLocaleString('pt-BR', { timeZone: TIMEZONE });
+          } else if (task.job.nextDates) {
+            const nd = task.job.nextDates(1);
+            if (nd && nd.length) nextRun = nd[0].toLocaleString('pt-BR', { timeZone: TIMEZONE });
+          }
+        } catch (e) {
+          nextRun = `Erro ao calcular`;
+        }
+        resp += `• ${task.description}: ${nextRun}\n`;
+      });
+      await sendMessageToGroup(resp, senderJid);
     }
     // Novo: Comando !start (pode ser usado por qualquer um)
     // else if (command === '!start') {
