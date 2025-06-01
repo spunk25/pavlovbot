@@ -383,25 +383,13 @@ async function initializeBotStatus() {
         scheduleNextRandomMessage('daytime');
     }
 }
-app.post('/webhook', (req, res, next) => {
-  const payload = req.body;
-  const event = (payload.event || '').toLowerCase();
 
-  // Mapeia event → rota interna
-  if (event === 'messages.upsert') {
-    // Chama internamente /webhook/messages-upsert
-    return app._router.handle(req, res, next, '/webhook/messages-upsert');
-  }
-  if (event === 'group.participants.update') {
-    return app._router.handle(req, res, next, '/webhook/group-participants-update');
-  }
-  // Caso nenhum case, devolve 200 normal
-  return res.status(200).send('Evento não mapeado ou não habilitado.');
-});
 // --- Servidor Webhook ---
 const express = require('express');
 const app = express();
 app.use(express.json());
+
+
 
 async function isUserAdmin(groupId, userId) {
     const groupInfo = await getGroupMetadata(groupId);
@@ -445,6 +433,22 @@ function isFromMe(data) {
     );
     return false;
   }
+
+  app.post('/webhook', (req, res, next) => {
+    const payload = req.body;
+    const event = (payload.event || '').toLowerCase();
+  
+    // Mapeia event → rota interna
+    if (event === 'messages.upsert') {
+      // Chama internamente /webhook/messages-upsert
+      return app._router.handle(req, res, next, '/webhook/messages-upsert');
+    }
+    if (event === 'group.participants.update') {
+      return app._router.handle(req, res, next, '/webhook/group-participants-update');
+    }
+    // Caso nenhum case, devolve 200 normal
+    return res.status(200).send('Evento não mapeado ou não habilitado.');
+  });
   
 
   app.post('/webhook/messages-upsert', async (req, res) => {
