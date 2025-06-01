@@ -783,9 +783,8 @@ app.post('/admin/api/config', express.json(), async (req, res) => {
     // Atualiza apenas as chaves permitidas
     const allowedKeys = [
       "GROUP_BASE_NAME", "MESSAGES_DURING_SERVER_OPEN", "MESSAGES_DURING_DAYTIME",
-      "DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME"
-      // "GROQ_API_KEY" // Descomente se quiser permitir alteração da chave Groq via painel
-      , "CHAT_SUMMARY_TIMES" // Adicionar CHAT_SUMMARY_TIMES às chaves permitidas
+      "DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME",
+      "CHAT_SUMMARY_TIMES", "TARGET_GROUP_ID" // <-- adicionado aqui
     ];
 
     for (const key of allowedKeys) {
