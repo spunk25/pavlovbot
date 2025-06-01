@@ -2,6 +2,7 @@
 require('dotenv').config();
 const axios = require('axios');
 const cron = require('node-cron');
+const fs = require('fs');
 const { getRandomElement } = require('./utils'); // Certifique-se que utils.js existe
 let cronParser;
 try {
