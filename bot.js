@@ -3,6 +3,7 @@ require('dotenv').config();
 const axios = require('axios');
 const cron = require('node-cron');
 const fs = require('fs');
+const path = require('path');
 const { getRandomElement } = require('./utils'); // Certifique-se que utils.js existe
 let cronParser;
 try {
@@ -31,34 +32,41 @@ const DAYTIME_END_HOUR = 17;
 const TIMEZONE = "America/Sao_Paulo"; // Ajuste para seu fuso horário
 
 // --- Mensagens ---
-const messages = {
-  status: {
-    closed: "🚧 Servidor fechado. Vai viver a vida real (ou tenta).",
-    openingSoon: "⏳ Servidor abre em 1 hora! Aqueles que forem entrar, aqueçam as mãos (e preparem as desculpas).",
-    open: "🟢 Servidor aberto! Que comecem os tiros, os gritos e os rage quits.",
-  },
-  newMember: [
-    "🔥 Mais um forno chegou! Alguém dá o manual (mentira, a gente joga ele no mapa e vê no que dá).",
-    "🎒 Novato na área! Não alimente, não ensine… apenas observe.",
-    "🐣 Mais um soldado saiu do lobby do além e chegou ao grupo. Boa sorte, guerreiro.",
-  ],
-  memberLeft: [
-    "💔 Mais um corno desistiu.",
-    "👋 Adeus, guerreiro… que seus tiros sejam melhores em outros servidores.",
-    "🪦 Um a menos pra culpar quando der ruim.",
-  ],
-  randomActive: [
-    "🧠 Lembrem-se: errar é humano… culpar o lag é Pavloviano.",
-    "🎧 Já recarregou sua arma hoje? Se não, recarregue sua vida.",
-    "🔫 Se você morreu 5 vezes seguidas, relaxa. O Perna também.",
-    "👑 Lembrem-se: no mundo de Pavlov, Akemi é lei. Obedeça ou exploda.",
-    "🎮 O servidor não perdoa. Mas a granada da Akemi persegue.",
-  ],
-  extras: {
-    sundayNight: "☠️ Chega de paz, começa a guerra. Domingo é dia de Pavlov. Tiro, tática e treta.",
-    friday: "🍻 Sextou no servidor! Hoje vale até errar e culpar o amigo.",
+let messages = {}; // Será populado por loadMessages
+const MESSAGES_FILE_PATH = path.join(__dirname, 'messages.json');
+
+function loadMessages() {
+  try {
+    if (fs.existsSync(MESSAGES_FILE_PATH)) {
+      const fileContent = fs.readFileSync(MESSAGES_FILE_PATH, 'utf-8');
+      messages = JSON.parse(fileContent);
+      console.log("Mensagens carregadas de messages.json");
+    } else {
+      console.error("ERRO: messages.json não encontrado. Usando mensagens padrão (se houver) ou bot pode não funcionar corretamente.");
+      // Você pode querer ter mensagens padrão aqui ou criar o arquivo se não existir
+      // Por enquanto, vamos assumir que ele deve existir.
+      // Para criar um default se não existir:
+      // messages = { /* estrutura padrão aqui */ };
+      // saveMessages(); // e então salvar
+    }
+  } catch (error) {
+    console.error("Erro ao carregar messages.json:", error);
+    // Fallback para um objeto vazio ou estrutura padrão para evitar que o bot quebre totalmente
+    messages = { status: {}, newMember: [], memberLeft: [], randomActive: [], extras: {} };
   }
-};
+}
+
+async function saveMessages() {
+  try {
+    await fs.promises.writeFile(MESSAGES_FILE_PATH, JSON.stringify(messages, null, 2), 'utf-8');
+    console.log("Mensagens salvas em messages.json");
+  } catch (error) {
+    console.error("Erro ao salvar messages.json:", error);
+  }
+}
+
+// Carrega as mensagens na inicialização
+loadMessages();
 
 // --- Funções da API Evolution ---
 const evolutionAPI = axios.create({
@@ -407,6 +415,9 @@ async function initializeBotStatus() {
 const express = require('express');
 const app = express();
 
+// Servir arquivos estáticos para o painel de administração
+app.use('/admin', express.static(path.join(__dirname, 'public')));
+
 // Modify express.json() to capture the raw body using the verify option
 app.use(express.json({
   verify: (req, res, buf, encoding) => {
@@ -437,6 +448,22 @@ app.use((err, req, res, next) => {
   } else {
     // If it's not a JSON parsing error, pass it to the next error handler in the stack
     next(err);
+  }
+});
+
+// API para o painel de administração
+app.get('/admin/api/messages', (req, res) => {
+  res.json(messages);
+});
+
+app.post('/admin/api/messages', express.json(), async (req, res) => { // Certifique-se que express.json() é usado aqui também
+  const newMessages = req.body;
+  if (typeof newMessages === 'object' && newMessages !== null) {
+    messages = newMessages; // Atualiza as mensagens em memória
+    await saveMessages();   // Salva no arquivo
+    res.json({ success: true, message: "Mensagens atualizadas com sucesso!" });
+  } else {
+    res.status(400).json({ success: false, message: "Payload inválido." });
   }
 });
 
@@ -777,6 +804,7 @@ async function startBot() {
   app.listen(BOT_WEBHOOK_PORT, () => {
     console.log(`Servidor de webhook escutando na porta ${BOT_WEBHOOK_PORT}`);
     console.log(`Configure o webhook na Evolution API para: http://SEU_IP_OU_DOMINIO:${BOT_WEBHOOK_PORT}/webhook`);
+    console.log(`Painel de Administração disponível em: http://SEU_IP_OU_DOMINIO:${BOT_WEBHOOK_PORT}/admin/admin.html`);
     console.log("Eventos Webhook: 'messages.upsert' e 'GROUP_PARTICIPANTS_UPDATE'.");
   });
 

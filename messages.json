@@ -1,0 +1,28 @@
+{
+  "status": {
+    "closed": "🚧 Servidor fechado. Vai viver a vida real (ou tenta).",
+    "openingSoon": "⏳ Servidor abre em 1 hora! Aqueles que forem entrar, aqueçam as mãos (e preparem as desculpas).",
+    "open": "🟢 Servidor aberto! Que comecem os tiros, os gritos e os rage quits."
+  },
+  "newMember": [
+    "🔥 Mais um forno chegou! Alguém dá o manual (mentira, a gente joga ele no mapa e vê no que dá).",
+    "🎒 Novato na área! Não alimente, não ensine… apenas observe.",
+    "🐣 Mais um soldado saiu do lobby do além e chegou ao grupo. Boa sorte, guerreiro."
+  ],
+  "memberLeft": [
+    "💔 Mais um corno desistiu.",
+    "👋 Adeus, guerreiro… que seus tiros sejam melhores em outros servidores.",
+    "🪦 Um a menos pra culpar quando der ruim."
+  ],
+  "randomActive": [
+    "🧠 Lembrem-se: errar é humano… culpar o lag é Pavloviano.",
+    "🎧 Já recarregou sua arma hoje? Se não, recarregue sua vida.",
+    "🔫 Se você morreu 5 vezes seguidas, relaxa. O Perna também.",
+    "👑 Lembrem-se: no mundo de Pavlov, Akemi é lei. Obedeça ou exploda.",
+    "🎮 O servidor não perdoa. Mas a granada da Akemi persegue."
+  ],
+  "extras": {
+    "sundayNight": "☠️ Chega de paz, começa a guerra. Domingo é dia de Pavlov. Tiro, tática e treta.",
+    "friday": "🍻 Sextou no servidor! Hoje vale até errar e culpar o amigo."
+  }
+} 
