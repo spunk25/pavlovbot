@@ -13,6 +13,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateAIMessageBtn = document.getElementById('generateAIMessageBtn');
     const aiMessageSpinner = document.getElementById('aiMessageSpinner');
 
+    // Novos campos para inGameRandom
+    const inGameRandomTextarea = document.getElementById('inGameRandom');
+    const generateAIInGameMessageBtn = document.getElementById('generateAIInGameMessageBtn');
+    const aiMessageSpinnerInGameRandom = document.getElementById('aiMessageSpinnerInGameRandom');
+
     // Formulário de Configurações Gerais
     const configForm = document.getElementById('configForm');
     const responseMessageConfigDiv = document.getElementById('responseMessageConfig');
@@ -51,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
             newMemberTextarea.value = Array.isArray(messages.newMember) ? messages.newMember.join('\n') : '';
             memberLeftTextarea.value = Array.isArray(messages.memberLeft) ? messages.memberLeft.join('\n') : '';
             randomActiveTextarea.value = Array.isArray(messages.randomActive) ? messages.randomActive.join('\n') : '';
+            inGameRandomTextarea.value = Array.isArray(messages.inGameRandom) ? messages.inGameRandom.join('\n') : '';
             if (messages.extras) {
                 extrasSundayNightInput.value = messages.extras.sundayNight || '';
                 extrasFridayInput.value = messages.extras.friday || '';
@@ -98,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             newMember: newMemberTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             memberLeft: memberLeftTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             randomActive: randomActiveTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
+            inGameRandom: inGameRandomTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             extras: {
                 sundayNight: extrasSundayNightInput.value.trim(),
                 friday: extrasFridayInput.value.trim(),
@@ -172,9 +179,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    generateAIMessageBtn.addEventListener('click', async () => {
-        aiMessageSpinner.style.display = 'inline-block';
-        generateAIMessageBtn.disabled = true;
+    // Função genérica para lidar com cliques nos botões de gerar IA
+    async function handleGenerateAIMessageClick(event) {
+        const button = event.target;
+        const messageType = button.dataset.messageType; // 'randomActive' ou 'inGameRandom'
+        const targetTextarea = messageType === 'randomActive' ? randomActiveTextarea : inGameRandomTextarea;
+        const spinner = messageType === 'randomActive' ? aiMessageSpinner : aiMessageSpinnerInGameRandom;
+
+        spinner.style.display = 'inline-block';
+        button.disabled = true;
         responseMessageMessagesDiv.textContent = '';
         responseMessageMessagesDiv.className = 'response-message';
 
@@ -182,26 +195,29 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/admin/api/generate-message', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}) // Pode enviar contexto se necessário no futuro
+                body: JSON.stringify({ type: messageType }) // Envia o tipo de mensagem
             });
             const result = await response.json();
 
             if (response.ok && result.success && result.message) {
-                const currentMessages = randomActiveTextarea.value.trim();
-                randomActiveTextarea.value = currentMessages ? `${currentMessages}\n${result.message}` : result.message;
-                showGlobalMessage('Mensagem gerada pela IA e adicionada à lista! Não se esqueça de salvar.');
+                const currentMessages = targetTextarea.value.trim();
+                targetTextarea.value = currentMessages ? `${currentMessages}\n${result.message}` : result.message;
+                showGlobalMessage(`Mensagem IA (${messageType}) gerada e adicionada! Não se esqueça de salvar.`);
             } else {
-                throw new Error(result.message || 'Falha ao gerar mensagem com IA.');
+                throw new Error(result.message || `Falha ao gerar mensagem IA (${messageType}).`);
             }
         } catch (error) {
-            console.error('Erro ao gerar mensagem com IA:', error);
-            responseMessageMessagesDiv.textContent = `Erro IA: ${error.message}`;
+            console.error(`Erro ao gerar mensagem IA (${messageType}):`, error);
+            responseMessageMessagesDiv.textContent = `Erro IA (${messageType}): ${error.message}`;
             responseMessageMessagesDiv.className = 'response-message error';
         } finally {
-            aiMessageSpinner.style.display = 'none';
-            generateAIMessageBtn.disabled = false;
+            spinner.style.display = 'none';
+            button.disabled = false;
         }
-    });
+    }
+
+    generateAIMessageBtn.addEventListener('click', handleGenerateAIMessageClick);
+    generateAIInGameMessageBtn.addEventListener('click', handleGenerateAIMessageClick);
 
     // Carregar dados iniciais
     loadMessages();

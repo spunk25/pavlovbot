@@ -135,4 +135,9 @@ input[type="time"], input[type="number"] {
     border: 1px solid #ddd;
     border-radius: 4px;
     box-sizing: border-box;
+}
+
+.ai-spinner { /* Classe comum para spinners */
+    margin-left: 10px;
+    font-style: italic;
 } 

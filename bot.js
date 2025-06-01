@@ -673,15 +673,45 @@ async function callGroqAPI(prompt) {
 }
 
 app.post('/admin/api/generate-message', express.json(), async (req, res) => {
-  const existingMessages = messages.randomActive || [];
-  const examples = existingMessages.length > 0 ? 
-    `Aqui estão alguns exemplos de mensagens existentes para você ter uma ideia do tom (tente não repetir):\n- ${getRandomElement(existingMessages)}\n- ${getRandomElement(existingMessages)}` 
-    : "Gere uma mensagem curta e divertida sobre o jogo Pavlov VR.";
+  const { type } = req.body; // 'randomActive' ou 'inGameRandom'
 
-  const prompt = `Gere uma nova mensagem aleatória para o bot. ${examples} A mensagem deve ser original e criativa.`;
+  if (!botConfig.GROQ_API_KEY) {
+    return res.status(500).json({ success: false, message: "Chave da API Groq não configurada no servidor." });
+  }
 
-  const generatedMessage = await callGroqAPI(prompt);
-  res.json({ success: !!generatedMessage && !generatedMessage.startsWith("Erro"), message: generatedMessage });
+  let exampleMessages = [];
+  let basePrompt = "";
+
+  if (type === 'inGameRandom') {
+    exampleMessages = messages.inGameRandom || [];
+    basePrompt = "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão. ";
+  } else { // Default to 'randomActive'
+    exampleMessages = messages.randomActive || [];
+    basePrompt = "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida. ";
+  }
+  
+  let promptContext = basePrompt;
+  if (exampleMessages.length > 0) {
+    const sampleSize = Math.min(exampleMessages.length, 2);
+    const samples = [];
+    for (let i = 0; i < sampleSize; i++) {
+      samples.push(getRandomElement(exampleMessages));
+    }
+    promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('"\n- "')}\n`;
+  }
+  promptContext += "A mensagem deve ser criativa e adequada. Evite ser repetitivo.";
+
+  try {
+    const generatedMessage = await callGroqAPI(promptContext);
+    if (generatedMessage && !generatedMessage.startsWith("Erro")) {
+      res.json({ success: true, message: generatedMessage });
+    } else {
+      throw new Error(generatedMessage || "Falha ao gerar mensagem com IA.");
+    }
+  } catch (error) {
+    console.error(`Erro ao gerar mensagem IA para admin (tipo: ${type}):`, error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 async function isUserAdmin(groupId, userId) {
@@ -994,38 +1024,74 @@ async function startBot() {
 
 startBot();
 
-// Função para obter uma mensagem aleatória, potencialmente gerada por IA
-async function getAIRandomMessage() {
+// Função para obter uma mensagem aleatória GERAL, potencialmente gerada por IA
+async function getAIRandomMessage() { // Para !random e mensagens diurnas
   if (!botConfig.GROQ_API_KEY) {
     console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista randomActive.");
     if (messages.randomActive && messages.randomActive.length > 0) {
       return getRandomElement(messages.randomActive);
     }
-    return "Aqui deveria ter uma piada, mas a IA está de folga e não temos exemplos!";
+    return "Aqui deveria ter uma piada, mas a IA está de folga e não temos exemplos para mensagens gerais!";
   }
 
   const exampleMessages = messages.randomActive || [];
-  let promptContext = "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. ";
+  let promptContext = "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida. ";
 
   if (exampleMessages.length > 0) {
-    const sampleSize = Math.min(exampleMessages.length, 2); // Pega até 2 exemplos
+    const sampleSize = Math.min(exampleMessages.length, 2);
     const samples = [];
     for (let i = 0; i < sampleSize; i++) {
       samples.push(getRandomElement(exampleMessages));
     }
     promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('"\n- "')}\n`;
   }
-  promptContext += "A mensagem deve ser criativa e adequada para um ambiente de jogo online. Evite ser repetitivo em relação a mensagens anteriores que você possa ter gerado.";
+  promptContext += "A mensagem deve ser criativa e adequada para um ambiente de jogo online. Evite ser repetitivo.";
 
   const generatedMessage = await callGroqAPI(promptContext);
 
-  if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) { // Verifica se a mensagem é válida
+  if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
     return generatedMessage;
   } else {
-    console.warn("Falha ao gerar mensagem com Groq ou mensagem inválida, usando fallback da lista randomActive.");
+    console.warn("Falha ao gerar mensagem GERAL com Groq, usando fallback da lista randomActive.");
     if (messages.randomActive && messages.randomActive.length > 0) {
       return getRandomElement(messages.randomActive);
     }
-    return "A IA tentou, mas falhou. Que tal um 'bora jogar!' clássico?";
+    return "A IA tentou, mas falhou na mensagem geral. Que tal um 'bora jogar!' clássico?";
+  }
+}
+
+// Função para obter uma mensagem aleatória "DURANTE O JOGO", potencialmente gerada por IA
+async function getAIInGameMessage() { // Para mensagens quando o servidor está aberto
+  if (!botConfig.GROQ_API_KEY) {
+    console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista inGameRandom.");
+    if (messages.inGameRandom && messages.inGameRandom.length > 0) {
+      return getRandomElement(messages.inGameRandom);
+    }
+    return "O jogo está rolando, mas a IA de mensagens de jogo está offline!";
+  }
+
+  const exampleMessages = messages.inGameRandom || [];
+  let promptContext = "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão. ";
+
+  if (exampleMessages.length > 0) {
+    const sampleSize = Math.min(exampleMessages.length, 2);
+    const samples = [];
+    for (let i = 0; i < sampleSize; i++) {
+      samples.push(getRandomElement(exampleMessages));
+    }
+    promptContext += `Inspire-se no tom e estilo destes exemplos de mensagens 'durante o jogo' (mas não os repita):\n- ${samples.join('"\n- "')}\n`;
+  }
+  promptContext += "A mensagem deve ser criativa e adequada para o calor do momento no jogo. Evite ser repetitivo.";
+
+  const generatedMessage = await callGroqAPI(promptContext);
+
+  if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
+    return generatedMessage;
+  } else {
+    console.warn("Falha ao gerar mensagem IN-GAME com Groq, usando fallback da lista inGameRandom.");
+    if (messages.inGameRandom && messages.inGameRandom.length > 0) {
+      return getRandomElement(messages.inGameRandom);
+    }
+    return "A IA de jogo bugou! Foquem no objetivo!";
   }
 }
