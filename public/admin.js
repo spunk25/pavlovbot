@@ -268,11 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         responseMessageConfigDiv.classList.add('hidden');
         responseMessageConfigDiv.textContent = '';
 
-        const updatedConfig = {
-            EVOLUTION_API_URL: configEvolutionApiUrlInput.value.trim(),
-            INSTANCE_NAME: configInstanceNameInput.value.trim(),
-            EVOLUTION_API_KEY: configEvolutionApiKeyInput.value,
-            GROQ_API_KEY: configGroqApiKeyInput.value,
+        const updatedConfig = {           
             TARGET_GROUP_ID: configTargetGroupIdInput.value.trim(),
             GROUP_BASE_NAME: configGroupBaseNameInput.value.trim(),
             SERVER_OPEN_TIME: configServerOpenTimeInput.value,
