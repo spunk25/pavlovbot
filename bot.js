@@ -679,11 +679,11 @@ async function callGroqAPI(prompt) {
     const groqResponse = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
       model: "mistral-saba-24b", // Ou outro modelo de sua preferência: mixtral-8x7b-32768
       messages: [
-        { role: "system", content: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR. Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo." },
+        { role: "system", content: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR. Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo, Pavlov VR é um jogo de tiro em primeira pessoa (FPS) desenvolvido para realidade virtual, oferecendo uma experiência imersiva e realista de combate. O jogo destaca-se por sua mecânica detalhada de manuseio de armas, onde os jogadores precisam realizar ações como carregar, recarregar e mirar manualmente, proporcionando uma sensação autêntica de uso de armamentos, esse jogo é carinhosamente apelidado como cs vr, o modo de jogo do nosso servidor é um modo tático onde uma equipe tenta plantar uma bomba enquanto a outra defende e tenta desarmá-la, o servidor é acessivel com os headsets meta quests 2 e 3, as vezes pode usar essa informação dos headsets para gerar mensagens mais relevantes para o grupo." },
         { role: "user", content: prompt }
       ],
       temperature: 0.8,
-      max_tokens: 60,
+      max_tokens: 80,
     }, {
       headers: {
         'Authorization': `Bearer ${botConfig.GROQ_API_KEY}`,
