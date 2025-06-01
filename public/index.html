@@ -78,18 +78,30 @@
                     <textarea id="status_closed" name="status_closed" rows="2"></textarea>
                     <button type="button" class="generate-ai-btn" data-message-type="status_closed" style="margin-left: 10px;">Gerar com IA</button>
                     <div id="aiSpinner_status_closed" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_status_closed" name="aiUsage_status_closed">
+                        <label for="aiUsage_status_closed" class="checkbox-label">Usar IA para esta mensagem?</label>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="status_openingSoon">Abrindo em Breve:</label>
                     <textarea id="status_openingSoon" name="status_openingSoon" rows="2"></textarea>
                     <button type="button" class="generate-ai-btn" data-message-type="status_openingSoon" style="margin-left: 10px;">Gerar com IA</button>
                     <div id="aiSpinner_status_openingSoon" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_status_openingSoon" name="aiUsage_status_openingSoon">
+                        <label for="aiUsage_status_openingSoon" class="checkbox-label">Usar IA para esta mensagem?</label>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="status_open">Aberto:</label>
                     <textarea id="status_open" name="status_open" rows="2"></textarea>
                     <button type="button" class="generate-ai-btn" data-message-type="status_open" style="margin-left: 10px;">Gerar com IA</button>
                     <div id="aiSpinner_status_open" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_status_open" name="aiUsage_status_open">
+                        <label for="aiUsage_status_open" class="checkbox-label">Usar IA para esta mensagem?</label>
+                    </div>
                 </div>
 
                 <h3>Boas-vindas e Despedidas</h3>
@@ -98,12 +110,20 @@
                     <textarea id="newMember" name="newMember" rows="5"></textarea>
                     <button type="button" class="generate-ai-btn" data-message-type="newMember" style="margin-top: 10px;">Gerar com IA</button>
                     <div id="aiSpinner_newMember" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_newMember" name="aiUsage_newMember">
+                        <label for="aiUsage_newMember" class="checkbox-label">Usar IA para esta mensagem?</label>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="memberLeft">Membro Saiu (uma por linha):</label>
                     <textarea id="memberLeft" name="memberLeft" rows="5"></textarea>
                     <button type="button" class="generate-ai-btn" data-message-type="memberLeft" style="margin-top: 10px;">Gerar com IA</button>
                     <div id="aiSpinner_memberLeft" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_memberLeft" name="aiUsage_memberLeft">
+                        <label for="aiUsage_memberLeft" class="checkbox-label">Usar IA para esta mensagem?</label>
+                    </div>
                 </div>
 
                 <h3>Mensagens Aleatórias (Servidor Ativo)</h3>
@@ -112,6 +132,10 @@
                     <textarea id="randomActive" name="randomActive" rows="8"></textarea>
                     <button type="button" id="generateAIMessageBtn" class="generate-ai-btn" data-message-type="randomActive" style="margin-top: 10px;">Gerar Mensagem com IA (Groq)</button>
                     <div id="aiMessageSpinner" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_randomActive" name="aiUsage_randomActive">
+                        <label for="aiUsage_randomActive" class="checkbox-label">Usar IA para estas mensagens?</label>
+                    </div>
                 </div>
 
                 
@@ -121,6 +145,10 @@
                     <textarea id="inGameRandom" name="inGameRandom" rows="8"></textarea>
                     <button type="button" id="generateAIInGameMessageBtn" class="generate-ai-btn" data-message-type="inGameRandom" style="margin-top: 10px;">Gerar Mensagem "Durante o Jogo" com IA</button>
                     <div id="aiMessageSpinnerInGameRandom" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_inGameRandom" name="aiUsage_inGameRandom">
+                        <label for="aiUsage_inGameRandom" class="checkbox-label">Usar IA para estas mensagens?</label>
+                    </div>
                 </div>
 
 
@@ -130,18 +158,76 @@
                     <textarea id="extras_sundayNight" name="extras_sundayNight" rows="2"></textarea>
                     <button type="button" class="generate-ai-btn" data-message-type="extras_sundayNight" style="margin-left: 10px;">Gerar com IA</button>
                     <div id="aiSpinner_extras_sundayNight" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_extras_sundayNight" name="aiUsage_extras_sundayNight">
+                        <label for="aiUsage_extras_sundayNight" class="checkbox-label">Usar IA para esta mensagem?</label>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="extras_friday">Sexta-feira:</label>
                     <textarea id="extras_friday" name="extras_friday" rows="2"></textarea>
                     <button type="button" class="generate-ai-btn" data-message-type="extras_friday" style="margin-left: 10px;">Gerar com IA</button>
                     <div id="aiSpinner_extras_friday" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
+                    <div class="form-group-inline">
+                        <input type="checkbox" id="aiUsage_extras_friday" name="aiUsage_extras_friday">
+                        <label for="aiUsage_extras_friday" class="checkbox-label">Usar IA para esta mensagem?</label>
+                    </div>
                 </div>
 
-                <button type="submit">Salvar Mensagens</button>
+                <button type="submit">Salvar Mensagens e Configurações de IA</button>
             </form>
             <div id="responseMessageMessages" class="response-message"></div>
         </section>
+
+        <hr>
+
+        <section id="aiPromptsSection">
+            <h2>Prompts da Inteligência Artificial</h2>
+            <p>Edite os prompts base usados para gerar mensagens com IA. Estes serão usados tanto pelas funções automáticas do bot quanto pelos botões "Gerar com IA" acima.</p>
+            <form id="aiPromptsForm">
+                <div class="form-group">
+                    <label for="aiPrompt_randomActive">Prompt para "Mensagem Aleatória (Geral)":</label>
+                    <textarea id="aiPrompt_randomActive" name="aiPrompt_randomActive" rows="4"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_inGameRandom">Prompt para "Mensagem Aleatória (Durante o Jogo)":</label>
+                    <textarea id="aiPrompt_inGameRandom" name="aiPrompt_inGameRandom" rows="4"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_chatSummary">Prompt para "Resumo do Chat": (Use {CHAT_PLACEHOLDER} onde o chat deve ser inserido)</label>
+                    <textarea id="aiPrompt_chatSummary" name="aiPrompt_chatSummary" rows="6"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_status_closed">Prompt para IA de "Status Fechado":</label>
+                    <textarea id="aiPrompt_status_closed" name="aiPrompt_status_closed" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_status_openingSoon">Prompt para IA de "Status Abrindo em Breve":</label>
+                    <textarea id="aiPrompt_status_openingSoon" name="aiPrompt_status_openingSoon" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_status_open">Prompt para IA de "Status Aberto":</label>
+                    <textarea id="aiPrompt_status_open" name="aiPrompt_status_open" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_newMember">Prompt para IA de "Novo Membro":</label>
+                    <textarea id="aiPrompt_newMember" name="aiPrompt_newMember" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_memberLeft">Prompt para IA de "Membro Saiu":</label>
+                    <textarea id="aiPrompt_memberLeft" name="aiPrompt_memberLeft" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_extras_sundayNight">Prompt para IA de "Extra: Domingo à Noite":</label>
+                    <textarea id="aiPrompt_extras_sundayNight" name="aiPrompt_extras_sundayNight" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="aiPrompt_extras_friday">Prompt para IA de "Extra: Sexta-feira":</label>
+                    <textarea id="aiPrompt_extras_friday" name="aiPrompt_extras_friday" rows="3"></textarea>
+                </div>
+            </form>
+        </section>
+
     </div>
 
     <script src="admin.js"></script>

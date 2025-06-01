@@ -201,6 +201,33 @@ loadBotConfig(); // Carrega as configurações na inicialização
 let messages = {}; // Será populado por loadMessages
 let chatHistory = []; // Para armazenar mensagens para resumo
 
+// Valores padrão para os prompts de IA, caso não estejam no messages.json
+const DEFAULT_AI_PROMPTS = {
+  randomActive: "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida.",
+  inGameRandom: "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão.",
+  chatSummary: "Você é um comentarista de e-sports para o jogo Pavlov VR, conhecido por seu humor e por capturar a essência das conversas dos jogadores. Analise o seguinte bate-papo do grupo de WhatsApp e crie um resumo curto (2-4 frases) ou ate onde for necessário para resumir as melhores partes do chat, divertido e temático sobre os principais tópicos discutidos. Imagine que você está fazendo um 'resumo da zoeira do lobby' ou 'os destaques da resenha'. Não liste mensagens individuais, crie uma narrativa coesa e engraçada. Se for relevante para o resumo ou para dar um toque especial ao comentário, você pode mencionar o nome de quem disse algo marcante (por exemplo, 'Parece que o [NomeDoJogador] estava inspirado hoje!' ou 'O [NomeDoJogador] soltou a pérola do dia:'). Use os nomes com moderação e apenas se agregar valor. Seja criativo!\n\nChat dos Jogadores:\n{CHAT_PLACEHOLDER}\n\nResumo Criativo do Comentarista:",
+  status_closed: "Gere uma mensagem curta e informativa para o status do grupo de Pavlov VR, indicando que o servidor está FECHADO. Exemplo: Servidor fechado por hoje, pessoal. Até amanhã!",
+  status_openingSoon: "Gere uma mensagem curta e animada para o status do grupo de Pavlov VR, indicando que o servidor abrirá EM BREVE (ex: em 1 hora). Exemplo: Preparem-se! Servidor abrindo em 1 hora!",
+  status_open: "Gere uma mensagem curta e convidativa para o status do grupo de Pavlov VR, indicando que o servidor está ABERTO. Exemplo: Servidor online! Bora pro tiroteio!",
+  newMember: "Gere uma mensagem de boas-vindas curta, amigável e divertida para um NOVO MEMBRO que acabou de entrar no grupo de Pavlov VR. Pode incluir um toque de humor ou referência ao jogo.",
+  memberLeft: "Gere uma mensagem curta, neutra ou levemente humorística para quando um MEMBRO SAI do grupo de Pavlov VR. Exemplo: Fulano desertou! Menos um pra dividir o loot.",
+  extras_sundayNight: "Gere uma mensagem curta e temática para ser enviada em um DOMINGO À NOITE para jogadores de Pavlov VR, talvez sobre o fim de semana ou a semana que começa, com um toque de Pavlov. Exemplo: Domingo acabando... última chance pra um headshot antes da segunda!",
+  extras_friday: "Gere uma mensagem curta e animada para uma SEXTA-FEIRA para jogadores de Pavlov VR, celebrando o início do fim de semana e chamando para o jogo. Exemplo: Sextou, soldados! Pavlov liberado no final de semana!"
+};
+
+// Valores padrão para as configurações de uso da IA
+const DEFAULT_AI_USAGE_SETTINGS = {
+  status_closed: false,
+  status_openingSoon: false,
+  status_open: false,
+  newMember: false,
+  memberLeft: false,
+  randomActive: true,
+  inGameRandom: true,
+  extras_sundayNight: false,
+  extras_friday: false
+};
+
 function loadMessages() {
   try {
     if (fs.existsSync(MESSAGES_FILE_PATH)) {
@@ -217,6 +244,32 @@ function loadMessages() {
         ];
       }
       console.log("Mensagens carregadas de messages.json");
+      // Carregar ou inicializar prompts da IA
+      if (!messages.aiPrompts) {
+        console.log("Bloco 'aiPrompts' não encontrado em messages.json, usando padrões.");
+        messages.aiPrompts = { ...DEFAULT_AI_PROMPTS };
+      } else {
+        // Garantir que todos os prompts padrão existam, caso o messages.json esteja incompleto
+        for (const key in DEFAULT_AI_PROMPTS) {
+          if (messages.aiPrompts[key] === undefined) {
+            console.warn(`Prompt de IA para '${key}' não encontrado em messages.json, usando padrão.`);
+            messages.aiPrompts[key] = DEFAULT_AI_PROMPTS[key];
+          }
+        }
+      }
+      // Carregar ou inicializar configurações de uso da IA
+      if (!messages.aiUsageSettings) {
+        console.log("Bloco 'aiUsageSettings' não encontrado em messages.json, usando padrões.");
+        messages.aiUsageSettings = { ...DEFAULT_AI_USAGE_SETTINGS };
+      } else {
+        // Garantir que todas as chaves de configuração de uso da IA existam
+        for (const key in DEFAULT_AI_USAGE_SETTINGS) {
+          if (messages.aiUsageSettings[key] === undefined) {
+            console.warn(`Configuração de uso da IA para '${key}' não encontrada, usando padrão (${DEFAULT_AI_USAGE_SETTINGS[key]}).`);
+            messages.aiUsageSettings[key] = DEFAULT_AI_USAGE_SETTINGS[key];
+          }
+        }
+      }
     } else {
       console.error("ERRO: messages.json não encontrado. Usando mensagens padrão (se houver) ou bot pode não funcionar corretamente.");
       messages = { status: {}, newMember: [], memberLeft: [], randomActive: [], extras: {}, gameTips: [
@@ -226,6 +279,8 @@ function loadMessages() {
           "Dica: Recarregar atrás de cobertura pode salvar sua vida.",
           "Dica: Conheça os 'callouts' dos mapas para informar posições."
         ] };
+      messages.aiPrompts = { ...DEFAULT_AI_PROMPTS }; // Usar padrões se o arquivo não existir
+      messages.aiUsageSettings = { ...DEFAULT_AI_USAGE_SETTINGS }; // Usar padrões se o arquivo não existir
     }
   } catch (error) {
     console.error("Erro ao carregar messages.json:", error);
@@ -236,6 +291,8 @@ function loadMessages() {
         "Dica: Recarregar atrás de cobertura pode salvar sua vida.",
         "Dica: Conheça os 'callouts' dos mapas para informar posições."
       ] };
+    messages.aiPrompts = { ...DEFAULT_AI_PROMPTS }; // Usar padrões em caso de erro de parse
+    messages.aiUsageSettings = { ...DEFAULT_AI_USAGE_SETTINGS }; // Usar padrões em caso de erro de parse
   }
 }
 
@@ -758,14 +815,37 @@ app.get('/admin/api/messages', (req, res) => {
 });
 
 app.post('/admin/api/messages', express.json(), async (req, res) => {
-  const newMessages = req.body;
-  if (typeof newMessages === 'object' && newMessages !== null) {
-    messages = newMessages;
-    await saveMessages();
-    res.json({ success: true, message: "Mensagens atualizadas com sucesso!" });
-  } else {
-    res.status(400).json({ success: false, message: "Payload inválido." });
+  const updatedMessages = req.body;
+  // Atualiza as mensagens principais
+  if (updatedMessages.status) messages.status = updatedMessages.status;
+  if (updatedMessages.newMember) messages.newMember = updatedMessages.newMember;
+  if (updatedMessages.memberLeft) messages.memberLeft = updatedMessages.memberLeft;
+  if (updatedMessages.randomActive) messages.randomActive = updatedMessages.randomActive;
+  if (updatedMessages.inGameRandom) messages.inGameRandom = updatedMessages.inGameRandom;
+  if (updatedMessages.extras) messages.extras = updatedMessages.extras;
+  if (updatedMessages.chatSummary) messages.chatSummary = updatedMessages.chatSummary;
+  if (updatedMessages.gameTips) messages.gameTips = updatedMessages.gameTips;
+  // Atualiza os prompts da IA
+  if (updatedMessages.aiPrompts) {
+    if (!messages.aiPrompts) messages.aiPrompts = {}; // Garante que messages.aiPrompts exista
+    for (const key in updatedMessages.aiPrompts) {
+      if (Object.prototype.hasOwnProperty.call(updatedMessages.aiPrompts, key)) {
+        messages.aiPrompts[key] = updatedMessages.aiPrompts[key];
+      }
+    }
   }
+  // Atualiza as configurações de uso da IA
+  if (updatedMessages.aiUsageSettings) {
+    if (!messages.aiUsageSettings) messages.aiUsageSettings = { ...DEFAULT_AI_USAGE_SETTINGS };
+     for (const key in updatedMessages.aiUsageSettings) {
+      if (Object.prototype.hasOwnProperty.call(updatedMessages.aiUsageSettings, key) && messages.aiUsageSettings.hasOwnProperty(key)) {
+        messages.aiUsageSettings[key] = updatedMessages.aiUsageSettings[key];
+      }
+    }
+  }
+
+  await saveMessages();
+  res.json({ success: true, message: "Mensagens e prompts de IA salvos com sucesso!" });
 });
 
 // API para configurações gerais do bot
@@ -859,45 +939,86 @@ app.post('/admin/api/generate-message', express.json(), async (req, res) => {
   let basePrompt = "";
   let singleExample = ""; // Para tipos que têm apenas uma string de exemplo
 
-  switch (type) {
-    case 'inGameRandom':
-      exampleMessages = messages.inGameRandom || [];
-      basePrompt = "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão. ";
-      break;
-    case 'randomActive':
-      exampleMessages = messages.randomActive || [];
-      basePrompt = "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida. ";
-      break;
-    case 'status_closed':
-      singleExample = messages.status?.closed;
-      basePrompt = "Gere uma mensagem curta e informativa para o status do grupo de Pavlov VR, indicando que o servidor está FECHADO. Exemplo: Servidor fechado por hoje, pessoal. Até amanhã!";
-      break;
-    case 'status_openingSoon':
-      singleExample = messages.status?.openingSoon;
-      basePrompt = "Gere uma mensagem curta e animada para o status do grupo de Pavlov VR, indicando que o servidor abrirá EM BREVE (ex: em 1 hora). Exemplo: Preparem-se! Servidor abrindo em 1 hora!";
-      break;
-    case 'status_open':
-      singleExample = messages.status?.open;
-      basePrompt = "Gere uma mensagem curta e convidativa para o status do grupo de Pavlov VR, indicando que o servidor está ABERTO. Exemplo: Servidor online! Bora pro tiroteio!";
-      break;
-    case 'newMember':
-      exampleMessages = messages.newMember || [];
-      basePrompt = "Gere uma mensagem de boas-vindas curta, amigável e divertida para um NOVO MEMBRO que acabou de entrar no grupo de Pavlov VR. Pode incluir um toque de humor ou referência ao jogo.";
-      break;
-    case 'memberLeft':
-      exampleMessages = messages.memberLeft || [];
-      basePrompt = "Gere uma mensagem curta, neutra ou levemente humorística para quando um MEMBRO SAI do grupo de Pavlov VR. Exemplo: Fulano desertou! Menos um pra dividir o loot.";
-      break;
-    case 'extras_sundayNight':
-      singleExample = messages.extras?.sundayNight;
-      basePrompt = "Gere uma mensagem curta e temática para ser enviada em um DOMINGO À NOITE para jogadores de Pavlov VR, talvez sobre o fim de semana ou a semana que começa, com um toque de Pavlov. Exemplo: Domingo acabando... última chance pra um headshot antes da segunda!";
-      break;
-    case 'extras_friday':
-      singleExample = messages.extras?.friday;
-      basePrompt = "Gere uma mensagem curta e animada para uma SEXTA-FEIRA para jogadores de Pavlov VR, celebrando o início do fim de semana e chamando para o jogo. Exemplo: Sextou, soldados! Pavlov liberado no final de semana!";
-      break;
-    default:
-      return res.status(400).json({ success: false, message: `Tipo de mensagem desconhecido: ${type}` });
+  // Usar o prompt customizável de messages.aiPrompts se existir para o tipo, senão um fallback.
+  basePrompt = messages.aiPrompts && messages.aiPrompts[type] ? messages.aiPrompts[type] : "";
+
+  if (!basePrompt) { // Fallback se o prompt não foi encontrado para o tipo específico
+    // Manter a lógica original de switch como fallback para prompts não configurados em messages.aiPrompts
+    // ou se messages.aiPrompts[type] estiver vazio.
+    console.warn(`Prompt de IA para o tipo '${type}' não encontrado ou vazio em messages.aiPrompts. Usando fallback interno se disponível.`);
+    switch (type) {
+      case 'inGameRandom':
+        exampleMessages = messages.inGameRandom || [];
+        basePrompt = DEFAULT_AI_PROMPTS.inGameRandom; // Usar o default daqui
+        break;
+      case 'randomActive':
+        exampleMessages = messages.randomActive || [];
+        basePrompt = DEFAULT_AI_PROMPTS.randomActive; // Usar o default daqui
+        break;
+      case 'status_closed':
+        singleExample = Array.isArray(messages.status?.closed) && messages.status.closed.length > 0 ? messages.status.closed[0] : messages.status?.closed;
+        basePrompt = DEFAULT_AI_PROMPTS.status_closed;
+        break;
+      case 'status_openingSoon':
+        singleExample = Array.isArray(messages.status?.openingSoon) && messages.status.openingSoon.length > 0 ? messages.status.openingSoon[0] : messages.status?.openingSoon;
+        basePrompt = DEFAULT_AI_PROMPTS.status_openingSoon;
+        break;
+      case 'status_open':
+        singleExample = Array.isArray(messages.status?.open) && messages.status.open.length > 0 ? messages.status.open[0] : messages.status?.open;
+        basePrompt = DEFAULT_AI_PROMPTS.status_open;
+        break;
+      case 'newMember':
+        exampleMessages = messages.newMember || [];
+        basePrompt = DEFAULT_AI_PROMPTS.newMember;
+        break;
+      case 'memberLeft':
+        exampleMessages = messages.memberLeft || [];
+        basePrompt = DEFAULT_AI_PROMPTS.memberLeft;
+        break;
+      case 'extras_sundayNight':
+        singleExample = Array.isArray(messages.extras?.sundayNight) && messages.extras.sundayNight.length > 0 ? messages.extras.sundayNight[0] : messages.extras?.sundayNight;
+        basePrompt = DEFAULT_AI_PROMPTS.extras_sundayNight;
+        break;
+      case 'extras_friday':
+        singleExample = Array.isArray(messages.extras?.friday) && messages.extras.friday.length > 0 ? messages.extras.friday[0] : messages.extras?.friday;
+        basePrompt = DEFAULT_AI_PROMPTS.extras_friday;
+        break;
+      default:
+        return res.status(400).json({ success: false, message: `Tipo de mensagem desconhecido ou prompt não configurado: ${type}` });
+    }
+  } else {
+    // Se o prompt veio de messages.aiPrompts[type], precisamos definir os examplesMessages ou singleExample
+    // para a lógica de contexto do prompt que se segue.
+     switch (type) {
+      case 'inGameRandom':
+        exampleMessages = messages.inGameRandom || [];
+        break;
+      case 'randomActive':
+        exampleMessages = messages.randomActive || [];
+        break;
+      case 'status_closed':
+        singleExample = Array.isArray(messages.status?.closed) && messages.status.closed.length > 0 ? messages.status.closed[0] : messages.status?.closed;
+        break;
+      case 'status_openingSoon':
+        singleExample = Array.isArray(messages.status?.openingSoon) && messages.status.openingSoon.length > 0 ? messages.status.openingSoon[0] : messages.status?.openingSoon;
+        break;
+      case 'status_open':
+        singleExample = Array.isArray(messages.status?.open) && messages.status.open.length > 0 ? messages.status.open[0] : messages.status?.open;
+        break;
+      case 'newMember':
+        exampleMessages = messages.newMember || [];
+        break;
+      case 'memberLeft':
+        exampleMessages = messages.memberLeft || [];
+        break;
+      case 'extras_sundayNight':
+        singleExample = Array.isArray(messages.extras?.sundayNight) && messages.extras.sundayNight.length > 0 ? messages.extras.sundayNight[0] : messages.extras?.sundayNight;
+        break;
+      case 'extras_friday':
+        singleExample = Array.isArray(messages.extras?.friday) && messages.extras.friday.length > 0 ? messages.extras.friday[0] : messages.extras?.friday;
+        break;
+      // No default needed here as basePrompt is already set
+    }
   }
   
   let promptContext = basePrompt;
@@ -1307,106 +1428,94 @@ startBot();
 
 // Função para obter uma mensagem aleatória GERAL, potencialmente gerada por IA ou uma dica
 async function getAIRandomMessage() {
-  // 30% chance to return a game tip
-  if (Math.random() < 0.3 && messages.gameTips && messages.gameTips.length > 0) {
-    console.log("Retornando dica de jogo (geral).");
-    return getRandomElement(messages.gameTips);
+  const useAI = messages.aiUsageSettings && messages.aiUsageSettings.randomActive && botConfig.GROQ_API_KEY;
+
+  if (useAI) {
+    // 30% chance to return a game tip IF AI is enabled for this type
+    if (Math.random() < 0.3 && messages.gameTips && messages.gameTips.length > 0) {
+      console.log("Retornando dica de jogo (geral, AI enabled path).");
+      return getRandomElement(messages.gameTips);
+    }
+    console.log("Tentando gerar mensagem aleatória GERAL com IA.");
+    const exampleMessages = messages.randomActive || [];
+    let promptContext = messages.aiPrompts?.randomActive || DEFAULT_AI_PROMPTS.randomActive;
+
+    if (exampleMessages.length > 0) {
+      const sampleSize = Math.min(exampleMessages.length, 2);
+      const samples = [];
+      const shuffledExamples = [...exampleMessages].sort(() => 0.5 - Math.random());
+      for (let i = 0; i < sampleSize; i++) {
+        if (shuffledExamples[i]) samples.push(shuffledExamples[i]);
+      }
+      if (samples.length > 0) {
+          promptContext += `\n\nInspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('\n- ')}`;
+      }
+    }
+    promptContext += "\nA mensagem deve ser criativa e adequada para um ambiente de jogo online. Evite ser repetitivo.";
+
+    const generatedMessage = await callGroqAPI(promptContext);
+
+    if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
+      return generatedMessage;
+    } else {
+      console.warn("Falha ao gerar mensagem GERAL com Groq (AI path), usando fallback da lista randomActive ou dica.");
+      // Fallback para lista pré-definida se IA falhar
+    }
   }
-
-  if (!botConfig.GROQ_API_KEY) {
-    console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista randomActive ou dica.");
-    if (messages.randomActive && messages.randomActive.length > 0) {
-      return getRandomElement(messages.randomActive);
-    }
-    if (messages.gameTips && messages.gameTips.length > 0) { // Fallback to tip if randomActive is empty
-        return getRandomElement(messages.gameTips);
-    }
-    return "Aqui deveria ter uma piada ou dica, mas a IA está de folga e não temos exemplos!";
+  // Se AI não estiver habilitada OU se IA falhou e caiu aqui:
+  if (messages.randomActive && messages.randomActive.length > 0) {
+    return getRandomElement(messages.randomActive);
   }
-
-  const exampleMessages = messages.randomActive || [];
-  let promptContext = "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida. ";
-
-  if (exampleMessages.length > 0) {
-    const sampleSize = Math.min(exampleMessages.length, 2);
-    const samples = [];
-    // Pega amostras aleatórias para evitar sempre os mesmos exemplos
-    const shuffledExamples = [...exampleMessages].sort(() => 0.5 - Math.random());
-    for (let i = 0; i < sampleSize; i++) {
-      if (shuffledExamples[i]) samples.push(shuffledExamples[i]);
-    }
-    if (samples.length > 0) {
-        promptContext += ` Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- ${samples.join('\n- ')}\n`;
-    }
+  if (messages.gameTips && messages.gameTips.length > 0) { // Fallback para dica
+      return getRandomElement(messages.gameTips);
   }
-  promptContext += "A mensagem deve ser criativa e adequada para um ambiente de jogo online. Evite ser repetitivo.";
-
-  const generatedMessage = await callGroqAPI(promptContext);
-
-  if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
-    return generatedMessage;
-  } else {
-    console.warn("Falha ao gerar mensagem GERAL com Groq, usando fallback da lista randomActive ou dica.");
-    if (messages.randomActive && messages.randomActive.length > 0) {
-      return getRandomElement(messages.randomActive);
-    }
-    if (messages.gameTips && messages.gameTips.length > 0) { // Fallback to tip
-        return getRandomElement(messages.gameTips);
-    }
-    return "A IA tentou, mas falhou na mensagem geral. Que tal um 'bora jogar!' clássico?";
-  }
+  return "A IA tentou, mas falhou na mensagem geral. Que tal um 'bora jogar!' clássico?"; // Fallback final
 }
 
 // Função para obter uma mensagem aleatória "DURANTE O JOGO", potencialmente gerada por IA ou uma dica
 async function getAIInGameMessage() {
-  // 30% chance to return a game tip
-  if (Math.random() < 0.3 && messages.gameTips && messages.gameTips.length > 0) {
-    console.log("Retornando dica de jogo (in-game).");
-    return getRandomElement(messages.gameTips);
+  const useAI = messages.aiUsageSettings && messages.aiUsageSettings.inGameRandom && botConfig.GROQ_API_KEY;
+
+  if (useAI) {
+    // 30% chance to return a game tip IF AI is enabled for this type
+    if (Math.random() < 0.3 && messages.gameTips && messages.gameTips.length > 0) {
+      console.log("Retornando dica de jogo (in-game, AI enabled path).");
+      return getRandomElement(messages.gameTips);
+    }
+    console.log("Tentando gerar mensagem IN-GAME com IA.");
+    const exampleMessages = messages.inGameRandom || [];
+    let promptContext = messages.aiPrompts?.inGameRandom || DEFAULT_AI_PROMPTS.inGameRandom;
+
+    if (exampleMessages.length > 0) {
+      const sampleSize = Math.min(exampleMessages.length, 2);
+      const samples = [];
+      const shuffledInGameExamples = [...exampleMessages].sort(() => 0.5 - Math.random());
+      for (let i = 0; i < sampleSize; i++) {
+        if (shuffledInGameExamples[i]) samples.push(shuffledInGameExamples[i]);
+      }
+      if (samples.length > 0) {
+          promptContext += `\n\nInspire-se no tom e estilo destes exemplos de mensagens 'durante o jogo' (mas não os repita):\n- ${samples.join('\n- ')}`;
+      }
+    }
+    promptContext += "\nA mensagem deve ser criativa e adequada para o calor do momento no jogo. Evite ser repetitivo.";
+
+    const generatedMessage = await callGroqAPI(promptContext);
+
+    if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
+      return generatedMessage;
+    } else {
+      console.warn("Falha ao gerar mensagem IN-GAME com Groq (AI path), usando fallback da lista inGameRandom ou dica.");
+      // Fallback para lista pré-definida se IA falhar
+    }
   }
-
-  if (!botConfig.GROQ_API_KEY) {
-    console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista inGameRandom ou dica.");
-    if (messages.inGameRandom && messages.inGameRandom.length > 0) {
-      return getRandomElement(messages.inGameRandom);
-    }
-    if (messages.gameTips && messages.gameTips.length > 0) { // Fallback to tip
-        return getRandomElement(messages.gameTips);
-    }
-    return "O jogo está rolando, mas a IA de mensagens de jogo está offline! Fica a dica: mire na cabeça!";
+  // Se AI não estiver habilitada OU se IA falhou e caiu aqui:
+  if (messages.inGameRandom && messages.inGameRandom.length > 0) {
+    return getRandomElement(messages.inGameRandom);
   }
-
-  const exampleMessages = messages.inGameRandom || [];
-  let promptContext = "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão. ";
-
-  if (exampleMessages.length > 0) {
-    const sampleSize = Math.min(exampleMessages.length, 2);
-    const samples = [];
-    // Pega amostras aleatórias para evitar sempre os mesmos exemplos
-    const shuffledInGameExamples = [...exampleMessages].sort(() => 0.5 - Math.random());
-    for (let i = 0; i < sampleSize; i++) {
-      if (shuffledInGameExamples[i]) samples.push(shuffledInGameExamples[i]);
-    }
-    if (samples.length > 0) {
-        promptContext += ` Inspire-se no tom e estilo destes exemplos de mensagens 'durante o jogo' (mas não os repita):\n- ${samples.join('\n- ')}\n`;
-    }
+  if (messages.gameTips && messages.gameTips.length > 0) { // Fallback para dica
+      return getRandomElement(messages.gameTips);
   }
-  promptContext += "A mensagem deve ser criativa e adequada para o calor do momento no jogo. Evite ser repetitivo.";
-
-  const generatedMessage = await callGroqAPI(promptContext);
-
-  if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
-    return generatedMessage;
-  } else {
-    console.warn("Falha ao gerar mensagem IN-GAME com Groq, usando fallback da lista inGameRandom ou dica.");
-    if (messages.inGameRandom && messages.inGameRandom.length > 0) {
-      return getRandomElement(messages.inGameRandom);
-    }
-    if (messages.gameTips && messages.gameTips.length > 0) { // Fallback to tip
-        return getRandomElement(messages.gameTips);
-    }
-    return "A IA de jogo bugou! Foquem no objetivo!";
-  }
+  return "A IA de jogo bugou! Foquem no objetivo!"; // Fallback final
 }
 
 // --- Funções de Resumo de Chat ---
@@ -1434,7 +1543,8 @@ async function triggerChatSummary() {
   const currentChatToSummarize = [...chatHistory];
   chatHistory = []; 
 
-  const prompt = `Você é um comentarista de e-sports para o jogo Pavlov VR, conhecido por seu humor e por capturar a essência das conversas dos jogadores. Analise o seguinte bate-papo do grupo de WhatsApp e crie um resumo curto (2-4 frases) ou ate onde for necessário para resumir as melhores partes do chat, divertido e temático sobre os principais tópicos discutidos. Imagine que você está fazendo um 'resumo da zoeira do lobby' ou 'os destaques da resenha'. Não liste mensagens individuais, crie uma narrativa coesa e engraçada. Se for relevante para o resumo ou para dar um toque especial ao comentário, você pode mencionar o nome de quem disse algo marcante (por exemplo, 'Parece que o [NomeDoJogador] estava inspirado hoje!' ou 'O [NomeDoJogador] soltou a pérola do dia:'). Use os nomes com moderação e apenas se agregar valor. Seja criativo!\n\nChat dos Jogadores:\n${formatChatForSummary(currentChatToSummarize)}\n\nResumo Criativo do Comentarista:`;
+  const baseChatSummaryPrompt = messages.aiPrompts?.chatSummary || DEFAULT_AI_PROMPTS.chatSummary;
+  const prompt = baseChatSummaryPrompt.replace('{CHAT_PLACEHOLDER}', formatChatForSummary(currentChatToSummarize));
 
   console.log(`Tentando gerar resumo para ${currentChatToSummarize.length} mensagens.`);
   const summary = await callGroqAPI(prompt);

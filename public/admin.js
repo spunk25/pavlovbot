@@ -18,6 +18,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateAIInGameMessageBtn = document.getElementById('generateAIInGameMessageBtn');
     const aiMessageSpinnerInGameRandom = document.getElementById('aiMessageSpinnerInGameRandom');
 
+    // Seletores para os textareas dos prompts de IA
+    const aiPromptRandomActiveTextarea = document.getElementById('aiPrompt_randomActive');
+    const aiPromptInGameRandomTextarea = document.getElementById('aiPrompt_inGameRandom');
+    const aiPromptChatSummaryTextarea = document.getElementById('aiPrompt_chatSummary');
+    const aiPromptStatusClosedTextarea = document.getElementById('aiPrompt_status_closed');
+    const aiPromptStatusOpeningSoonTextarea = document.getElementById('aiPrompt_status_openingSoon');
+    const aiPromptStatusOpenTextarea = document.getElementById('aiPrompt_status_open');
+    const aiPromptNewMemberTextarea = document.getElementById('aiPrompt_newMember');
+    const aiPromptMemberLeftTextarea = document.getElementById('aiPrompt_memberLeft');
+    const aiPromptExtrasSundayNightTextarea = document.getElementById('aiPrompt_extras_sundayNight');
+    const aiPromptExtrasFridayTextarea = document.getElementById('aiPrompt_extras_friday');
+
+    // Seletores para os checkboxes de uso da IA
+    const aiUsageStatusClosedCheckbox = document.getElementById('aiUsage_status_closed');
+    const aiUsageStatusOpeningSoonCheckbox = document.getElementById('aiUsage_status_openingSoon');
+    const aiUsageStatusOpenCheckbox = document.getElementById('aiUsage_status_open');
+    const aiUsageNewMemberCheckbox = document.getElementById('aiUsage_newMember');
+    const aiUsageMemberLeftCheckbox = document.getElementById('aiUsage_memberLeft');
+    const aiUsageRandomActiveCheckbox = document.getElementById('aiUsage_randomActive');
+    const aiUsageInGameRandomCheckbox = document.getElementById('aiUsage_inGameRandom');
+    const aiUsageExtrasSundayNightCheckbox = document.getElementById('aiUsage_extras_sundayNight');
+    const aiUsageExtrasFridayCheckbox = document.getElementById('aiUsage_extras_friday');
+
     // Formulário de Configurações Gerais
     const configForm = document.getElementById('configForm');
     const responseMessageConfigDiv = document.getElementById('responseMessageConfig');
@@ -102,6 +125,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 extrasSundayNightInput.value = Array.isArray(messages.extras.sundayNight) ? messages.extras.sundayNight.join('\n') : (messages.extras.sundayNight || '');
                 extrasFridayInput.value = Array.isArray(messages.extras.friday) ? messages.extras.friday.join('\n') : (messages.extras.friday || '');
             }
+
+            // Carregar prompts da IA
+            if (messages.aiPrompts) {
+                if (aiPromptRandomActiveTextarea && messages.aiPrompts.randomActive !== undefined) aiPromptRandomActiveTextarea.value = messages.aiPrompts.randomActive;
+                if (aiPromptInGameRandomTextarea && messages.aiPrompts.inGameRandom !== undefined) aiPromptInGameRandomTextarea.value = messages.aiPrompts.inGameRandom;
+                if (aiPromptChatSummaryTextarea && messages.aiPrompts.chatSummary !== undefined) aiPromptChatSummaryTextarea.value = messages.aiPrompts.chatSummary;
+                if (aiPromptStatusClosedTextarea && messages.aiPrompts.status_closed !== undefined) aiPromptStatusClosedTextarea.value = messages.aiPrompts.status_closed;
+                if (aiPromptStatusOpeningSoonTextarea && messages.aiPrompts.status_openingSoon !== undefined) aiPromptStatusOpeningSoonTextarea.value = messages.aiPrompts.status_openingSoon;
+                if (aiPromptStatusOpenTextarea && messages.aiPrompts.status_open !== undefined) aiPromptStatusOpenTextarea.value = messages.aiPrompts.status_open;
+                if (aiPromptNewMemberTextarea && messages.aiPrompts.newMember !== undefined) aiPromptNewMemberTextarea.value = messages.aiPrompts.newMember;
+                if (aiPromptMemberLeftTextarea && messages.aiPrompts.memberLeft !== undefined) aiPromptMemberLeftTextarea.value = messages.aiPrompts.memberLeft;
+                if (aiPromptExtrasSundayNightTextarea && messages.aiPrompts.extras_sundayNight !== undefined) aiPromptExtrasSundayNightTextarea.value = messages.aiPrompts.extras_sundayNight;
+                if (aiPromptExtrasFridayTextarea && messages.aiPrompts.extras_friday !== undefined) aiPromptExtrasFridayTextarea.value = messages.aiPrompts.extras_friday;
+            }
+
+            // Carregar configurações de uso da IA
+            const defaultAiUsage = { // Padrões caso não existam no messages.json
+                status_closed: false, status_openingSoon: false, status_open: false,
+                newMember: false, memberLeft: false,
+                randomActive: true, inGameRandom: true,
+                extras_sundayNight: false, extras_friday: false
+            };
+            const currentAiUsage = messages.aiUsageSettings || defaultAiUsage;
+
+            if (aiUsageStatusClosedCheckbox) aiUsageStatusClosedCheckbox.checked = currentAiUsage.status_closed !== undefined ? currentAiUsage.status_closed : defaultAiUsage.status_closed;
+            if (aiUsageStatusOpeningSoonCheckbox) aiUsageStatusOpeningSoonCheckbox.checked = currentAiUsage.status_openingSoon !== undefined ? currentAiUsage.status_openingSoon : defaultAiUsage.status_openingSoon;
+            if (aiUsageStatusOpenCheckbox) aiUsageStatusOpenCheckbox.checked = currentAiUsage.status_open !== undefined ? currentAiUsage.status_open : defaultAiUsage.status_open;
+            if (aiUsageNewMemberCheckbox) aiUsageNewMemberCheckbox.checked = currentAiUsage.newMember !== undefined ? currentAiUsage.newMember : defaultAiUsage.newMember;
+            if (aiUsageMemberLeftCheckbox) aiUsageMemberLeftCheckbox.checked = currentAiUsage.memberLeft !== undefined ? currentAiUsage.memberLeft : defaultAiUsage.memberLeft;
+            if (aiUsageRandomActiveCheckbox) aiUsageRandomActiveCheckbox.checked = currentAiUsage.randomActive !== undefined ? currentAiUsage.randomActive : defaultAiUsage.randomActive;
+            if (aiUsageInGameRandomCheckbox) aiUsageInGameRandomCheckbox.checked = currentAiUsage.inGameRandom !== undefined ? currentAiUsage.inGameRandom : defaultAiUsage.inGameRandom;
+            if (aiUsageExtrasSundayNightCheckbox) aiUsageExtrasSundayNightCheckbox.checked = currentAiUsage.extras_sundayNight !== undefined ? currentAiUsage.extras_sundayNight : defaultAiUsage.extras_sundayNight;
+            if (aiUsageExtrasFridayCheckbox) aiUsageExtrasFridayCheckbox.checked = currentAiUsage.extras_friday !== undefined ? currentAiUsage.extras_friday : defaultAiUsage.extras_friday;
+
         } catch (error) {
             console.error('Erro ao carregar mensagens:', error);
             responseMessageMessagesDiv.textContent = 'Erro ao carregar mensagens do servidor.';
@@ -158,6 +215,29 @@ document.addEventListener('DOMContentLoaded', () => {
             extras: {
                 sundayNight: extrasSundayNightInput.value.split('\n').map(s => s.trim()).filter(s => s),
                 friday: extrasFridayInput.value.split('\n').map(s => s.trim()).filter(s => s),
+            },
+            aiPrompts: {
+                randomActive: aiPromptRandomActiveTextarea ? aiPromptRandomActiveTextarea.value.trim() : '',
+                inGameRandom: aiPromptInGameRandomTextarea ? aiPromptInGameRandomTextarea.value.trim() : '',
+                chatSummary: aiPromptChatSummaryTextarea ? aiPromptChatSummaryTextarea.value.trim() : '',
+                status_closed: aiPromptStatusClosedTextarea ? aiPromptStatusClosedTextarea.value.trim() : '',
+                status_openingSoon: aiPromptStatusOpeningSoonTextarea ? aiPromptStatusOpeningSoonTextarea.value.trim() : '',
+                status_open: aiPromptStatusOpenTextarea ? aiPromptStatusOpenTextarea.value.trim() : '',
+                newMember: aiPromptNewMemberTextarea ? aiPromptNewMemberTextarea.value.trim() : '',
+                memberLeft: aiPromptMemberLeftTextarea ? aiPromptMemberLeftTextarea.value.trim() : '',
+                extras_sundayNight: aiPromptExtrasSundayNightTextarea ? aiPromptExtrasSundayNightTextarea.value.trim() : '',
+                extras_friday: aiPromptExtrasFridayTextarea ? aiPromptExtrasFridayTextarea.value.trim() : ''
+            },
+            aiUsageSettings: {
+                status_closed: aiUsageStatusClosedCheckbox ? aiUsageStatusClosedCheckbox.checked : false,
+                status_openingSoon: aiUsageStatusOpeningSoonCheckbox ? aiUsageStatusOpeningSoonCheckbox.checked : false,
+                status_open: aiUsageStatusOpenCheckbox ? aiUsageStatusOpenCheckbox.checked : false,
+                newMember: aiUsageNewMemberCheckbox ? aiUsageNewMemberCheckbox.checked : false,
+                memberLeft: aiUsageMemberLeftCheckbox ? aiUsageMemberLeftCheckbox.checked : false,
+                randomActive: aiUsageRandomActiveCheckbox ? aiUsageRandomActiveCheckbox.checked : true, // Default true
+                inGameRandom: aiUsageInGameRandomCheckbox ? aiUsageInGameRandomCheckbox.checked : true, // Default true
+                extras_sundayNight: aiUsageExtrasSundayNightCheckbox ? aiUsageExtrasSundayNightCheckbox.checked : false,
+                extras_friday: aiUsageExtrasFridayCheckbox ? aiUsageExtrasFridayCheckbox.checked : false
             }
         };
 
