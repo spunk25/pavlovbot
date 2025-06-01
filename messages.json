@@ -31,5 +31,9 @@
   "extras": {
     "sundayNight": "☠️ Chega de paz, começa a guerra. Domingo é dia de Pavlov. Tiro, tática e treta.",
     "friday": "🍻 Sextou no servidor! Hoje vale até errar e culpar o amigo."
+  },
+  "chatSummary": {
+    "summaryTitle": "📢 *Resenha da Rodada (Fofocas do Front):*",
+    "noNewMessages": "Tudo quieto no front, sem fofocas para resumir agora, soldados!"
   }
 } 

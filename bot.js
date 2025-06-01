@@ -36,7 +36,8 @@ let botConfig = {
   DAYTIME_END_HOUR: 17,
   TIMEZONE: "America/Sao_Paulo",
   GROQ_API_KEY: '',
-  BOT_PUBLIC_URL: 'http://localhost:8080' // Default public URL
+  BOT_PUBLIC_URL: 'http://localhost:8080', // Default public URL
+  CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"] // Default times for chat summary
 };
 
 function loadBotConfig() {
@@ -75,6 +76,19 @@ function loadBotConfig() {
    botConfig.MESSAGES_DURING_SERVER_OPEN = parseInt(botConfig.MESSAGES_DURING_SERVER_OPEN, 10);
    botConfig.MESSAGES_DURING_DAYTIME = parseInt(botConfig.MESSAGES_DURING_DAYTIME, 10);
 
+   // Ensure CHAT_SUMMARY_TIMES is an array of strings
+   if (botConfig.CHAT_SUMMARY_TIMES && typeof botConfig.CHAT_SUMMARY_TIMES === 'string') {
+     try {
+       botConfig.CHAT_SUMMARY_TIMES = JSON.parse(botConfig.CHAT_SUMMARY_TIMES);
+     } catch (e) {
+       console.warn("Formato inválido para CHAT_SUMMARY_TIMES em .env/config.json, usando padrão. Deve ser um array JSON de strings, ex: [\"10:00\", \"16:00\"]");
+       botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"];
+     }
+   }
+   if (!Array.isArray(botConfig.CHAT_SUMMARY_TIMES)) {
+       console.warn("CHAT_SUMMARY_TIMES não é um array, usando padrão.");
+       botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"];
+   }
 
   console.log("Configurações finais do bot:", { ...botConfig, EVOLUTION_API_KEY: '***', GROQ_API_KEY: '***' }); // Não logar chaves
 }
@@ -94,7 +108,8 @@ async function saveBotConfig() {
       // O GROQ_API_KEY pode ser salvo se o usuário o inserir pelo painel,
       // mas é mais seguro mantê-lo apenas no .env.
       // Se você quiser permitir salvar pelo painel, descomente a linha abaixo.
-      // GROQ_API_KEY: botConfig.GROQ_API_KEY 
+      // GROQ_API_KEY: botConfig.GROQ_API_KEY
+      CHAT_SUMMARY_TIMES: botConfig.CHAT_SUMMARY_TIMES // Salvar os horários do resumo
     };
     await fs.promises.writeFile(CONFIG_FILE_PATH, JSON.stringify(configToSave, null, 2), 'utf-8');
     console.log("Configurações salvas em config.json");
@@ -107,6 +122,7 @@ loadBotConfig(); // Carrega as configurações na inicialização
 
 // --- Mensagens ---
 let messages = {}; // Será populado por loadMessages
+let chatHistory = []; // Para armazenar mensagens para resumo
 
 function loadMessages() {
   try {
@@ -428,6 +444,18 @@ function setupCronJobs() {
     logScheduledCronTask('0 20 * * 0', "Mensagem Dominical", messages.extras.sundayNight, async () => { await sendMessageToGroup(messages.extras.sundayNight); });
     logScheduledCronTask('0 18 * * 5', "Mensagem de Sexta", messages.extras.friday, async () => { await sendMessageToGroup(messages.extras.friday); });
     
+    // Agendamentos para resumo do chat
+    if (Array.isArray(botConfig.CHAT_SUMMARY_TIMES)) {
+        botConfig.CHAT_SUMMARY_TIMES.forEach(time => {
+            if (typeof time === 'string' && /^\d{1,2}:\d{2}$/.test(time)) {
+                const [hour, minute] = time.split(':');
+                logScheduledCronTask(`${minute} ${hour} * * *`, `Resumo do Chat (${hour}:${minute})`, "Gerar resumo do chat", triggerChatSummary);
+            } else {
+                console.warn(`Formato de hora inválido para CHAT_SUMMARY_TIMES: "${time}". Ignorando.`);
+            }
+        });
+    }
+    
     // Inicia os cron jobs recém configurados
     scheduledCronTasks.forEach(task => task.job.start());
     console.log("Cron jobs configurados e iniciados.");
@@ -609,13 +637,14 @@ app.post('/admin/api/config', express.json(), async (req, res) => {
       "GROUP_BASE_NAME", "MESSAGES_DURING_SERVER_OPEN", "MESSAGES_DURING_DAYTIME",
       "DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME"
       // "GROQ_API_KEY" // Descomente se quiser permitir alteração da chave Groq via painel
+      , "CHAT_SUMMARY_TIMES" // Adicionar CHAT_SUMMARY_TIMES às chaves permitidas
     ];
 
     for (const key of allowedKeys) {
       if (newConfig[key] !== undefined) {
-        // Verifica se alguma configuração de tempo foi alterada
-        if (["DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME"].includes(key) &&
-            botConfig[key] !== newConfig[key]) {
+        // Verifica se alguma configuração de tempo ou resumo foi alterada
+        if (["DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME", "CHAT_SUMMARY_TIMES"].includes(key) &&
+            JSON.stringify(botConfig[key]) !== JSON.stringify(newConfig[key])) { // Comparar como string para arrays
           requireCronRestart = true;
         }
         // Tratar números
@@ -853,6 +882,22 @@ function isFromMe(data) {
     // 3. Perform admin check (is the sender an admin of TARGET_GROUP_ID?)
     const isAdmin = await isUserAdmin(botConfig.TARGET_GROUP_ID, actualSenderJid);
     
+    // Adicionar mensagem ao histórico para resumo (se aplicável)
+    if (isGroupMessage && 
+        remoteJid === botConfig.TARGET_GROUP_ID && 
+        messageContent && 
+        !commandText.startsWith("!") &&
+        !isFromMe(data) // Já verificado acima, mas redundância não machuca
+    ) {
+        const senderName = data.pushName || actualSenderJid.split('@')[0]; // Usa pushName ou parte do JID
+        chatHistory.push({
+            sender: senderName,
+            text: messageContent,
+            timestamp: new Date()
+        });
+        // console.log(`[ChatHistory] Added: ${senderName}: ${messageContent.substring(0,30)}... Total: ${chatHistory.length}`);
+    }
+
     let replyTo = actualSenderJid; // Default: reply to where the command came from (PM or group if sender is the bot's JID in a group context)
     if (isGroupMessage && remoteJid === botConfig.TARGET_GROUP_ID) {
         replyTo = botConfig.TARGET_GROUP_ID; // If command is in target group, usually reply to group
@@ -877,6 +922,8 @@ function isFromMe(data) {
         "• !avisar      – (Admin) Aviso 1h antes de abrir\n" +
         "• !statusauto  – (Admin) Reativar status automático\n" +
         "• !teste       – (Admin) Testa o bot\n" +
+        "• !say <msg>   – (Admin) Envia msg customizada ao grupo\n" +
+        "• !anunciar <msg>– (Admin) Alias para !say\n" +
         "• !random      – Mensagem aleatória (IA)\n" +
         "• !jogar?      – Enquete rápida de jogo\n" +
         "• !audio <URL> – (Admin) Enviar áudio narrado\n" +
@@ -1026,6 +1073,21 @@ function isFromMe(data) {
                 });
             }
             await sendMessageToGroup(resp, actualSenderJid);
+        }
+        // Novo comando: !say ou !anunciar para enviar mensagem customizada
+        else if (command === '!say' || command === '!anunciar') {
+            commandProcessed = true;
+            if (args.length > 0) {
+                const messageToSend = messageContent.substring(command.length + 1).trim(); // Pega todo o texto após o comando
+                if (messageToSend) {
+                    await sendMessageToGroup(messageToSend, botConfig.TARGET_GROUP_ID);
+                    await sendMessageToGroup("✅ Mensagem enviada para o grupo.", actualSenderJid);
+                } else {
+                    await sendMessageToGroup("⚠️ Por favor, forneça uma mensagem para enviar. Uso: !say <sua mensagem>", actualSenderJid);
+                }
+            } else {
+                await sendMessageToGroup("⚠️ Uso: !say <sua mensagem>", actualSenderJid);
+            }
         }
         // If admin sent a PM and it wasn't any of the above commands
         else if (!isGroupMessage && !commandProcessed && commandText.length > 0) {
@@ -1198,5 +1260,47 @@ async function getAIInGameMessage() { // Para mensagens quando o servidor está 
       return getRandomElement(messages.inGameRandom);
     }
     return "A IA de jogo bugou! Foquem no objetivo!";
+  }
+}
+
+// --- Funções de Resumo de Chat ---
+function formatChatForSummary(history) {
+  return history.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
+}
+
+async function triggerChatSummary() {
+  if (!botConfig.GROQ_API_KEY) {
+    console.warn("GROQ_API_KEY não configurada. Resumo do chat desabilitado.");
+    chatHistory = []; // Limpa o histórico mesmo assim
+    return;
+  }
+
+  if (chatHistory.length === 0) {
+    console.log("Nenhuma mensagem no histórico para resumir.");
+    // Opcional: Enviar mensagem ao grupo informando que não há nada para resumir
+    // const noNewMessagesText = messages.chatSummary?.noNewMessages || "Tudo quieto no front, sem fofocas para resumir agora!";
+    // await sendMessageToGroup(noNewMessagesText, botConfig.TARGET_GROUP_ID);
+    return;
+  }
+
+  const chatText = formatChatForSummary(chatHistory);
+  // Limpa o histórico ANTES de chamar a API para evitar que mensagens sejam reprocessadas em caso de falha na API e retentativa do cron
+  const currentChatToSummarize = [...chatHistory];
+  chatHistory = []; 
+
+  const prompt = `Você é um comentarista de e-sports para o jogo Pavlov VR, conhecido por seu humor e por capturar a essência das conversas dos jogadores. Analise o seguinte bate-papo do grupo de WhatsApp e crie um resumo curto (2-4 frases), divertido e temático sobre os principais tópicos discutidos. Imagine que você está fazendo um 'resumo da zoeira do lobby' ou 'os destaques da resenha'. Não liste mensagens individuais, crie uma narrativa coesa e engraçada. Se for relevante para o resumo ou para dar um toque especial ao comentário, você pode mencionar o nome de quem disse algo marcante (por exemplo, 'Parece que o [NomeDoJogador] estava inspirado hoje!' ou 'O [NomeDoJogador] soltou a pérola do dia:'). Use os nomes com moderação e apenas se agregar valor. Seja criativo!\n\nChat dos Jogadores:\n${formatChatForSummary(currentChatToSummarize)}\n\nResumo Criativo do Comentarista:`;
+
+  console.log(`Tentando gerar resumo para ${currentChatToSummarize.length} mensagens.`);
+  const summary = await callGroqAPI(prompt);
+
+  const summaryTitleText = messages.chatSummary?.summaryTitle || "📢 *Resenha da Rodada (Fofocas do Front):*";
+
+  if (summary && !summary.startsWith("Erro") && !summary.startsWith("Não foi possível") && summary.length > 10) {
+    await sendMessageToGroup(`${summaryTitleText}\n\n${summary}`, botConfig.TARGET_GROUP_ID);
+    console.log("Resumo do chat enviado ao grupo.");
+  } else {
+    console.warn("Falha ao gerar resumo do chat ou resumo inválido:", summary);
+    // Opcional: notificar o grupo sobre a falha
+    // await sendMessageToGroup("A IA hoje não colaborou para o resumo. Mais sorte na próxima!", botConfig.TARGET_GROUP_ID);
   }
 }
