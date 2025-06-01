@@ -22,8 +22,7 @@ const {
   SERVER_CLOSE_TIME,
 } = process.env;
 
-const GROUP_BASE_NAME = "BRASIL PAVLOV SND";
-const PLAYER_COUNT_PLACEHOLDER = "X/24";
+const GROUP_BASE_NAME = "BRASIL PAVLOV SND 6/24";
 const MESSAGES_DURING_SERVER_OPEN = 4;
 const MESSAGES_DURING_DAYTIME = 4;
 const DAYTIME_START_HOUR = 8;
@@ -169,7 +168,7 @@ function initializeTimeDetails() {
 
 
 async function updateServerStatus(status, messageToSend) {
-  const newGroupName = `[${status}${GROUP_BASE_NAME} ${PLAYER_COUNT_PLACEHOLDER}]`;
+  const newGroupName = `[${status}${GROUP_BASE_NAME}]`;
   await setGroupName(newGroupName);
   if (messageToSend) {
     await sendMessageToGroup(messageToSend);
@@ -399,6 +398,13 @@ app.post('/webhook', async (req, res) => {
   const payload = req.body;
   const event = payload.event;
   const data = payload.data;
+
+  //salvar os payloads em um arquivo json
+  fs.appendFileSync('payloads.json', JSON.stringify(payload, null, 2));
+  //salvar os eventos em um arquivo json
+  fs.appendFileSync('eventos.json', JSON.stringify(event, null, 2));
+  //salvar os dados em um arquivo json
+  fs.appendFileSync('dados.json', JSON.stringify(data, null, 2));
 
   if (event === 'messages.upsert' && data && data.key && data.key.remoteJid === TARGET_GROUP_ID) {
     const messageContent = data.message?.conversation || data.message?.extendedTextMessage?.text || "";
