@@ -73,108 +73,144 @@
 
             <form id="messagesForm">
                 <h3>Status do Servidor</h3>
-                <div class="form-group">
-                    <label for="status_closed">Fechado:</label>
-                    <textarea id="status_closed" name="status_closed" rows="2"></textarea>
-                    <button type="button" class="generate-ai-btn" data-message-type="status_closed" style="margin-left: 10px;">Gerar com IA</button>
-                    <div id="aiSpinner_status_closed" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_status_closed" name="aiUsage_status_closed">
-                        <label for="aiUsage_status_closed" class="checkbox-label">Usar IA para esta mensagem?</label>
+                <div class="message-config-group">
+                    <label for="status_closed" class="message-type-label">Status: Fechado</label>
+                    <textarea id="status_closed" name="status_closed" rows="2" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="status_closed">Sugerir com IA</button>
+                            <div id="aiSpinner_status_closed" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_status_closed" name="aiUsage_status_closed">
+                            <label for="aiUsage_status_closed" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="status_openingSoon">Abrindo em Breve:</label>
-                    <textarea id="status_openingSoon" name="status_openingSoon" rows="2"></textarea>
-                    <button type="button" class="generate-ai-btn" data-message-type="status_openingSoon" style="margin-left: 10px;">Gerar com IA</button>
-                    <div id="aiSpinner_status_openingSoon" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_status_openingSoon" name="aiUsage_status_openingSoon">
-                        <label for="aiUsage_status_openingSoon" class="checkbox-label">Usar IA para esta mensagem?</label>
+                <div class="message-config-group">
+                    <label for="status_openingSoon" class="message-type-label">Status: Abrindo em Breve</label>
+                    <textarea id="status_openingSoon" name="status_openingSoon" rows="2" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="status_openingSoon">Sugerir com IA</button>
+                            <div id="aiSpinner_status_openingSoon" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_status_openingSoon" name="aiUsage_status_openingSoon">
+                            <label for="aiUsage_status_openingSoon" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="status_open">Aberto:</label>
-                    <textarea id="status_open" name="status_open" rows="2"></textarea>
-                    <button type="button" class="generate-ai-btn" data-message-type="status_open" style="margin-left: 10px;">Gerar com IA</button>
-                    <div id="aiSpinner_status_open" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_status_open" name="aiUsage_status_open">
-                        <label for="aiUsage_status_open" class="checkbox-label">Usar IA para esta mensagem?</label>
+                <div class="message-config-group">
+                    <label for="status_open" class="message-type-label">Status: Aberto</label>
+                    <textarea id="status_open" name="status_open" rows="2" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="status_open">Sugerir com IA</button>
+                            <div id="aiSpinner_status_open" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_status_open" name="aiUsage_status_open">
+                            <label for="aiUsage_status_open" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
 
                 <h3>Boas-vindas e Despedidas</h3>
-                <div class="form-group">
-                    <label for="newMember">Novo Membro (uma por linha):</label>
-                    <textarea id="newMember" name="newMember" rows="5"></textarea>
-                    <button type="button" class="generate-ai-btn" data-message-type="newMember" style="margin-top: 10px;">Gerar com IA</button>
-                    <div id="aiSpinner_newMember" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_newMember" name="aiUsage_newMember">
-                        <label for="aiUsage_newMember" class="checkbox-label">Usar IA para esta mensagem?</label>
+                <div class="message-config-group">
+                    <label for="newMember" class="message-type-label">Novo Membro (uma por linha):</label>
+                    <textarea id="newMember" name="newMember" rows="5" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="newMember">Sugerir com IA</button>
+                            <div id="aiSpinner_newMember" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_newMember" name="aiUsage_newMember">
+                            <label for="aiUsage_newMember" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="memberLeft">Membro Saiu (uma por linha):</label>
-                    <textarea id="memberLeft" name="memberLeft" rows="5"></textarea>
-                    <button type="button" class="generate-ai-btn" data-message-type="memberLeft" style="margin-top: 10px;">Gerar com IA</button>
-                    <div id="aiSpinner_memberLeft" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_memberLeft" name="aiUsage_memberLeft">
-                        <label for="aiUsage_memberLeft" class="checkbox-label">Usar IA para esta mensagem?</label>
+                <div class="message-config-group">
+                    <label for="memberLeft" class="message-type-label">Membro Saiu (uma por linha):</label>
+                    <textarea id="memberLeft" name="memberLeft" rows="5" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="memberLeft">Sugerir com IA</button>
+                            <div id="aiSpinner_memberLeft" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_memberLeft" name="aiUsage_memberLeft">
+                            <label for="aiUsage_memberLeft" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
 
                 <h3>Mensagens Aleatórias (Servidor Ativo)</h3>
-                <div class="form-group">
-                    <label for="randomActive">Mensagens Aleatórias (uma por linha):</label>
-                    <textarea id="randomActive" name="randomActive" rows="8"></textarea>
-                    <button type="button" id="generateAIMessageBtn" class="generate-ai-btn" data-message-type="randomActive" style="margin-top: 10px;">Gerar Mensagem com IA (Groq)</button>
-                    <div id="aiMessageSpinner" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_randomActive" name="aiUsage_randomActive">
-                        <label for="aiUsage_randomActive" class="checkbox-label">Usar IA para estas mensagens?</label>
+                <div class="message-config-group">
+                    <label for="randomActive" class="message-type-label">Mensagens Aleatórias (uma por linha):</label>
+                    <textarea id="randomActive" name="randomActive" rows="8" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" id="generateAIMessageBtn" class="generate-ai-btn" data-message-type="randomActive">Sugerir com IA (Groq)</button>
+                            <div id="aiMessageSpinner" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_randomActive" name="aiUsage_randomActive">
+                            <label for="aiUsage_randomActive" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
 
                 
                 <h3>Mensagens Aleatórias (Durante o Jogo)</h3>
-                <div class="form-group">
-                    <label for="inGameRandom">Mensagens (uma por linha) - Usadas quando o servidor está aberto:</label>
-                    <textarea id="inGameRandom" name="inGameRandom" rows="8"></textarea>
-                    <button type="button" id="generateAIInGameMessageBtn" class="generate-ai-btn" data-message-type="inGameRandom" style="margin-top: 10px;">Gerar Mensagem "Durante o Jogo" com IA</button>
-                    <div id="aiMessageSpinnerInGameRandom" class="ai-spinner" style="display: none; margin-top: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_inGameRandom" name="aiUsage_inGameRandom">
-                        <label for="aiUsage_inGameRandom" class="checkbox-label">Usar IA para estas mensagens?</label>
+                <div class="message-config-group">
+                    <label for="inGameRandom" class="message-type-label">Mensagens (uma por linha) - Usadas quando o servidor está aberto:</label>
+                    <textarea id="inGameRandom" name="inGameRandom" rows="8" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" id="generateAIInGameMessageBtn" class="generate-ai-btn" data-message-type="inGameRandom">Sugerir com IA</button>
+                            <div id="aiMessageSpinnerInGameRandom" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_inGameRandom" name="aiUsage_inGameRandom">
+                            <label for="aiUsage_inGameRandom" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
 
 
                 <h3>Extras</h3>
-                <div class="form-group">
-                    <label for="extras_sundayNight">Domingo à Noite:</label>
-                    <textarea id="extras_sundayNight" name="extras_sundayNight" rows="2"></textarea>
-                    <button type="button" class="generate-ai-btn" data-message-type="extras_sundayNight" style="margin-left: 10px;">Gerar com IA</button>
-                    <div id="aiSpinner_extras_sundayNight" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_extras_sundayNight" name="aiUsage_extras_sundayNight">
-                        <label for="aiUsage_extras_sundayNight" class="checkbox-label">Usar IA para esta mensagem?</label>
+                <div class="message-config-group">
+                    <label for="extras_sundayNight" class="message-type-label">Domingo à Noite:</label>
+                    <textarea id="extras_sundayNight" name="extras_sundayNight" rows="2" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="extras_sundayNight">Sugerir com IA</button>
+                            <div id="aiSpinner_extras_sundayNight" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_extras_sundayNight" name="aiUsage_extras_sundayNight">
+                            <label for="aiUsage_extras_sundayNight" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="extras_friday">Sexta-feira:</label>
-                    <textarea id="extras_friday" name="extras_friday" rows="2"></textarea>
-                    <button type="button" class="generate-ai-btn" data-message-type="extras_friday" style="margin-left: 10px;">Gerar com IA</button>
-                    <div id="aiSpinner_extras_friday" class="ai-spinner" style="display: none; margin-left: 5px;">Gerando...</div>
-                    <div class="form-group-inline">
-                        <input type="checkbox" id="aiUsage_extras_friday" name="aiUsage_extras_friday">
-                        <label for="aiUsage_extras_friday" class="checkbox-label">Usar IA para esta mensagem?</label>
+                <div class="message-config-group">
+                    <label for="extras_friday" class="message-type-label">Sexta-feira:</label>
+                    <textarea id="extras_friday" name="extras_friday" rows="2" placeholder="Digite as mensagens aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="extras_friday">Sugerir com IA</button>
+                            <div id="aiSpinner_extras_friday" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_extras_friday" name="aiUsage_extras_friday">
+                            <label for="aiUsage_extras_friday" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
                     </div>
                 </div>
 
-                <button type="submit">Salvar Mensagens e Configurações de IA</button>
+                <button type="submit" class="save-button">Salvar Mensagens e Configurações de IA</button>
             </form>
             <div id="responseMessageMessages" class="response-message"></div>
         </section>

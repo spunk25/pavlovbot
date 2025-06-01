@@ -1,143 +1,250 @@
+/* Estilos Gerais */
 body {
-    font-family: Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
     margin: 0;
-    padding: 20px;
-    background-color: #f4f4f4;
+    padding: 0;
+    background-color: #f4f7f9;
     color: #333;
 }
 
 .container {
-    max-width: 800px;
-    margin: auto;
-    background: #fff;
-    padding: 20px;
+    width: 90%;
+    max-width: 1000px;
+    margin: 30px auto;
+    padding: 25px;
+    background-color: #fff;
     border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-h1, h2 {
-    color: #333;
+h1 {
+    color: #2c3e50;
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
+    font-size: 2em;
 }
 
 h2 {
-    margin-top: 30px;
-    border-bottom: 1px solid #eee;
+    color: #34495e;
+    border-bottom: 2px solid #e0e0e0;
     padding-bottom: 10px;
-}
-
-.form-group {
-    margin-bottom: 15px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-    font-weight: bold;
-}
-
-.form-group input[type="text"],
-.form-group textarea {
-    width: calc(100% - 22px);
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-sizing: border-box;
-}
-
-.form-group textarea {
-    resize: vertical;
-    min-height: 80px;
-}
-
-button[type="submit"] {
-    display: block;
-    width: 100%;
-    padding: 10px 15px;
-    background-color: #5cb85c;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-    margin-top: 20px;
-}
-
-button[type="submit"]:hover {
-    background-color: #4cae4c;
-}
-
-#responseMessage {
-    margin-top: 20px;
-    padding: 10px;
-    border-radius: 4px;
-    text-align: center;
-}
-
-#responseMessage.success {
-    background-color: #dff0d8;
-    color: #3c763d;
-    border: 1px solid #d6e9c6;
-}
-
-#responseMessage.error {
-    background-color: #f2dede;
-    color: #a94442;
-    border: 1px solid #ebccd1;
-}
-
-/* Estilos para mensagens de feedback e spinner */
-.response-message {
-    margin-top: 15px;
-    padding: 10px;
-    border-radius: 4px;
-    text-align: center;
-    display: none; /* Começa escondido */
-    font-size: 0.9em;
-}
-
-.response-message.success {
-    background-color: #dff0d8;
-    color: #3c763d;
-    border: 1px solid #d6e9c6;
-    display: block;
-}
-
-.response-message.error {
-    background-color: #f2dede;
-    color: #a94442;
-    border: 1px solid #ebccd1;
-    display: block;
-}
-
-#responseMessageGlobal { /* Para a mensagem no topo */
+    margin-top: 30px;
     margin-bottom: 20px;
+    font-size: 1.6em;
+}
+
+h3 {
+    color: #3498db;
+    margin-top: 25px;
+    margin-bottom: 15px;
+    font-size: 1.3em;
 }
 
 hr {
-    margin-top: 40px;
-    margin-bottom: 40px;
     border: 0;
-    border-top: 1px solid #eee;
+    height: 1px;
+    background-color: #ddd;
+    margin: 40px 0;
 }
 
-section {
-    margin-bottom: 30px;
-    padding: 20px;
-    background-color: #f9f9f9;
+/* Formulários */
+form {
+    margin-bottom: 25px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #555;
+}
+
+.message-type-label { /* Label principal para o tipo de mensagem */
+    font-size: 1.1em;
+    color: #2980b9; /* Um azul um pouco mais escuro para destaque */
+}
+
+input[type="text"],
+input[type="password"],
+input[type="time"],
+input[type="number"],
+input[type="url"],
+textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ccc;
     border-radius: 5px;
-    border: 1px solid #e3e3e3;
-}
-
-input[type="time"], input[type="number"] {
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
     box-sizing: border-box;
+    font-size: 1em;
+    transition: border-color 0.3s ease;
 }
 
-.ai-spinner { /* Classe comum para spinners */
-    margin-left: 10px;
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="time"]:focus,
+input[type="number"]:focus,
+input[type="url"]:focus,
+textarea:focus {
+    border-color: #3498db;
+    outline: none;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.25);
+}
+
+textarea {
+    min-height: 60px;
+    resize: vertical;
+}
+
+/* Botões */
+button, .button { /* Adicionada classe .button para consistência se necessário */
+    background-color: #3498db;
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+button:hover, .button:hover {
+    background-color: #2980b9;
+}
+
+button:disabled, .button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+.save-button { /* Botão principal de salvar formulário */
+    background-color: #2ecc71; /* Verde para salvar */
+    min-width: 180px;
+}
+.save-button:hover {
+    background-color: #27ae60;
+}
+
+.generate-ai-btn {
+    background-color: #9b59b6; /* Roxo para botões de IA */
+    padding: 8px 15px;
+    font-size: 0.9em;
+    margin-right: 10px; /* Espaço entre o botão e o spinner/checkbox */
+}
+.generate-ai-btn:hover {
+    background-color: #8e44ad;
+}
+
+
+/* Mensagens de Resposta */
+.response-message {
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 5px;
+    text-align: center;
+    font-weight: 500;
+}
+.response-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.response-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+.response-message:empty {
+    display: none;
+}
+
+/* Estilos específicos para o novo layout de mensagens */
+.message-config-group {
+    background-color: #fdfdfd;
+    padding: 20px;
+    border: 1px solid #e7e7e7;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+.message-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px dashed #eee;
+    flex-wrap: wrap; /* Para responsividade */
+}
+
+.ai-manual-generate, .ai-auto-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Espaço entre elementos dentro do grupo */
+}
+
+.ai-auto-toggle {
+    margin-left: auto; /* Empurra para a direita se houver espaço */
+}
+
+@media (max-width: 600px) {
+    .message-options {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .ai-auto-toggle {
+        margin-left: 0;
+        width: 100%; /* Faz o toggle ocupar a largura */
+    }
+}
+
+
+.ai-spinner {
     font-style: italic;
+    color: #7f8c8d;
+    font-size: 0.9em;
+}
+.ai-spinner:empty {
+    display: none;
+}
+
+input[type="checkbox"] {
+    margin-right: 6px;
+    transform: scale(1.1); /* Torna o checkbox um pouco maior */
+    accent-color: #3498db; /* Cor do checkbox quando marcado */
+}
+
+.checkbox-label {
+    font-weight: normal;
+    color: #555;
+    font-size: 0.95em;
+    cursor: pointer;
+    margin-bottom: 0; /* Reset margin from general label style */
+}
+
+/* Seções */
+#configSection, #messagesSection, #aiPromptsSection {
+    padding: 20px;
+    margin-bottom: 30px;
+    background-color: #ffffff;
+    border-radius: 6px;
+    /* box-shadow: 0 2px 8px rgba(0,0,0,0.07); */ /* Sombra mais sutil para seções */
+}
+
+/* Ajustes para os prompts de IA (seção separada) */
+#aiPromptsSection .form-group {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid #efefef;
 } 
