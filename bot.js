@@ -685,8 +685,7 @@ function isFromMe(data) {
         resp += `• ${task.description}: ${nextRun}\n`;
       });
       await sendMessageToGroup(resp, senderJid);
-    }
-      else if (command === '!mensagens') {
+    }else if (command === '!mensagens') {
         const subcmd = args[0]?.toLowerCase();
         let list = [];
         let title = '';
@@ -711,7 +710,7 @@ function isFromMe(data) {
       
         const lines = list.map((m, i) => `${i+1}. ${m}`);
         await sendMessageToGroup(`📋 *${title}*:\n${lines.join('\n')}`, senderJid);
-      } 
+      
     }
     // Novo: Comando !start (pode ser usado por qualquer um)
     // else if (command === '!start') {
