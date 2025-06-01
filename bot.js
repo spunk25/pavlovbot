@@ -726,39 +726,37 @@ function setupCronJobs() {
       }
   };
 
-  // Agendamento para abrir o servidor (aviso 1h antes)
+  // --- Agendamento para abrir o servidor (aviso 1h antes) e abertura efetiva ---
   if (openHour !== undefined && openMinute !== undefined && warningHour !== undefined && warningMinute !== undefined) {
-      const warningCron = `${warningMinute} ${warningHour} * * *`;
-      scheduleJob("Aviso: 1h para abrir", warningCron, async () => {
-          const message = getRandomElement(messages.status.openingSoon, messages.aiPrompts.status_openingSoon, messages.aiUsageSettings.status_openingSoon);
-          if (message) {
-              await updateGroupSubjectWithStatus("⏳");
-              await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
-          }
-      }, "Aviso de abertura do servidor");
+    const warningCron = `${warningMinute} ${warningHour} * * *`;
+    // 1h antes → dispara triggerServerOpeningSoon (coloca 🟡 + envia mensagem + envia enquete)
+    scheduleJob(
+      "Aviso: 1h para abrir",
+      warningCron,
+      triggerServerOpeningSoon,
+      "Aviso de abertura do servidor"
+    );
 
-      const openCron = `${openMinute} ${openHour} * * *`;
-      scheduleJob("Servidor Aberto", openCron, async () => {
-          const message = getRandomElement(messages.status.open, messages.aiPrompts.status_open, messages.aiUsageSettings.status_open);
-          if (message) {
-              await updateGroupSubjectWithStatus("🟢");
-              await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
-              startRandomMessageCycle(botConfig.MESSAGES_DURING_SERVER_OPEN, 'inGameRandom');
-          }
-      }, "Abertura do servidor e início de mensagens in-game");
+    const openCron = `${openMinute} ${openHour} * * *`;
+    // hora exata → dispara triggerServerOpen (coloca 🟢 + envia mensagem + inicia mensagens in-game)
+    scheduleJob(
+      "Servidor Aberto",
+      openCron,
+      triggerServerOpen,
+      "Abertura do servidor e início de mensagens in-game"
+    );
   }
 
-  // Agendamento para fechar o servidor
+  // --- Agendamento para fechar o servidor ---
   if (closeHour !== undefined && closeMinute !== undefined) {
-      const closeCron = `${closeMinute} ${closeHour} * * *`;
-      scheduleJob("Servidor Fechado", closeCron, async () => {
-          const message = getRandomElement(messages.status.closed, messages.aiPrompts.status_closed, messages.aiUsageSettings.status_closed);
-          if (message) {
-              await updateGroupSubjectWithStatus("🚧");
-              await sendMessageToGroup(message, botConfig.TARGET_GROUP_ID);
-              stopRandomMessageCycle();
-          }
-      }, "Fechamento do servidor");
+    const closeCron = `${closeMinute} ${closeHour} * * *`;
+    // hora de fechamento → dispara triggerServerClose (coloca 🔴 + envia mensagem + interrompe ciclo)
+    scheduleJob(
+      "Servidor Fechado",
+      closeCron,
+      triggerServerClose,
+      "Fechamento do servidor"
+    );
   }
 
   // Agendamento para mensagens aleatórias durante o dia
@@ -900,25 +898,24 @@ async function initializeBotStatus() {
         }
     }
 
-    // Só atualiza nome do grupo se estiver em openingSoon (🟡) ou open (🟢)
-    if (initialStatus !== '🔴') {
-        await updateServerStatus(initialStatus, null);
-        console.log(`Status inicial do bot definido para: ${initialStatus}`);
+    // Ao iniciar, dispara o comportamento completo correspondente:
+    if (initialStatus === '🟡') {
+      console.log("Inicialização: dentro da janela de aviso (1h antes). Disparando aviso com enquete.");
+      await triggerServerOpeningSoon();
+    } else if (initialStatus === '🟢') {
+      console.log("Inicialização: já dentro do horário de abertura. Disparando status aberto.");
+      await triggerServerOpen();
     } else {
-        // mantém apenas o status interno, sem mexer no nome
-        currentServerStatus = initialStatus;
-        console.log(`Status inicial 'fechado' detectado fora de horário. Nome do grupo NÃO será alterado.`);
+      // Fora de qualquer janela de abertura/aviso → mantém fechado sem notificação
+      currentServerStatus = '🔴';
+      console.log("Status inicial 'fechado' detectado fora de horário. Nome do grupo NÃO será alterado.");
     }
 
-    // se já estiver aberto, inicia as mensagens automáticas
-    if (initialStatus === '🟢') {
-        serverOpenMessagesSent = 0;
-        scheduleNextRandomMessage('serverOpen');
-    }
+    // Mensagens aleatórias diurnas (se estiver dentro da janela diurna)
     const currentHourNow = new Date().getHours();
     if (currentHourNow >= botConfig.DAYTIME_START_HOUR && currentHourNow < botConfig.DAYTIME_END_HOUR) {
-        daytimeMessagesSent = 0;
-        scheduleNextRandomMessage('daytime');
+      daytimeMessagesSent = 0;
+      scheduleNextRandomMessage('daytime');
     }
 }
 
