@@ -231,23 +231,39 @@ async function getGroupMetadata(groupId) {
 // --- Lógica de Status do Servidor ---
 let currentServerStatus = '🔴';
 
-// Utilitário para converter "HH:MM" em objeto Date do dia atual no fuso horário
-function getStatusTimeDetails(timeStr) {
-  // timeStr: "19:00"
-  const [hour, minute] = timeStr.split(':').map(Number);
-  const now = new Date();
-  now.setHours(hour, minute, 0, 0);
-  return now;
+// --- Funções de Tempo e Agendamento ---
+let openTimeDetails = { hour: 19, minute: 0 }; // Padrão
+let closeTimeDetails = { hour: 23, minute: 59 }; // Padrão
+let oneHourBeforeOpenDetails = { hour: 18, minute: 0 }; // Padrão
+
+// NOVA FUNÇÃO ADICIONADA
+function getStatusTimeDetails(timeString) {
+  if (typeof timeString !== 'string' || !timeString.includes(':')) {
+    console.warn(`Formato de tempo inválido: "${timeString}". Usando padrão 00:00.`);
+    return { hour: 0, minute: 0 };
+  }
+  const [hour, minute] = timeString.split(':').map(Number);
+  if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    console.warn(`Valores de tempo inválidos em "${timeString}". Usando padrão 00:00.`);
+    return { hour: 0, minute: 0 };
+  }
+  return { hour, minute };
 }
 
-let openTimeDetails, closeTimeDetails, oneHourBeforeOpenTimeDetails;
-
 function initializeTimeDetails() {
-    openTimeDetails = getStatusTimeDetails(botConfig.SERVER_OPEN_TIME);
-    closeTimeDetails = getStatusTimeDetails(botConfig.SERVER_CLOSE_TIME);
-    oneHourBeforeOpenTimeDetails = { ...openTimeDetails };
-    oneHourBeforeOpenTimeDetails.hour -= 1;
-    if (oneHourBeforeOpenTimeDetails.hour < 0) oneHourBeforeOpenTimeDetails.hour = 23;
+  // Carrega os horários de abertura e fechamento do botConfig
+  openTimeDetails = getStatusTimeDetails(botConfig.SERVER_OPEN_TIME);
+  closeTimeDetails = getStatusTimeDetails(botConfig.SERVER_CLOSE_TIME);
+
+  // Calcula "uma hora antes de abrir"
+  let oneHourBeforeHour = openTimeDetails.hour - 1;
+  let oneHourBeforeMinute = openTimeDetails.minute;
+  if (oneHourBeforeHour < 0) { // Caso o servidor abra à meia-noite, por exemplo
+    oneHourBeforeHour = 23; // A hora anterior seria 23h do dia anterior
+  }
+  oneHourBeforeOpenDetails = { hour: oneHourBeforeHour, minute: oneHourBeforeMinute };
+
+  console.log(`Horários de status inicializados: Abrir ${openTimeDetails.hour}:${openTimeDetails.minute}, Fechar ${closeTimeDetails.hour}:${closeTimeDetails.minute}, Aviso ${oneHourBeforeOpenDetails.hour}:${oneHourBeforeOpenDetails.minute}`);
 }
 
 async function updateServerStatus(status, messageToSend) {
@@ -400,7 +416,7 @@ function setupCronJobs() {
     // Recarrega os detalhes de tempo caso tenham sido alterados
     initializeTimeDetails();
 
-    logScheduledCronTask(`${oneHourBeforeOpenTimeDetails.minute} ${oneHourBeforeOpenTimeDetails.hour} * * *`, "Aviso: 1h para abrir", messages.status.openingSoon, triggerServerOpeningSoon);
+    logScheduledCronTask(`${oneHourBeforeOpenDetails.minute} ${oneHourBeforeOpenDetails.hour} * * *`, "Aviso: 1h para abrir", messages.status.openingSoon, triggerServerOpeningSoon);
     logScheduledCronTask(`${openTimeDetails.minute} ${openTimeDetails.hour} * * *`, "Servidor Aberto", messages.status.open, triggerServerOpen);
     logScheduledCronTask(`${closeTimeDetails.minute} ${closeTimeDetails.hour} * * *`, "Servidor Fechado", messages.status.closed, triggerServerClose);
     logScheduledCronTask(`0 ${botConfig.DAYTIME_START_HOUR} * * *`, "Início Msgs Diurnas", "Iniciar ciclo de mensagens aleatórias diurnas", () => {
@@ -455,7 +471,7 @@ async function initializeBotStatus() {
 
     const openH = openTimeDetails.hour; const openM = openTimeDetails.minute;
     const closeH = closeTimeDetails.hour; const closeM = closeTimeDetails.minute;
-    const oneHourBeforeOpenH = oneHourBeforeOpenTimeDetails.hour; const oneHourBeforeOpenM = oneHourBeforeOpenTimeDetails.minute;
+    const oneHourBeforeOpenH = oneHourBeforeOpenDetails.hour; const oneHourBeforeOpenM = oneHourBeforeOpenDetails.minute;
 
     const timeNow = currentHour * 60 + currentMinute;
     const timeOneHourBefore = oneHourBeforeOpenH * 60 + oneHourBeforeOpenM;
