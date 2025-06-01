@@ -910,14 +910,18 @@ function logCronJobs() {
 
 // --- Inicialização do Bot e Status ---
 async function initializeBotStatus() {
+  // Usar o timezone configurado para obter a hora local correta
   const now = new Date();
-  const timeNow = now.getHours() * 60 + now.getMinutes();
+  const localTime = new Date(now.toLocaleString("en-US", {timeZone: botConfig.TIMEZONE}));
+  const timeNow = localTime.getHours() * 60 + localTime.getMinutes();
 
   const openTime = openTimeDetails.hour * 60 + openTimeDetails.minute;
   const closeTime = closeTimeDetails.hour * 60 + closeTimeDetails.minute;
   const warningTime = oneHourBeforeOpenDetails.hour * 60 + oneHourBeforeOpenDetails.minute;
 
-  console.log(`initializeBotStatus: now=${timeNow} (${Math.floor(timeNow/60)}:${String(timeNow%60).padStart(2,'0')})`);
+  console.log(`initializeBotStatus (${botConfig.TIMEZONE}): now=${timeNow} (${Math.floor(timeNow/60)}:${String(timeNow%60).padStart(2,'0')})`);
+  console.log(`  - UTC time: ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`);
+  console.log(`  - Local time: ${localTime.getHours()}:${String(localTime.getMinutes()).padStart(2,'0')}`);
   console.log(`  - warning=${warningTime} (${Math.floor(warningTime/60)}:${String(warningTime%60).padStart(2,'0')})`);
   console.log(`  - open=${openTime} (${Math.floor(openTime/60)}:${String(openTime%60).padStart(2,'0')})`);
   console.log(`  - close=${closeTime} (${Math.floor(closeTime/60)}:${String(closeTime%60).padStart(2,'0')})`);
@@ -975,7 +979,7 @@ async function initializeBotStatus() {
   }
 
   // Mensagens aleatórias diurnas
-  const currentHourNow = now.getHours();
+  const currentHourNow = localTime.getHours();
   if (currentHourNow >= botConfig.DAYTIME_START_HOUR && currentHourNow < botConfig.DAYTIME_END_HOUR) {
     daytimeMessagesSent = 0;
     scheduleNextRandomMessage('daytime');
