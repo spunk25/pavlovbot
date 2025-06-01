@@ -580,12 +580,8 @@ function isFromMe(data) {
           });
           await sendMessageToGroup("Agendamentos automáticos de status REATIVADOS.", TARGET_GROUP_ID);
           console.log("Agendamentos automáticos de status REATIVADOS.");
-        }
-      } else {
-        await sendMessageToGroup(
-          "Desculpe, apenas administradores podem usar este comando.",
-          senderJid
-        );
+        }   
+     
       }
     }
     // Comando para enviar mensagem aleatória
