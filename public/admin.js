@@ -294,10 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showFormMessage(responseMessageConfigDiv, 'Quantidade de mensagens não pode ser negativa.', true);
             validationError = true;
         }
-        if (isNaN(updatedConfig.BOT_WEBHOOK_PORT) || updatedConfig.BOT_WEBHOOK_PORT < 1024 || updatedConfig.BOT_WEBHOOK_PORT > 65535) {
-            showFormMessage(responseMessageConfigDiv, 'Porta do Webhook deve ser um número entre 1024 e 65535.', true);
-            validationError = true;
-        }
+        
         if (validationError) return;
 
         try {
