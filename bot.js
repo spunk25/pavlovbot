@@ -14,26 +14,99 @@ try {
 }
 
 // --- Configurações ---
-const {
-  EVOLUTION_API_URL,
-  EVOLUTION_API_KEY,
-  INSTANCE_NAME,
-  TARGET_GROUP_ID,
-  BOT_WEBHOOK_PORT,
-  SERVER_OPEN_TIME,
-  SERVER_CLOSE_TIME,
-} = process.env;
+const envConfig = process.env;
 
-const GROUP_BASE_NAME = "BRASIL PAVLOV SND 6/24";
-const MESSAGES_DURING_SERVER_OPEN = 4;
-const MESSAGES_DURING_DAYTIME = 4;
-const DAYTIME_START_HOUR = 8;
-const DAYTIME_END_HOUR = 17;
-const TIMEZONE = "America/Sao_Paulo"; // Ajuste para seu fuso horário
+// Caminhos para os arquivos de configuração
+const MESSAGES_FILE_PATH = path.join(__dirname, 'messages.json');
+const CONFIG_FILE_PATH = path.join(__dirname, 'config.json');
+
+// Configurações padrão que podem ser sobrescritas pelo config.json e depois pelo .env
+let botConfig = {
+  EVOLUTION_API_URL: '',
+  EVOLUTION_API_KEY: '',
+  INSTANCE_NAME: '',
+  TARGET_GROUP_ID: '',
+  BOT_WEBHOOK_PORT: 8080, // Default port
+  SERVER_OPEN_TIME: '19:00',
+  SERVER_CLOSE_TIME: '23:59',
+  GROUP_BASE_NAME: "BRASIL PAVLOV SND 6/24",
+  MESSAGES_DURING_SERVER_OPEN: 4,
+  MESSAGES_DURING_DAYTIME: 4,
+  DAYTIME_START_HOUR: 8,
+  DAYTIME_END_HOUR: 17,
+  TIMEZONE: "America/Sao_Paulo",
+  GROQ_API_KEY: '',
+  BOT_PUBLIC_URL: 'http://localhost:8080' // Default public URL
+};
+
+function loadBotConfig() {
+  // 1. Carregar de config.json
+  if (fs.existsSync(CONFIG_FILE_PATH)) {
+    try {
+      const fileContent = fs.readFileSync(CONFIG_FILE_PATH, 'utf-8');
+      const jsonConfig = JSON.parse(fileContent);
+      botConfig = { ...botConfig, ...jsonConfig };
+      console.log("Configurações carregadas de config.json");
+    } catch (error) {
+      console.error("Erro ao carregar config.json, usando padrões e .env:", error);
+    }
+  } else {
+    console.warn("config.json não encontrado. Usando padrões e .env. O arquivo será criado ao salvar configurações pelo painel.");
+  }
+
+  // 2. Sobrescrever com variáveis de ambiente (elas têm maior precedência)
+  for (const key in botConfig) {
+    if (envConfig[key] !== undefined) {
+      // Tratar números e booleanos que podem vir como string do .env
+      if (!isNaN(parseFloat(envConfig[key])) && isFinite(envConfig[key])) {
+        botConfig[key] = parseFloat(envConfig[key]);
+      } else if (envConfig[key].toLowerCase() === 'true' || envConfig[key].toLowerCase() === 'false') {
+        botConfig[key] = envConfig[key].toLowerCase() === 'true';
+      } else {
+        botConfig[key] = envConfig[key];
+      }
+    }
+  }
+   // Garante que as horas sejam strings
+   botConfig.SERVER_OPEN_TIME = String(botConfig.SERVER_OPEN_TIME);
+   botConfig.SERVER_CLOSE_TIME = String(botConfig.SERVER_CLOSE_TIME);
+   botConfig.DAYTIME_START_HOUR = parseInt(botConfig.DAYTIME_START_HOUR, 10);
+   botConfig.DAYTIME_END_HOUR = parseInt(botConfig.DAYTIME_END_HOUR, 10);
+   botConfig.MESSAGES_DURING_SERVER_OPEN = parseInt(botConfig.MESSAGES_DURING_SERVER_OPEN, 10);
+   botConfig.MESSAGES_DURING_DAYTIME = parseInt(botConfig.MESSAGES_DURING_DAYTIME, 10);
+
+
+  console.log("Configurações finais do bot:", { ...botConfig, EVOLUTION_API_KEY: '***', GROQ_API_KEY: '***' }); // Não logar chaves
+}
+
+async function saveBotConfig() {
+  try {
+    // Salva apenas as chaves que estão no config.json original ou que são relevantes para ele
+    // Não salva chaves de API ou URLs da Evolution API que devem vir do .env
+    const configToSave = {
+      GROUP_BASE_NAME: botConfig.GROUP_BASE_NAME,
+      MESSAGES_DURING_SERVER_OPEN: botConfig.MESSAGES_DURING_SERVER_OPEN,
+      MESSAGES_DURING_DAYTIME: botConfig.MESSAGES_DURING_DAYTIME,
+      DAYTIME_START_HOUR: botConfig.DAYTIME_START_HOUR,
+      DAYTIME_END_HOUR: botConfig.DAYTIME_END_HOUR,
+      SERVER_OPEN_TIME: botConfig.SERVER_OPEN_TIME,
+      SERVER_CLOSE_TIME: botConfig.SERVER_CLOSE_TIME,
+      // O GROQ_API_KEY pode ser salvo se o usuário o inserir pelo painel,
+      // mas é mais seguro mantê-lo apenas no .env.
+      // Se você quiser permitir salvar pelo painel, descomente a linha abaixo.
+      // GROQ_API_KEY: botConfig.GROQ_API_KEY 
+    };
+    await fs.promises.writeFile(CONFIG_FILE_PATH, JSON.stringify(configToSave, null, 2), 'utf-8');
+    console.log("Configurações salvas em config.json");
+  } catch (error) {
+    console.error("Erro ao salvar config.json:", error);
+  }
+}
+
+loadBotConfig(); // Carrega as configurações na inicialização
 
 // --- Mensagens ---
 let messages = {}; // Será populado por loadMessages
-const MESSAGES_FILE_PATH = path.join(__dirname, 'messages.json');
 
 function loadMessages() {
   try {
@@ -70,16 +143,16 @@ loadMessages();
 
 // --- Funções da API Evolution ---
 const evolutionAPI = axios.create({
-  baseURL: EVOLUTION_API_URL,
+  baseURL: botConfig.EVOLUTION_API_URL,
   headers: {
-    'apikey': EVOLUTION_API_KEY,
+    'apikey': botConfig.EVOLUTION_API_KEY,
     'Content-Type': 'application/json'
   }
 });
 
-async function sendMessageToGroup(messageText, recipientJid = TARGET_GROUP_ID) {
+async function sendMessageToGroup(messageText, recipientJid = botConfig.TARGET_GROUP_ID) {
   try {
-    await evolutionAPI.post(`/message/sendText/${INSTANCE_NAME}`, {
+    await evolutionAPI.post(`/message/sendText/${botConfig.INSTANCE_NAME}`, {
       number: recipientJid,
       text: messageText,
     });
@@ -88,9 +161,9 @@ async function sendMessageToGroup(messageText, recipientJid = TARGET_GROUP_ID) {
   }
 }
 
-async function sendNarratedAudio(audioUrlOrBase64, recipientJid = TARGET_GROUP_ID, options = {}) {
+async function sendNarratedAudio(audioUrlOrBase64, recipientJid = botConfig.TARGET_GROUP_ID, options = {}) {
   try {
-    await evolutionAPI.post(`/message/sendWhatsAppAudio/${INSTANCE_NAME}`, {
+    await evolutionAPI.post(`/message/sendWhatsAppAudio/${botConfig.INSTANCE_NAME}`, {
       number: recipientJid,
       audio: audioUrlOrBase64,
       ...options
@@ -101,9 +174,9 @@ async function sendNarratedAudio(audioUrlOrBase64, recipientJid = TARGET_GROUP_I
   }
 }
 
-async function sendPoll(pollName, pollValues, recipientJid = TARGET_GROUP_ID, selectableCount = 1, options = {}) {
+async function sendPoll(pollName, pollValues, recipientJid = botConfig.TARGET_GROUP_ID, selectableCount = 1, options = {}) {
   try {
-    await evolutionAPI.post(`/message/sendPoll/${INSTANCE_NAME}`, {
+    await evolutionAPI.post(`/message/sendPoll/${botConfig.INSTANCE_NAME}`, {
       number: recipientJid,
       name: pollName,
       selectableCount: selectableCount,
@@ -118,9 +191,9 @@ async function sendPoll(pollName, pollValues, recipientJid = TARGET_GROUP_ID, se
 
 async function setGroupName(newSubject) {
   try {
-    await evolutionAPI.post(`/group/updateGroupSubject/${INSTANCE_NAME}`,
+    await evolutionAPI.post(`/group/updateGroupSubject/${botConfig.INSTANCE_NAME}`,
       { subject: newSubject },
-      { params: { groupJid: TARGET_GROUP_ID } }
+      { params: { groupJid: botConfig.TARGET_GROUP_ID } }
     );
     console.log(`Nome do grupo alterado para: ${newSubject}`);
   } catch (error) {
@@ -130,7 +203,7 @@ async function setGroupName(newSubject) {
 
 async function getGroupMetadata(groupId) {
   try {
-    const response = await evolutionAPI.get(`/group/findGroupInfos/${INSTANCE_NAME}`, {
+    const response = await evolutionAPI.get(`/group/findGroupInfos/${botConfig.INSTANCE_NAME}`, {
         params: { groupJid: groupId }
     });
     if (response.data && (response.data.participants || (Array.isArray(response.data) && response.data[0]?.participants) ) ) {
@@ -138,7 +211,7 @@ async function getGroupMetadata(groupId) {
         if(Array.isArray(response.data) && response.data.length > 0 && response.data[0].participants) return response.data[0];
     }
     console.warn(`findGroupInfos não retornou dados para ${groupId} ou estrutura inesperada. Tentando fetchAllGroups...`);
-    const fallbackResponse = await evolutionAPI.get(`/group/fetchAllGroups/${INSTANCE_NAME}`, {
+    const fallbackResponse = await evolutionAPI.get(`/group/fetchAllGroups/${botConfig.INSTANCE_NAME}`, {
         params: { getParticipants: "true" } //  Pode ser booleano true ou string "true"
     });
     if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
@@ -159,7 +232,7 @@ async function getGroupMetadata(groupId) {
 let currentServerStatus = '🔴';
 function getStatusTimeParts(timeStr) {
     if (!timeStr || !timeStr.includes(':')) {
-        console.error(`Formato de hora inválido no .env: "${timeStr}". Usando 00:00 como padrão.`);
+        console.error(`Formato de hora inválido: "${timeStr}". Usando 00:00 como padrão.`);
         return { hour: 0, minute: 0};
     }
     const parts = timeStr.split(':');
@@ -175,15 +248,15 @@ function getStatusTimeParts(timeStr) {
 let openTimeDetails, closeTimeDetails, oneHourBeforeOpenTimeDetails;
 
 function initializeTimeDetails() {
-    openTimeDetails = getStatusTimeParts(SERVER_OPEN_TIME);
-    closeTimeDetails = getStatusTimeParts(SERVER_CLOSE_TIME);
+    openTimeDetails = getStatusTimeParts(botConfig.SERVER_OPEN_TIME);
+    closeTimeDetails = getStatusTimeDetails(botConfig.SERVER_CLOSE_TIME);
     oneHourBeforeOpenTimeDetails = { ...openTimeDetails };
     oneHourBeforeOpenTimeDetails.hour -= 1;
     if (oneHourBeforeOpenTimeDetails.hour < 0) oneHourBeforeOpenTimeDetails.hour = 23;
 }
 
 async function updateServerStatus(status, messageToSend) {
-  const newGroupName = `[${status}${GROUP_BASE_NAME}]`;
+  const newGroupName = `[${status}${botConfig.GROUP_BASE_NAME}]`;
   await setGroupName(newGroupName);
   if (messageToSend) {
     await sendMessageToGroup(messageToSend);
@@ -208,7 +281,7 @@ async function triggerServerClose() {
     clearTimeout(serverOpenMessageTimeoutId);
     serverOpenMessageTimeoutId = null;
   }
-  serverOpenMessagesSent = MESSAGES_DURING_SERVER_OPEN;
+  serverOpenMessagesSent = botConfig.MESSAGES_DURING_SERVER_OPEN;
 }
 
 async function triggerServerOpeningSoon() {
@@ -218,7 +291,7 @@ async function triggerServerOpeningSoon() {
   await sendPoll(
     "Ei!! Você 🫵 vai jogar Pavlov hoje?",
     ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
-    TARGET_GROUP_ID
+    botConfig.TARGET_GROUP_ID
   );
 }
 
@@ -260,16 +333,16 @@ async function scheduleNextRandomMessage(type) {
   let delay;
 
   if (type === 'serverOpen') {
-    if (serverOpenMessagesSent >= MESSAGES_DURING_SERVER_OPEN) {
-      console.log(`[DEBUG] [serverOpen] Limite de ${MESSAGES_DURING_SERVER_OPEN} mensagens atingido. Não agendando mais.`);
+    if (serverOpenMessagesSent >= botConfig.MESSAGES_DURING_SERVER_OPEN) {
+      console.log(`[DEBUG] [serverOpen] Limite de ${botConfig.MESSAGES_DURING_SERVER_OPEN} mensagens atingido. Não agendando mais.`);
       return;
     }
     // intervalo em minutos entre cada mensagem durante o servidor aberto
     delay = calculateRandomDelay(10, 30);
   } 
   else if (type === 'daytime') {
-    if (daytimeMessagesSent >= MESSAGES_DURING_DAYTIME) {
-      console.log(`[DEBUG] [daytime] Limite de ${MESSAGES_DURING_DAYTIME} mensagens atingido. Não agendando mais.`);
+    if (daytimeMessagesSent >= botConfig.MESSAGES_DURING_DAYTIME) {
+      console.log(`[DEBUG] [daytime] Limite de ${botConfig.MESSAGES_DURING_DAYTIME} mensagens atingido. Não agendando mais.`);
       return;
     }
     // intervalo em minutos entre cada mensagem de dia
@@ -316,25 +389,66 @@ async function scheduleNextRandomMessage(type) {
 // --- Agendamentos Cron ---
 const scheduledCronTasks = [];
 function logScheduledCronTask(cronExpression, description, messageOrAction, taskFn) {
-  const job = cron.schedule(cronExpression, taskFn, { timezone: TIMEZONE, scheduled: false });
+  const job = cron.schedule(cronExpression, taskFn, { timezone: botConfig.TIMEZONE, scheduled: false });
   scheduledCronTasks.push({ job, description, cronExpression, messageOrAction, originalTaskFn: taskFn });
 }
 
 function setupCronJobs() {
-    scheduledCronTasks.forEach(task => task.job.stop());
-    scheduledCronTasks.length = 0;
+    console.log("Configurando/Reconfigurando cron jobs...");
+    scheduledCronTasks.forEach(task => {
+        if (task.job && typeof task.job.stop === 'function') {
+            task.job.stop();
+        }
+    });
+    scheduledCronTasks.length = 0; // Limpa a lista de tarefas antigas
+
+    // Recarrega os detalhes de tempo caso tenham sido alterados
+    initializeTimeDetails();
 
     logScheduledCronTask(`${oneHourBeforeOpenTimeDetails.minute} ${oneHourBeforeOpenTimeDetails.hour} * * *`, "Aviso: 1h para abrir", messages.status.openingSoon, triggerServerOpeningSoon);
     logScheduledCronTask(`${openTimeDetails.minute} ${openTimeDetails.hour} * * *`, "Servidor Aberto", messages.status.open, triggerServerOpen);
     logScheduledCronTask(`${closeTimeDetails.minute} ${closeTimeDetails.hour} * * *`, "Servidor Fechado", messages.status.closed, triggerServerClose);
-    logScheduledCronTask(`0 ${DAYTIME_START_HOUR} * * *`, "Início Msgs Diurnas", "Iniciar ciclo de mensagens aleatórias diurnas", () => {
+    logScheduledCronTask(`0 ${botConfig.DAYTIME_START_HOUR} * * *`, "Início Msgs Diurnas", "Iniciar ciclo de mensagens aleatórias diurnas", () => {
       daytimeMessagesSent = 0; if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId); scheduleNextRandomMessage('daytime');
     });
-    logScheduledCronTask(`0 ${DAYTIME_END_HOUR} * * *`, "Fim Msgs Diurnas", "Parar ciclo de mensagens aleatórias diurnas", () => {
-      if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId); daytimeMessagesSent = MESSAGES_DURING_DAYTIME;
+    logScheduledCronTask(`0 ${botConfig.DAYTIME_END_HOUR} * * *`, "Fim Msgs Diurnas", "Parar ciclo de mensagens aleatórias diurnas", () => {
+      if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId); daytimeMessagesSent = botConfig.MESSAGES_DURING_DAYTIME;
     });
     logScheduledCronTask('0 20 * * 0', "Mensagem Dominical", messages.extras.sundayNight, async () => { await sendMessageToGroup(messages.extras.sundayNight); });
     logScheduledCronTask('0 18 * * 5', "Mensagem de Sexta", messages.extras.friday, async () => { await sendMessageToGroup(messages.extras.friday); });
+    
+    // Inicia os cron jobs recém configurados
+    scheduledCronTasks.forEach(task => task.job.start());
+    console.log("Cron jobs configurados e iniciados.");
+    logCurrentCronSchedule(); // Log a nova programação
+}
+
+function logCurrentCronSchedule() {
+    console.log("\n--- AGENDAMENTOS CRON ATIVOS ---");
+    const nowForCronDisplay = new Date();
+    if (scheduledCronTasks.length === 0) {
+        console.log("Nenhum cron job agendado no momento.");
+    }
+    scheduledCronTasks.forEach(task => {
+        let nextRunDisplay = "N/A";
+        try {
+            if (cronParser && task.job.running) { // Verifica se o job está rodando antes de tentar pegar nextDate
+                const interval = cronParser.parseExpression(task.cronExpression, { currentDate: nowForCronDisplay, tz: botConfig.TIMEZONE });
+                nextRunDisplay = interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+            } else if (task.job.nextDates) { // Fallback se cronParser não estiver disponível ou job não rodando
+                const nextDates = task.job.nextDates(1); 
+                if (nextDates && nextDates.length > 0) {
+                    nextRunDisplay = nextDates[0].toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+                }
+            }
+        } catch (e) { 
+            nextRunDisplay = `(Erro ao calcular próxima execução: ${e.message.substring(0,30)}...)`; 
+        }
+        let msgPrev = typeof task.messageOrAction === 'string' ? task.messageOrAction : 'Ação programada';
+        if (msgPrev.length > 60) msgPrev = msgPrev.substring(0, 57) + "...";
+        console.log(`- Tarefa: ${task.description}\n  Próxima: ${nextRunDisplay}\n  Msg/Ação: ${msgPrev}\n  Cron: ${task.cronExpression}\n  Rodando: ${task.job.running}`);
+    });
+    console.log("--------------------------------\n");
 }
 
 // --- Inicialização do Bot e Status ---
@@ -405,7 +519,7 @@ async function initializeBotStatus() {
         scheduleNextRandomMessage('serverOpen');
     }
     const currentHourNow = new Date().getHours();
-    if (currentHourNow >= DAYTIME_START_HOUR && currentHourNow < DAYTIME_END_HOUR) {
+    if (currentHourNow >= botConfig.DAYTIME_START_HOUR && currentHourNow < botConfig.DAYTIME_END_HOUR) {
         daytimeMessagesSent = 0;
         scheduleNextRandomMessage('daytime');
     }
@@ -456,15 +570,107 @@ app.get('/admin/api/messages', (req, res) => {
   res.json(messages);
 });
 
-app.post('/admin/api/messages', express.json(), async (req, res) => { // Certifique-se que express.json() é usado aqui também
+app.post('/admin/api/messages', express.json(), async (req, res) => {
   const newMessages = req.body;
   if (typeof newMessages === 'object' && newMessages !== null) {
-    messages = newMessages; // Atualiza as mensagens em memória
-    await saveMessages();   // Salva no arquivo
+    messages = newMessages;
+    await saveMessages();
     res.json({ success: true, message: "Mensagens atualizadas com sucesso!" });
   } else {
     res.status(400).json({ success: false, message: "Payload inválido." });
   }
+});
+
+// API para configurações gerais do bot
+app.get('/admin/api/config', (req, res) => {
+  // Retorna apenas as configurações que são seguras e editáveis pelo painel
+  const { EVOLUTION_API_KEY, GROQ_API_KEY, ...safeConfig } = botConfig;
+  res.json(safeConfig);
+});
+
+app.post('/admin/api/config', express.json(), async (req, res) => {
+  const newConfig = req.body;
+  let requireCronRestart = false;
+
+  if (typeof newConfig === 'object' && newConfig !== null) {
+    // Atualiza apenas as chaves permitidas
+    const allowedKeys = [
+      "GROUP_BASE_NAME", "MESSAGES_DURING_SERVER_OPEN", "MESSAGES_DURING_DAYTIME",
+      "DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME"
+      // "GROQ_API_KEY" // Descomente se quiser permitir alteração da chave Groq via painel
+    ];
+
+    for (const key of allowedKeys) {
+      if (newConfig[key] !== undefined) {
+        // Verifica se alguma configuração de tempo foi alterada
+        if (["DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME"].includes(key) &&
+            botConfig[key] !== newConfig[key]) {
+          requireCronRestart = true;
+        }
+        // Tratar números
+        if (["MESSAGES_DURING_SERVER_OPEN", "MESSAGES_DURING_DAYTIME", "DAYTIME_START_HOUR", "DAYTIME_END_HOUR"].includes(key)) {
+            botConfig[key] = parseInt(newConfig[key], 10);
+        } else {
+            botConfig[key] = newConfig[key];
+        }
+      }
+    }
+
+    await saveBotConfig(); // Salva no config.json
+
+    if (requireCronRestart) {
+        console.log("Configurações de tempo alteradas, reconfigurando cron jobs...");
+        setupCronJobs(); // Reconfigura e reinicia os cron jobs
+    }
+
+    res.json({ success: true, message: "Configurações atualizadas com sucesso!" + (requireCronRestart ? " Cron jobs foram reiniciados." : "") });
+  } else {
+    res.status(400).json({ success: false, message: "Payload de configuração inválido." });
+  }
+});
+
+// API para gerar mensagem com Groq
+async function callGroqAPI(prompt) {
+  if (!botConfig.GROQ_API_KEY) {
+    console.error("GROQ_API_KEY não configurada.");
+    return "Erro: Chave da API Groq não configurada no servidor.";
+  }
+  try {
+    const groqResponse = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
+      model: "llama3-8b-8192", // Ou outro modelo de sua preferência: mixtral-8x7b-32768
+      messages: [
+        { role: "system", content: "Você é um assistente divertido para um bot de WhatsApp de um grupo de jogadores de Pavlov VR. Gere mensagens curtas, engraçadas e no tema do jogo. Evite ser repetitivo com as mensagens de exemplo." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.8,
+      max_tokens: 60,
+    }, {
+      headers: {
+        'Authorization': `Bearer ${botConfig.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (groqResponse.data.choices && groqResponse.data.choices.length > 0) {
+      return groqResponse.data.choices[0].message.content.trim();
+    }
+    return "Não foi possível gerar uma mensagem da IA.";
+  } catch (error) {
+    console.error("Erro ao chamar API Groq:", error.response ? error.response.data : error.message);
+    return `Erro ao contatar a IA: ${error.message}`;
+  }
+}
+
+app.post('/admin/api/generate-message', express.json(), async (req, res) => {
+  const existingMessages = messages.randomActive || [];
+  const examples = existingMessages.length > 0 ? 
+    `Aqui estão alguns exemplos de mensagens existentes para você ter uma ideia do tom (tente não repetir):\n- "${getRandomElement(existingMessages)}"\n- "${getRandomElement(existingMessages)}"` 
+    : "Gere uma mensagem curta e divertida sobre o jogo Pavlov VR.";
+
+  const prompt = `Gere uma nova mensagem aleatória para o bot. ${examples} A mensagem deve ser original e criativa.`;
+
+  const generatedMessage = await callGroqAPI(prompt);
+  res.json({ success: !!generatedMessage && !generatedMessage.startsWith("Erro"), message: generatedMessage });
 });
 
 async function isUserAdmin(groupId, userId) {
@@ -487,29 +693,6 @@ function isFromMe(data) {
     return data.key && data.key.fromMe === true;
   }
   
-  // --- Função para checar se um usuário é administrador (mantida igual ao original) ---
-  async function isUserAdmin(groupId, userId) {
-    const groupInfo = await getGroupMetadata(groupId);
-    if (groupInfo && groupInfo.participants) {
-      const userInfo = groupInfo.participants.find(
-        p => p.id === userId || p.jid === userId
-      );
-      if (userInfo) {
-        return (
-          userInfo.admin === 'admin' ||
-          userInfo.admin === 'superadmin' ||
-          userInfo.isSuperAdmin === true ||
-          userInfo.isAdmin === true ||
-          userInfo.adminLevel > 0
-        );
-      }
-    }
-    console.warn(
-      `Metadados/participantes não encontrados para grupo ${groupId} ou usuário ${userId} não encontrado.`
-    );
-    return false;
-  }
-
   app.post('/webhook', (req, res, next) => {
     const receivedPayload = req.body; 
     // console.log('[DEBUG /webhook] req.body BEFORE app.handle:', JSON.stringify(req.body, null, 2));
@@ -555,7 +738,7 @@ function isFromMe(data) {
   
     // Se não houver data (already checked), ou não for a partir do grupo alvo, ou for mensagem do bot, ignora
     if (
-      data.key.remoteJid !== TARGET_GROUP_ID || // Check properties on the 'data' object
+      data.key.remoteJid !== botConfig.TARGET_GROUP_ID || // Check properties on the 'data' object
       isFromMe(data)
     ) {
       return res.status(200).send('Ignorado: sem processamento.');
@@ -573,10 +756,10 @@ function isFromMe(data) {
   
     // Comandos que só admins podem usar
     if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
-      const isAdmin = await isUserAdmin(TARGET_GROUP_ID, senderJid);
+      const isAdmin = await isUserAdmin(botConfig.TARGET_GROUP_ID, senderJid);
       if (isAdmin) {
         if (command === '!teste') {
-          await sendMessageToGroup("Testado por admin!", TARGET_GROUP_ID);
+          await sendMessageToGroup("Testado por admin!", botConfig.TARGET_GROUP_ID);
         } else if (command === '!abrir') {
           await triggerServerOpen();
           // Pausar agendamentos automáticos de status
@@ -624,7 +807,7 @@ function isFromMe(data) {
               task.job.start();
             }
           });
-          await sendMessageToGroup("Agendamentos automáticos de status REATIVADOS.", TARGET_GROUP_ID);
+          await sendMessageToGroup("Agendamentos automáticos de status REATIVADOS.", botConfig.TARGET_GROUP_ID);
           console.log("Agendamentos automáticos de status REATIVADOS.");
         }   
      
@@ -640,14 +823,14 @@ function isFromMe(data) {
       await sendPoll(
         "Ei!! Você 🫵 vai jogar Pavlov hoje?",
         ["Sim, vou!", "Talvez mais tarde", "Hoje não"],
-        TARGET_GROUP_ID
+        botConfig.TARGET_GROUP_ID
       );
     }
     // Comando para enviar áudio narrado
     else if (command === '!audio' && args.length > 0) {
       const audioUrl = args[0];
       if (audioUrl.startsWith('http')) {
-        await sendNarratedAudio(audioUrl, TARGET_GROUP_ID);
+        await sendNarratedAudio(audioUrl, botConfig.TARGET_GROUP_ID);
       } else {
         await sendMessageToGroup("Uso: !audio <URL_DO_AUDIO>", senderJid);
       }
@@ -687,7 +870,7 @@ function isFromMe(data) {
         else pollOptions.push(currentArg);
       }
       if (pollTitle && pollOptions.length > 0) {
-        await sendPoll(pollTitle, pollOptions, TARGET_GROUP_ID, pollOptions.length);
+        await sendPoll(pollTitle, pollOptions, botConfig.TARGET_GROUP_ID, pollOptions.length);
       } else {
         await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', senderJid);
       }
@@ -700,11 +883,11 @@ function isFromMe(data) {
         let nextRun = 'N/A';
         try {
           if (cronParser) {
-            const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: TIMEZONE });
-            nextRun = interval.next().toDate().toLocaleString('pt-BR', { timeZone: TIMEZONE });
+            const interval = cronParser.parseExpression(task.cronExpression, { currentDate: now, tz: botConfig.TIMEZONE });
+            nextRun = interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
           } else if (task.job.nextDates) {
             const nd = task.job.nextDates(1);
-            if (nd && nd.length) nextRun = nd[0].toLocaleString('pt-BR', { timeZone: TIMEZONE });
+            if (nd && nd.length) nextRun = nd[0].toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
           }
         } catch (e) {
           nextRun = `Erro ao calcular`;
@@ -744,7 +927,7 @@ function isFromMe(data) {
     // Verifica se é o grupo correto e se há participantes
     // Ensure 'data' itself is checked before accessing its properties like data.id or data.participants
     if (
-      (data.id === TARGET_GROUP_ID || data.chatId === TARGET_GROUP_ID) &&
+      (data.id === botConfig.TARGET_GROUP_ID || data.chatId === botConfig.TARGET_GROUP_ID) &&
       Array.isArray(data.participants)
     ) {
       const action = data.action; // "add" ou "remove"
@@ -773,8 +956,8 @@ function isFromMe(data) {
 // --- Iniciar o Bot ---
 async function startBot() {
   console.log("Iniciando o bot Pavlov...");
-  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !INSTANCE_NAME || !TARGET_GROUP_ID || !SERVER_OPEN_TIME || !SERVER_CLOSE_TIME || !BOT_WEBHOOK_PORT) {
-    console.error("ERRO: Variáveis de ambiente cruciais não definidas. Verifique .env (URL, KEY, INSTANCE, GROUP_ID, OPEN_TIME, CLOSE_TIME, BOT_WEBHOOK_PORT)");
+  if (!botConfig.EVOLUTION_API_URL || !botConfig.EVOLUTION_API_KEY || !botConfig.INSTANCE_NAME || !botConfig.TARGET_GROUP_ID || !botConfig.SERVER_OPEN_TIME || !botConfig.SERVER_CLOSE_TIME || !botConfig.BOT_WEBHOOK_PORT) {
+    console.error("ERRO: Variáveis de ambiente/configuração cruciais não definidas. Verifique .env e config.json (URL, KEY, INSTANCE, GROUP_ID, OPEN_TIME, CLOSE_TIME, BOT_WEBHOOK_PORT)");
     process.exit(1);
   }
 
@@ -782,36 +965,20 @@ async function startBot() {
   setupCronJobs();
   await initializeBotStatus();
 
-  console.log("\n--- AGENDAMENTOS CRON ATIVOS ---");
-  const nowForCronDisplay = new Date();
-  scheduledCronTasks.forEach(task => {
-    task.job.start();
-    let nextRunDisplay = "N/A";
-    try {
-      if (cronParser) {
-        const interval = cronParser.parseExpression(task.cronExpression, { currentDate: nowForCronDisplay, tz: TIMEZONE });
-        nextRunDisplay = interval.next().toDate().toLocaleString('pt-BR', { timeZone: TIMEZONE });
-      } else if (task.job.nextDates) {
-        const nextDates = task.job.nextDates(1); if (nextDates && nextDates.length > 0) nextRunDisplay = nextDates[0].toLocaleString('pt-BR', { timeZone: TIMEZONE });
-      }
-    } catch (e) { nextRunDisplay = `(Erro: ${e.message.substring(0,20)}...)`; }
-    let msgPrev = typeof task.messageOrAction === 'string' ? task.messageOrAction : 'Ação programada';
-    if (msgPrev.length > 60) msgPrev = msgPrev.substring(0, 57) + "...";
-    console.log(`- Tarefa: ${task.description}\n  Próxima: ${nextRunDisplay}\n  Msg/Ação: ${msgPrev}\n  Cron: ${task.cronExpression}\n`);
-  });
-  console.log("--------------------------------\n");
+  // logCurrentCronSchedule(); // Log da programação inicial já é feito dentro de setupCronJobs
 
-  app.listen(BOT_WEBHOOK_PORT, () => {
-    console.log(`Servidor de webhook escutando na porta ${BOT_WEBHOOK_PORT}`);
-    console.log(`Configure o webhook na Evolution API para: http://SEU_IP_OU_DOMINIO:${BOT_WEBHOOK_PORT}/webhook`);
-    console.log(`Painel de Administração disponível em: http://SEU_IP_OU_DOMINIO:${BOT_WEBHOOK_PORT}/admin/admin.html`);
+  app.listen(botConfig.BOT_WEBHOOK_PORT, () => {
+    console.log(`Servidor de webhook escutando na porta ${botConfig.BOT_WEBHOOK_PORT}`);
+    const publicUrl = botConfig.BOT_PUBLIC_URL || `http://SEU_IP_OU_DOMINIO:${botConfig.BOT_WEBHOOK_PORT}`;
+    console.log(`Configure o webhook na Evolution API para: ${publicUrl}/webhook`);
+    console.log(`Painel de Administração disponível em: ${publicUrl}/admin/admin.html`);
     console.log("Eventos Webhook: 'messages.upsert' e 'GROUP_PARTICIPANTS_UPDATE'.");
   });
 
   console.log("Bot Pavlov iniciado e agendamentos configurados.");
-  console.log(`Grupo: ${TARGET_GROUP_ID}`);
-  console.log(`Servidor abre: ${SERVER_OPEN_TIME}, Fecha: ${SERVER_CLOSE_TIME} (Fuso: ${TIMEZONE})`);
-  console.log(`Msgs diurnas: ${DAYTIME_START_HOUR}:00 - ${DAYTIME_END_HOUR}:00 (Fuso: ${TIMEZONE})`);
+  console.log(`Grupo: ${botConfig.TARGET_GROUP_ID}`);
+  console.log(`Servidor abre: ${botConfig.SERVER_OPEN_TIME}, Fecha: ${botConfig.SERVER_CLOSE_TIME} (Fuso: ${botConfig.TIMEZONE})`);
+  console.log(`Msgs diurnas: ${botConfig.DAYTIME_START_HOUR}:00 - ${botConfig.DAYTIME_END_HOUR}:00 (Fuso: ${botConfig.TIMEZONE})`);
 }
 
 startBot();

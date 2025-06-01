@@ -8,54 +8,112 @@
 </head>
 <body>
     <div class="container">
-        <h1>Painel de Gerenciamento de Mensagens</h1>
-        <p>Aqui você pode editar as mensagens que o bot utiliza. Clique em "Salvar Mensagens" após fazer as alterações.</p>
-        <p><strong>Nota:</strong> Para mensagens que são uma lista (como "Novo Membro"), adicione cada nova mensagem em uma nova linha dentro da caixa de texto.</p>
+        <h1>Painel de Administração do Bot Pavlov</h1>
+        <div id="responseMessageGlobal" class="response-message"></div>
 
-        <form id="messagesForm">
-            <h2>Status do Servidor</h2>
-            <div class="form-group">
-                <label for="status_closed">Fechado:</label>
-                <input type="text" id="status_closed" name="status_closed">
-            </div>
-            <div class="form-group">
-                <label for="status_openingSoon">Abrindo em Breve:</label>
-                <input type="text" id="status_openingSoon" name="status_openingSoon">
-            </div>
-            <div class="form-group">
-                <label for="status_open">Aberto:</label>
-                <input type="text" id="status_open" name="status_open">
-            </div>
+        <section id="configSection">
+            <h2>Configurações Gerais do Bot</h2>
+            <form id="configForm">
+                <div class="form-group">
+                    <label for="config_GROUP_BASE_NAME">Nome Base do Grupo:</label>
+                    <input type="text" id="config_GROUP_BASE_NAME" name="GROUP_BASE_NAME">
+                </div>
+                
+                <h3>Horários do Servidor (HH:MM)</h3>
+                <div class="form-group">
+                    <label for="config_SERVER_OPEN_TIME">Hora de Abertura:</label>
+                    <input type="time" id="config_SERVER_OPEN_TIME" name="SERVER_OPEN_TIME">
+                </div>
+                <div class="form-group">
+                    <label for="config_SERVER_CLOSE_TIME">Hora de Fechamento:</label>
+                    <input type="time" id="config_SERVER_CLOSE_TIME" name="SERVER_CLOSE_TIME">
+                </div>
 
-            <h2>Boas-vindas e Despedidas</h2>
-            <div class="form-group">
-                <label for="newMember">Novo Membro (uma por linha):</label>
-                <textarea id="newMember" name="newMember" rows="5"></textarea>
-            </div>
-            <div class="form-group">
-                <label for="memberLeft">Membro Saiu (uma por linha):</label>
-                <textarea id="memberLeft" name="memberLeft" rows="5"></textarea>
-            </div>
+                <h3>Mensagens Automáticas (Servidor Aberto)</h3>
+                <div class="form-group">
+                    <label for="config_MESSAGES_DURING_SERVER_OPEN">Qtd. Mensagens (Servidor Aberto):</label>
+                    <input type="number" id="config_MESSAGES_DURING_SERVER_OPEN" name="MESSAGES_DURING_SERVER_OPEN" min="0">
+                </div>
 
-            <h2>Mensagens Aleatórias (Servidor Ativo)</h2>
-            <div class="form-group">
-                <label for="randomActive">Mensagens Aleatórias (uma por linha):</label>
-                <textarea id="randomActive" name="randomActive" rows="8"></textarea>
-            </div>
+                <h3>Mensagens Automáticas (Diurnas)</h3>
+                <div class="form-group">
+                    <label for="config_MESSAGES_DURING_DAYTIME">Qtd. Mensagens (Diurnas):</label>
+                    <input type="number" id="config_MESSAGES_DURING_DAYTIME" name="MESSAGES_DURING_DAYTIME" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="config_DAYTIME_START_HOUR">Início Horário Diurno (0-23):</label>
+                    <input type="number" id="config_DAYTIME_START_HOUR" name="DAYTIME_START_HOUR" min="0" max="23">
+                </div>
+                <div class="form-group">
+                    <label for="config_DAYTIME_END_HOUR">Fim Horário Diurno (0-23):</label>
+                    <input type="number" id="config_DAYTIME_END_HOUR" name="DAYTIME_END_HOUR" min="0" max="23">
+                </div>
+                
+                <!-- Se quiser permitir edição da chave Groq via painel (menos seguro)
+                <div class="form-group">
+                    <label for="config_GROQ_API_KEY">Chave API Groq (Opcional - Prioriza .env):</label>
+                    <input type="password" id="config_GROQ_API_KEY" name="GROQ_API_KEY">
+                </div>
+                -->
+                <button type="submit">Salvar Configurações Gerais</button>
+            </form>
+            <div id="responseMessageConfig" class="response-message"></div>
+        </section>
 
-            <h2>Extras</h2>
-            <div class="form-group">
-                <label for="extras_sundayNight">Domingo à Noite:</label>
-                <input type="text" id="extras_sundayNight" name="extras_sundayNight">
-            </div>
-            <div class="form-group">
-                <label for="extras_friday">Sexta-feira:</label>
-                <input type="text" id="extras_friday" name="extras_friday">
-            </div>
+        <hr>
 
-            <button type="submit">Salvar Mensagens</button>
-        </form>
-        <div id="responseMessage"></div>
+        <section id="messagesSection">
+            <h2>Gerenciamento de Mensagens</h2>
+            <p>Aqui você pode editar as mensagens que o bot utiliza. Clique em "Salvar Mensagens" após fazer as alterações.</p>
+            <p><strong>Nota:</strong> Para mensagens que são uma lista (como "Novo Membro"), adicione cada nova mensagem em uma nova linha dentro da caixa de texto.</p>
+
+            <form id="messagesForm">
+                <h3>Status do Servidor</h3>
+                <div class="form-group">
+                    <label for="status_closed">Fechado:</label>
+                    <input type="text" id="status_closed" name="status_closed">
+                </div>
+                <div class="form-group">
+                    <label for="status_openingSoon">Abrindo em Breve:</label>
+                    <input type="text" id="status_openingSoon" name="status_openingSoon">
+                </div>
+                <div class="form-group">
+                    <label for="status_open">Aberto:</label>
+                    <input type="text" id="status_open" name="status_open">
+                </div>
+
+                <h3>Boas-vindas e Despedidas</h3>
+                <div class="form-group">
+                    <label for="newMember">Novo Membro (uma por linha):</label>
+                    <textarea id="newMember" name="newMember" rows="5"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="memberLeft">Membro Saiu (uma por linha):</label>
+                    <textarea id="memberLeft" name="memberLeft" rows="5"></textarea>
+                </div>
+
+                <h3>Mensagens Aleatórias (Servidor Ativo)</h3>
+                <div class="form-group">
+                    <label for="randomActive">Mensagens Aleatórias (uma por linha):</label>
+                    <textarea id="randomActive" name="randomActive" rows="8"></textarea>
+                    <button type="button" id="generateAIMessageBtn" style="margin-top: 10px;">Gerar Mensagem com IA (Groq)</button>
+                    <div id="aiMessageSpinner" style="display: none; margin-top: 5px;">Gerando...</div>
+                </div>
+
+                <h3>Extras</h3>
+                <div class="form-group">
+                    <label for="extras_sundayNight">Domingo à Noite:</label>
+                    <input type="text" id="extras_sundayNight" name="extras_sundayNight">
+                </div>
+                <div class="form-group">
+                    <label for="extras_friday">Sexta-feira:</label>
+                    <input type="text" id="extras_friday" name="extras_friday">
+                </div>
+
+                <button type="submit">Salvar Mensagens</button>
+            </form>
+            <div id="responseMessageMessages" class="response-message"></div>
+        </section>
     </div>
 
     <script src="admin.js"></script>
