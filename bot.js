@@ -970,6 +970,30 @@ async function initializeBotStatus() {
   console.log(`  - open=${openTime} (${Math.floor(openTime/60)}:${String(openTime%60).padStart(2,'0')})`);
   console.log(`  - close=${closeTime} (${Math.floor(closeTime/60)}:${String(closeTime%60).padStart(2,'0')})`);
 
+  // PRIMEIRO: Detecta o status atual do grupo pelo nome
+  try {
+    const groupData = await getGroupMetadata(botConfig.TARGET_GROUP_ID);
+    if (groupData && groupData.subject) {
+      const groupName = groupData.subject;
+      console.log(`Nome atual do grupo: "${groupName}"`);
+      
+      if (groupName.includes('🟢')) {
+        currentServerStatus = '🟢';
+      } else if (groupName.includes('🟡')) {
+        currentServerStatus = '🟡';
+      } else {
+        currentServerStatus = '🔴';
+      }
+      console.log(`Status detectado pelo nome do grupo: ${currentServerStatus}`);
+    } else {
+      console.log("Não foi possível obter nome do grupo, assumindo status fechado.");
+      currentServerStatus = '🔴';
+    }
+  } catch (error) {
+    console.error("Erro ao detectar status do grupo:", error.message);
+    currentServerStatus = '🔴';
+  }
+
   // Determina qual DEVERIA ser o status baseado no horário atual
   let expectedStatus = '🔴'; // Padrão fechado
 
@@ -1007,19 +1031,19 @@ async function initializeBotStatus() {
   }
 
   console.log(`Windows: warning=${inWarningWindow}, open=${inOpenWindow}, expectedStatus=${expectedStatus}`);
-  console.log(`Status atual: ${currentServerStatus}`);
+  console.log(`Status atual: ${currentServerStatus}, Status esperado: ${expectedStatus}`);
 
   // SÓ EXECUTA AÇÕES SE O STATUS ATUAL FOR DIFERENTE DO ESPERADO
   if (currentServerStatus === expectedStatus) {
-    console.log(`Inicialização: já está no status correto (${expectedStatus}). Nada a fazer.`);
+    console.log(`✅ Inicialização: já está no status correto (${expectedStatus}). NADA A FAZER.`);
   } else if (inWarningWindow && !inOpenWindow) {
-    console.log("Inicialização: precisa mudar para status de aviso. Disparando triggerServerOpeningSoon.");
+    console.log("🟡 Inicialização: precisa mudar para status de aviso. Disparando triggerServerOpeningSoon.");
     await triggerServerOpeningSoon();
   } else if (inOpenWindow) {
-    console.log("Inicialização: precisa mudar para status aberto. Disparando triggerServerOpen.");
+    console.log("🟢 Inicialização: precisa mudar para status aberto. Disparando triggerServerOpen.");
     await triggerServerOpen();
   } else {
-    console.log("Inicialização: precisa mudar para status fechado. Definindo status fechado.");
+    console.log("🔴 Inicialização: precisa mudar para status fechado. Definindo status fechado.");
     currentServerStatus = '🔴';
     const newGroupName = `[🔴${botConfig.GROUP_BASE_NAME}]`;
     await setGroupName(newGroupName);
