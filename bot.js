@@ -826,7 +826,7 @@ function isFromMe(data) {
     }
     // Comando para enviar mensagem aleatória
     else if (command === '!random') {
-      const randomMsg = getRandomElement(messages.randomActive);
+      const randomMsg = await getAIRandomMessage();
       if (randomMsg) await sendMessageToGroup(randomMsg);
     }
     // Comando para criar enquete fixa
@@ -993,3 +993,39 @@ async function startBot() {
 }
 
 startBot();
+
+// Função para obter uma mensagem aleatória, potencialmente gerada por IA
+async function getAIRandomMessage() {
+  if (!botConfig.GROQ_API_KEY) {
+    console.warn("Chave da API Groq não configurada. Usando mensagem de fallback da lista randomActive.");
+    if (messages.randomActive && messages.randomActive.length > 0) {
+      return getRandomElement(messages.randomActive);
+    }
+    return "Aqui deveria ter uma piada, mas a IA está de folga e não temos exemplos!";
+  }
+
+  const exampleMessages = messages.randomActive || [];
+  let promptContext = "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. ";
+
+  if (exampleMessages.length > 0) {
+    const sampleSize = Math.min(exampleMessages.length, 2); // Pega até 2 exemplos
+    const samples = [];
+    for (let i = 0; i < sampleSize; i++) {
+      samples.push(getRandomElement(exampleMessages));
+    }
+    promptContext += `Inspire-se no tom e estilo destes exemplos (mas não os repita):\n- "${samples.join('"\n- "')}"\n`;
+  }
+  promptContext += "A mensagem deve ser criativa e adequada para um ambiente de jogo online. Evite ser repetitivo em relação a mensagens anteriores que você possa ter gerado.";
+
+  const generatedMessage = await callGroqAPI(promptContext);
+
+  if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) { // Verifica se a mensagem é válida
+    return generatedMessage;
+  } else {
+    console.warn("Falha ao gerar mensagem com Groq ou mensagem inválida, usando fallback da lista randomActive.");
+    if (messages.randomActive && messages.randomActive.length > 0) {
+      return getRandomElement(messages.randomActive);
+    }
+    return "A IA tentou, mas falhou. Que tal um 'bora jogar!' clássico?";
+  }
+}
