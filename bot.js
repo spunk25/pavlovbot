@@ -22,12 +22,13 @@ const {
   SERVER_CLOSE_TIME,
 } = process.env;
 
-const GROUP_BASE_NAME = "BRASIL PAVLOV SND 6/24";
+const GROUP_BASE_NAME = "BRASIL PAVLOV SND";
+const PLAYER_COUNT_PLACEHOLDER = "X/24"; // Ou o que você preferir
 const MESSAGES_DURING_SERVER_OPEN = 4;
 const MESSAGES_DURING_DAYTIME = 4;
 const DAYTIME_START_HOUR = 8;
 const DAYTIME_END_HOUR = 17;
-const TIMEZONE = "America/Sao_Paulo";
+const TIMEZONE = "America/Sao_Paulo"; // Ajuste para seu fuso horário
 
 // --- Mensagens ---
 const messages = {
@@ -130,10 +131,10 @@ async function getGroupMetadata(groupId) {
     }
     console.warn(`findGroupInfos não retornou dados para ${groupId} ou estrutura inesperada. Tentando fetchAllGroups...`);
     const fallbackResponse = await evolutionAPI.get(`/group/fetchAllGroups/${INSTANCE_NAME}`, {
-        params: { getParticipants: "true" }
+        params: { getParticipants: "true" } //  Pode ser booleano true ou string "true"
     });
     if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
-        const group = fallbackResponse.data.find(g => g.id === groupId || g.jid === groupId);
+        const group = fallbackResponse.data.find(g => g.id === groupId || g.jid === groupId); // Comparar com id ou jid
         if (group && group.participants) {
             return group;
         }
@@ -150,10 +151,17 @@ async function getGroupMetadata(groupId) {
 let currentServerStatus = '🔴';
 function getStatusTimeParts(timeStr) {
     if (!timeStr || !timeStr.includes(':')) {
-        console.error(`Formato de hora inválido: ${timeStr}. Usando 00:00 como padrão.`);
+        console.error(`Formato de hora inválido no .env: "${timeStr}". Usando 00:00 como padrão.`);
         return { hour: 0, minute: 0};
     }
-    return { hour: parseInt(timeStr.split(':')[0]), minute: parseInt(timeStr.split(':')[1]) };
+    const parts = timeStr.split(':');
+    const hour = parseInt(parts[0]);
+    const minute = parseInt(parts[1]);
+    if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+        console.error(`Valores de hora/minuto inválidos em "${timeStr}". Usando 00:00 como padrão.`);
+        return { hour: 0, minute: 0 };
+    }
+    return { hour, minute };
 }
 
 let openTimeDetails, closeTimeDetails, oneHourBeforeOpenTimeDetails;
@@ -166,9 +174,8 @@ function initializeTimeDetails() {
     if (oneHourBeforeOpenTimeDetails.hour < 0) oneHourBeforeOpenTimeDetails.hour = 23;
 }
 
-
 async function updateServerStatus(status, messageToSend) {
-  const newGroupName = `[${status}${GROUP_BASE_NAME}]`;
+  const newGroupName = `[${status}${GROUP_BASE_NAME} ${PLAYER_COUNT_PLACEHOLDER}]`;
   await setGroupName(newGroupName);
   if (messageToSend) {
     await sendMessageToGroup(messageToSend);
@@ -201,7 +208,6 @@ async function triggerServerOpeningSoon() {
   await updateServerStatus('🟡', messages.status.openingSoon);
 }
 
-
 // --- Lógica para Mensagens Aleatórias Espalhadas ---
 let serverOpenMessagesSent = 0;
 let daytimeMessagesSent = 0;
@@ -221,9 +227,10 @@ function getWindowMillis(startTimeDetails, endTimeDetails) {
     endDate.setHours(endTimeDetails.hour, endTimeDetails.minute, 0, 0);
 
     if (endDate < startDate) { // Janela cruza meia-noite
-        if ((now >= startDate) || (now < endDate)) { // Se agora está depois da abertura HOJE ou antes do fechamento AMANHÃ
+        // Se agora está depois da abertura HOJE OU antes do fechamento AMANHÃ
+        if ((now >= startDate) || (now < endDate && now.getDate() === (new Date(startDate).getDate() +1) %32 ) ) { // pequena correção para data
             endDate.setDate(endDate.getDate() + 1);
-        } else { // Fora da janela que cruza (ex: 15:00, janela 22:00-02:00)
+        } else {
             return 0;
         }
     }
@@ -249,7 +256,6 @@ async function scheduleNextRandomMessage(type) {
   } else return;
 
   if (timeoutIdToClear) clearTimeout(timeoutIdToClear);
-
   if (!statusCheckFn() || messagesSent >= totalMessages) return;
 
   const remainingWindowMillis = getWindowMillis(windowDetails.start, windowDetails.end);
@@ -261,11 +267,12 @@ async function scheduleNextRandomMessage(type) {
   const minAbsDelay = (type === 'serverOpen' ? 5 : 15) * 60 * 1000;
 
   const minDelay = Math.max(minAbsDelay, avgDelayPerMessage * minDelayFactor);
-  const maxDelay = Math.min(remainingWindowMillis - (1 * 60 * 1000), avgDelayPerMessage * maxDelayFactor); // Deixa 1min de margem
+  // Max delay não deve ser maior que o tempo restante na janela, menos uma pequena margem
+  const maxDelay = Math.min(remainingWindowMillis - (1 * 60 * 1000), avgDelayPerMessage * maxDelayFactor);
   let delay = calculateRandomDelay(minDelay / (60 * 1000), maxDelay / (60 * 1000));
-  delay = Math.max(delay, 1 * 60 * 1000); // Mínimo 1 minuto
+  delay = Math.max(delay, 1 * 60 * 1000); // Mínimo 1 minuto de delay absoluto
 
-  if (delay <= 0 || delay > remainingWindowMillis) return; // Segurança adicional
+  if (delay <= 0 || delay > remainingWindowMillis) return;
 
   const nextSendTime = new Date(Date.now() + delay);
   // console.log(`${logPrefix} Próxima em ${Math.round(delay / 60000)} min (${nextSendTime.toLocaleTimeString('pt-BR', {timeZone: TIMEZONE})}). (${messagesSent + 1}/${totalMessages})`);
@@ -286,7 +293,6 @@ async function scheduleNextRandomMessage(type) {
   else daytimeMessageTimeoutId = newTimeoutId;
 }
 
-
 // --- Agendamentos Cron ---
 const scheduledCronTasks = [];
 function logScheduledCronTask(cronExpression, description, messageOrAction, taskFn) {
@@ -295,9 +301,8 @@ function logScheduledCronTask(cronExpression, description, messageOrAction, task
 }
 
 function setupCronJobs() {
-    // Limpa tarefas antigas se estiver re-configurando
     scheduledCronTasks.forEach(task => task.job.stop());
-    scheduledCronTasks.length = 0; // Esvazia o array
+    scheduledCronTasks.length = 0;
 
     logScheduledCronTask(`${oneHourBeforeOpenTimeDetails.minute} ${oneHourBeforeOpenTimeDetails.hour} * * *`, "Aviso: 1h para abrir", messages.status.openingSoon, triggerServerOpeningSoon);
     logScheduledCronTask(`${openTimeDetails.minute} ${openTimeDetails.hour} * * *`, "Servidor Aberto", messages.status.open, triggerServerOpen);
@@ -311,7 +316,6 @@ function setupCronJobs() {
     logScheduledCronTask('0 20 * * 0', "Mensagem Dominical", messages.extras.sundayNight, async () => { await sendMessageToGroup(messages.extras.sundayNight); });
     logScheduledCronTask('0 18 * * 5', "Mensagem de Sexta", messages.extras.friday, async () => { await sendMessageToGroup(messages.extras.friday); });
 }
-
 
 // --- Inicialização do Bot e Status ---
 async function initializeBotStatus() {
@@ -329,22 +333,17 @@ async function initializeBotStatus() {
     const timeOpen = openH * 60 + openM;
     const timeClose = closeH * 60 + closeM;
 
-    // Lógica simplificada para status inicial
-    // Se a janela de abertura/fechamento cruza a meia-noite
-    if (timeOpen > timeClose) { // Ex: Abre 22:00 (1320), Fecha 02:00 (120)
-        if (timeNow >= timeOpen || timeNow < timeClose) { // Está aberto
+    if (timeOpen > timeClose) { // Cruza meia-noite (ex: Abre 22:00 (1320), Fecha 02:00 (120) do dia seguinte)
+        if (timeNow >= timeOpen || timeNow < timeClose) {
             initialStatus = '🟢';
         }
-        // Verifica "1h antes" para janela que cruza meia-noite
-        if (timeOneHourBefore > timeOpen) { // 1h antes é no mesmo dia da abertura (raro se abrir tarde)
-            if (timeNow >= timeOneHourBefore && timeNow < timeOpen) initialStatus = '🟡';
-        } else { // 1h antes é ANTES da abertura, mas pode ser no dia anterior (ex: 1h antes 21:00, abre 22:00)
-                 // ou 1h antes é DEPOIS da abertura no dia anterior (ex: 1h antes 23:00, abre 00:00)
-            if ((timeNow >= timeOneHourBefore && timeNow > timeClose) || (timeNow < timeOpen && timeNow < timeClose && timeOneHourBefore > timeClose)) {
-                 initialStatus = '🟡';
-            }
+        if (timeNow >= timeOneHourBefore && timeNow < timeOpen && timeOneHourBefore >= timeClose) { // 1h antes ainda no dia "de abertura"
+             initialStatus = '🟡';
+        } else if (timeNow >= timeOneHourBefore && timeOneHourBefore < timeOpen && timeOneHourBefore < timeClose) { // 1h antes no dia "de fechamento" mas antes de abrir
+             initialStatus = '🟡';
         }
-    } else { // Abre e fecha no mesmo dia
+
+    } else { // Mesmo dia (ex: Abre 19:00 (1140), Fecha 23:00 (1380))
         if (timeNow >= timeOpen && timeNow < timeClose) {
             initialStatus = '🟢';
         }
@@ -352,10 +351,22 @@ async function initializeBotStatus() {
             initialStatus = '🟡';
         }
     }
-    // Caso especial: se 1h antes é, por exemplo, 23:00 e a abertura é 00:00
-    // E agora são 23:30, o status deve ser amarelo.
-    if (oneHourBeforeOpenH === 23 && openH === 0 && currentHour === 23 && currentMinute >= oneHourBeforeOpenM) {
+     // Ajuste final para garantir que se estiver 1h antes, seja amarelo, lidando com cruzamento de meia-noite
+    if (oneHourBeforeOpenH === 23 && openH === 0) { // 1h antes é 23:xx, abre 00:xx
+        if(currentHour === 23 && currentMinute >= oneHourBeforeOpenM) initialStatus = '🟡';
+    } else if (currentHour === oneHourBeforeOpenH && currentMinute >= oneHourBeforeOpenM && currentHour < openH) { // Caso normal 1h antes
         initialStatus = '🟡';
+    } else if (currentHour === openH && currentMinute < openM && currentHour === oneHourBeforeOpenH && currentMinute >= oneHourBeforeOpenM) { // Exatamente no início da janela de 1h antes
+        initialStatus = '🟡';
+    }
+
+    // Se o status foi definido para amarelo, mas já passou da hora de abrir (e ainda não fechou), então deve ser verde.
+    if (initialStatus === '🟡') {
+        if (timeOpen > timeClose) { // Cruza meia-noite
+            if (timeNow >= timeOpen || timeNow < timeClose) initialStatus = '🟢';
+        } else { // Mesmo dia
+            if (timeNow >= timeOpen && timeNow < timeClose) initialStatus = '🟢';
+        }
     }
 
 
@@ -364,13 +375,11 @@ async function initializeBotStatus() {
 
     if (initialStatus === '🟢') {
         serverOpenMessagesSent = 0;
-        console.log("Bot iniciado com servidor aberto, iniciando ciclo de mensagens do servidor.");
         scheduleNextRandomMessage('serverOpen');
     }
     const currentHourNow = new Date().getHours();
     if (currentHourNow >= DAYTIME_START_HOUR && currentHourNow < DAYTIME_END_HOUR) {
         daytimeMessagesSent = 0;
-        console.log("Bot iniciado durante horário diurno, iniciando ciclo de mensagens diurnas.");
         scheduleNextRandomMessage('daytime');
     }
 }
@@ -383,14 +392,15 @@ app.use(express.json());
 async function isUserAdmin(groupId, userId) {
     const groupInfo = await getGroupMetadata(groupId);
     if (groupInfo && groupInfo.participants) {
-        const userInfo = groupInfo.participants.find(p => p.id === userId || p.jid === userId); // Checa por id ou jid
-        // IMPORTANTE: Ajuste esta condição! Use console.log(JSON.stringify(userInfo, null, 2)); para ver a estrutura.
+        const userInfo = groupInfo.participants.find(p => p.id === userId || p.jid === userId);
         if (userInfo) {
-            // console.log("Informações do remetente para verificação de admin:", JSON.stringify(userInfo, null, 2));
-            return userInfo.admin === 'admin' || userInfo.admin === 'superadmin' || userInfo.isSuperAdmin === true || userInfo.isAdmin === true || userInfo.adminLevel > 0; // Adicionei adminLevel como palpite
+            // DESCOMENTE A LINHA ABAIXO PARA VER A ESTRUTURA DE userInfo NO CONSOLE DO BOT
+            // console.log("DEBUG: Informações do participante para verificação de admin:", JSON.stringify(userInfo, null, 2));
+            // AJUSTE A CONDIÇÃO ABAIXO CONFORME A ESTRUTURA REAL DA SUA API:
+            return userInfo.admin === 'admin' || userInfo.admin === 'superadmin' || userInfo.isSuperAdmin === true || userInfo.isAdmin === true || userInfo.adminLevel > 0;
         }
     }
-    console.warn(`Não foi possível obter metadados ou participantes para o grupo ${groupId} ao verificar admin para ${userId}.`);
+    console.warn(`Metadados/participantes não encontrados para grupo ${groupId} ou usuário ${userId} não encontrado.`);
     return false;
 }
 
@@ -399,46 +409,38 @@ app.post('/webhook', async (req, res) => {
   const event = payload.event;
   const data = payload.data;
 
-  //salvar os payloads em um arquivo json
-  fs.appendFileSync('payloads.json', JSON.stringify(payload, null, 2));
-  //salvar os eventos em um arquivo json
-  fs.appendFileSync('eventos.json', JSON.stringify(event, null, 2));
-  //salvar os dados em um arquivo json
-  fs.appendFileSync('dados.json', JSON.stringify(data, null, 2));
-
   if (event === 'messages.upsert' && data && data.key && data.key.remoteJid === TARGET_GROUP_ID) {
     const messageContent = data.message?.conversation || data.message?.extendedTextMessage?.text || "";
     const senderJid = data.key?.participant || data.key?.remoteJid;
 
+    if (!messageContent && !data.message?.buttonsResponseMessage && !data.message?.listResponseMessage && !data.message?.templateButtonReplyMessage) {
+        console.log(`Mensagem de ${senderJid} no grupo ${TARGET_GROUP_ID} sem conteúdo de texto claro.`);
+        return res.status(200).send('Mensagem sem conteúdo de texto processável.');
+    }
+
     const commandText = messageContent.trim().toLowerCase();
     const command = commandText.split(' ')[0];
     const args = commandText.split(' ').slice(1);
-
-    let processed = true; // Assume que será processado se entrar em um if de comando
+    let processed = true;
 
     if (['!abrir', '!fechar', '!avisar', '!teste', '!statusauto'].includes(command)) {
         const isAdmin = await isUserAdmin(TARGET_GROUP_ID, senderJid);
         if (isAdmin) {
-            if (command === '!teste') {
-                await sendMessageToGroup("Testado por admin!", TARGET_GROUP_ID);
-            } else if (command === '!abrir') {
+            if (command === '!teste') await sendMessageToGroup("Testado por admin!", TARGET_GROUP_ID);
+            else if (command === '!abrir') {
                 await triggerServerOpen();
                 scheduledCronTasks.forEach(task => { if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) task.job.stop(); });
-                console.log("Agendamentos automáticos de status PAUSADOS devido a comando manual.");
+                console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
             } else if (command === '!fechar') {
                 await triggerServerClose();
                 scheduledCronTasks.forEach(task => { if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) task.job.stop(); });
-                console.log("Agendamentos automáticos de status PAUSADOS devido a comando manual.");
+                console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
             } else if (command === '!avisar') {
                 await triggerServerOpeningSoon();
                 scheduledCronTasks.forEach(task => { if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) task.job.stop(); });
-                console.log("Agendamentos automáticos de status PAUSADOS devido a comando manual.");
+                console.log("Agendamentos automáticos de status PAUSADOS por comando manual.");
             } else if (command === '!statusauto') {
-                scheduledCronTasks.forEach(task => {
-                    if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) {
-                        task.job.start(); // Reinicia o job com sua função original
-                    }
-                });
+                scheduledCronTasks.forEach(task => { if(["Servidor Aberto", "Servidor Fechado", "Aviso: 1h para abrir"].includes(task.description)) task.job.start(); });
                 await sendMessageToGroup("Agendamentos automáticos de status REATIVADOS.", TARGET_GROUP_ID);
                 console.log("Agendamentos automáticos de status REATIVADOS.");
             }
@@ -447,8 +449,7 @@ app.post('/webhook', async (req, res) => {
         }
     }
     else if (command === '!random') {
-        const randomMsg = getRandomElement(messages.randomActive);
-        if (randomMsg) await sendMessageToGroup(randomMsg);
+        const randomMsg = getRandomElement(messages.randomActive); if (randomMsg) await sendMessageToGroup(randomMsg);
     }
     else if (command === '!jogar?') {
         const pollTitle = "Quem vai jogar Pavlov hoje?";
@@ -465,7 +466,7 @@ app.post('/webhook', async (req, res) => {
         for (const part of args) {
             if (part.startsWith('"') && !inQuotes) {
                 currentArg = part.substring(1); inQuotes = true;
-                if (part.endsWith('"') && part.length > 1) { // Verifica se não é só "
+                if (part.endsWith('"') && part.length > 1) {
                     currentArg = currentArg.slice(0, -1);
                     if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg);
                     currentArg = ""; inQuotes = false;
@@ -474,48 +475,45 @@ app.post('/webhook', async (req, res) => {
                 currentArg += " " + part.slice(0, -1);
                 if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg);
                 currentArg = ""; inQuotes = false;
-            } else if (inQuotes) {
-                currentArg += " " + part;
-            } else {
-                if (!pollTitle) pollTitle = part; else pollOptions.push(part);
-            }
+            } else if (inQuotes) { currentArg += " " + part;
+            } else { if (!pollTitle) pollTitle = part; else pollOptions.push(part); }
         }
         if (currentArg && inQuotes) { if (!pollTitle) pollTitle = currentArg; else pollOptions.push(currentArg); }
         if (pollTitle && pollOptions.length > 0) await sendPoll(pollTitle, pollOptions, TARGET_GROUP_ID, pollOptions.length);
         else await sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', senderJid);
     } else {
-        processed = false; // Nenhum comando conhecido foi acionado
+        processed = false;
     }
-
     if(processed) return res.status(200).send('Comando processado.');
   }
 
   const groupIdFromPayload = data?.id || data?.chat?.id || data?.chatId || payload.groupId || (data?.key?.remoteJid === TARGET_GROUP_ID ? TARGET_GROUP_ID : null);
   if (event !== 'messages.upsert' && groupIdFromPayload !== TARGET_GROUP_ID) {
-    return res.status(200).send('Evento ignorado: não é do grupo alvo ou já tratado.');
+    return res.status(200).send('Evento ignorado.');
   }
 
   if (event === 'GROUP_PARTICIPANTS_UPDATE') {
     const action = data?.action; const participants = data?.participants;
-    if (!action || !participants || participants.length === 0) return res.status(200).send('Payload de atualização de participantes incompleto.');
+    if (!action || !participants || participants.length === 0) return res.status(200).send('Payload incompleto.');
     if (action === 'add') {
       const welcomeMsg = getRandomElement(messages.newMember); if (welcomeMsg) await sendMessageToGroup(welcomeMsg);
     } else if (action === 'remove' || action === 'leave') {
       const farewellMsg = getRandomElement(messages.memberLeft); if (farewellMsg) await sendMessageToGroup(farewellMsg);
     }
   }
-  res.status(200).send('Webhook processado');
+  res.status(200).send('Webhook processado.');
 });
 
 // --- Iniciar o Bot ---
 async function startBot() {
   console.log("Iniciando o bot Pavlov...");
-  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !INSTANCE_NAME || !TARGET_GROUP_ID || !SERVER_OPEN_TIME || !SERVER_CLOSE_TIME) {
-    console.error("ERRO: Variáveis de ambiente cruciais não definidas. Verifique .env"); process.exit(1);
+  if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !INSTANCE_NAME || !TARGET_GROUP_ID || !SERVER_OPEN_TIME || !SERVER_CLOSE_TIME || !BOT_WEBHOOK_PORT) {
+    console.error("ERRO: Variáveis de ambiente cruciais não definidas. Verifique .env (URL, KEY, INSTANCE, GROUP_ID, OPEN_TIME, CLOSE_TIME, BOT_WEBHOOK_PORT)");
+    process.exit(1);
   }
 
-  initializeTimeDetails(); // Inicializa os detalhes de tempo antes de usá-los
-  setupCronJobs(); // Configura os cron jobs com os tempos corretos
+  initializeTimeDetails();
+  setupCronJobs();
   await initializeBotStatus();
 
   console.log("\n--- AGENDAMENTOS CRON ATIVOS ---");
