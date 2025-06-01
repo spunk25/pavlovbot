@@ -751,11 +751,6 @@ async function scheduleNextRandomMessage(type) {
 }
 
 // --- Agendamentos Cron ---
-function logScheduledCronTask(cronExpression, description, messageOrAction, taskFn) {
-  const job = cron.schedule(cronExpression, taskFn, { timezone: botConfig.TIMEZONE, scheduled: false });
-  scheduledCronTasks.push({ job, description, cronExpression, messageOrAction, originalTaskFn: taskFn });
-}
-
 function setupCronJobs() {
   console.log("Configurando cron jobs...");
 
@@ -814,51 +809,64 @@ function setupCronJobs() {
   const scheduleJob = (name, cronExpression, action, actionDescription) => {
       if (!cronExpression || cronExpression.trim() === '') {
           console.log(`Cron para "${name}" não definido ou vazio. Ignorando.`);
-          cronJobs.push({ name, cron: "N/A", actionDescription, task: null, error: "Não configurado", status: "Não Configurado" });
+          cronJobs.push({ name, cronExpression: "N/A", actionDescription, task: null, error: "Não configurado", status: "Não Configurado" });
           return;
       }
 
       try {
-          const currentTZ = botConfig.TIMEZONE;
-          console.log(`[scheduleJob] Tentando agendar "${name}". Cron: "${cronExpression}". Timezone configurado (ignorado para teste): "${currentTZ}"`);
-          console.warn(`[scheduleJob] ATENÇÃO: Agendando "${name}" SEM a opção timezone explícita devido a erros anteriores. Usará o timezone do sistema.`);
-
+          console.log(`[scheduleJob] Tentando agendar "${name}". Cron: "${cronExpression}"`);
           const task = cron.schedule(cronExpression, async () => {
               try {
-                  console.log(`Executando tarefa agendada: ${name} (${actionDescription || 'Sem descrição'})`);
-                  await action(); // 'action' é a função da tarefa que você passou
+                  console.log(`Executando tarefa agendada: ${name}`);
+                  await action();
                   console.log(`Tarefa "${name}" concluída.`);
               } catch (taskError) {
-                  console.error(`Erro durante a execução da tarefa agendada "${name}":`, taskError);
+                  console.error(`Erro na tarefa "${name}":`, taskError);
               }
-          }); // Removida a opção timezone daqui
+          });
 
           if (task) {
+              // calcula próxima execução via cron-parser
+              let nextExec = 'N/A';
+              if (cronParser) {
+                  try {
+                      const interval = cronParser.parseExpression(cronExpression, { tz: botConfig.TIMEZONE });
+                      nextExec = interval.next().toDate().toLocaleString('pt-BR', { timeZone: botConfig.TIMEZONE });
+                  } catch (parseErr) {
+                      console.error(`Erro ao parsear "${name}":`, parseErr.message);
+                      nextExec = 'Erro no parse';
+                  }
+              } else {
+                  nextExec = 'cron-parser não disponível';
+              }
+
               cronJobs.push({
                   name,
                   cron: cronExpression,
+                  cronExpression,            // para uso em logCronJobs
                   actionDescription,
-                  task, // O objeto do job retornado por cron.schedule
-                  status: `Agendado (TZ do sistema). Próxima: ${task.nextDates().toString()}`
+                  task,
+                  nextExecution: nextExec,   // armazenamos aqui
+                  status: `Agendado (TZ do sistema)`
               });
-              console.log(`Tarefa "${name}" agendada (usando timezone do sistema). Próxima execução: ${task.nextDates().toString()}`);
+              console.log(`Tarefa "${name}" agendada. Próxima execução: ${nextExec}`);
           } else {
-              console.error(`[scheduleJob] ERRO CRÍTICO: cron.schedule retornou null/undefined para "${name}".`);
+              console.error(`cron.schedule retornou null para "${name}".`);
               cronJobs.push({
                   name,
-                  cron: cronExpression,
+                  cronExpression,
                   actionDescription,
                   task: null,
-                  error: "Falha crítica no agendamento (retornou null)",
+                  error: "Retornou null",
                   status: "Falha Crítica"
               });
           }
 
       } catch (e) {
-          console.error(`Erro CRÍTICO ao tentar agendar tarefa "${name}" com cron "${cronExpression}": ${e.message}`);
+          console.error(`Falha ao agendar "${name}" com cron "${cronExpression}":`, e.message);
           cronJobs.push({
               name,
-              cron: cronExpression,
+              cronExpression: cronExpression,
               actionDescription,
               task: null,
               error: e.message,
