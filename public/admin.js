@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiPromptMemberLeftTextarea = document.getElementById('aiPrompt_memberLeft');
     const aiPromptExtrasSundayNightTextarea = document.getElementById('aiPrompt_extras_sundayNight');
     const aiPromptExtrasFridayTextarea = document.getElementById('aiPrompt_extras_friday');
+    const aiPromptSystemPromptTextarea = document.getElementById('aiPrompt_systemPrompt');
 
     // Seletores para os checkboxes de uso da IA
     const aiUsageStatusClosedCheckbox = document.getElementById('aiUsage_status_closed');
@@ -128,6 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Carregar prompts da IA
             if (messages.aiPrompts) {
+                if (aiPromptSystemPromptTextarea && messages.aiPrompts.systemPrompt !== undefined) aiPromptSystemPromptTextarea.value = messages.aiPrompts.systemPrompt;
                 if (aiPromptRandomActiveTextarea && messages.aiPrompts.randomActive !== undefined) aiPromptRandomActiveTextarea.value = messages.aiPrompts.randomActive;
                 if (aiPromptInGameRandomTextarea && messages.aiPrompts.inGameRandom !== undefined) aiPromptInGameRandomTextarea.value = messages.aiPrompts.inGameRandom;
                 if (aiPromptChatSummaryTextarea && messages.aiPrompts.chatSummary !== undefined) aiPromptChatSummaryTextarea.value = messages.aiPrompts.chatSummary;
@@ -217,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 friday: extrasFridayInput.value.split('\n').map(s => s.trim()).filter(s => s),
             },
             aiPrompts: {
+                systemPrompt: aiPromptSystemPromptTextarea ? aiPromptSystemPromptTextarea.value.trim() : '',
                 randomActive: aiPromptRandomActiveTextarea ? aiPromptRandomActiveTextarea.value.trim() : '',
                 inGameRandom: aiPromptInGameRandomTextarea ? aiPromptInGameRandomTextarea.value.trim() : '',
                 chatSummary: aiPromptChatSummaryTextarea ? aiPromptChatSummaryTextarea.value.trim() : '',

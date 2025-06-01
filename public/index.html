@@ -222,6 +222,11 @@
             <p>Edite os prompts base usados para gerar mensagens com IA. Estes serão usados tanto pelas funções automáticas do bot quanto pelos botões "Gerar com IA" acima.</p>
             <form id="aiPromptsForm">
                 <div class="form-group">
+                    <label for="aiPrompt_systemPrompt">Prompt Mestre do Sistema (Persona do Bot):</label>
+                    <textarea id="aiPrompt_systemPrompt" name="aiPrompt_systemPrompt" rows="8" placeholder="Defina aqui a personalidade principal, contexto e instruções gerais para a IA do bot Audozappo..."></textarea>
+                </div>
+                <hr class="prompt-separator">
+                <div class="form-group">
                     <label for="aiPrompt_randomActive">Prompt para "Mensagem Aleatória (Geral)":</label>
                     <textarea id="aiPrompt_randomActive" name="aiPrompt_randomActive" rows="4"></textarea>
                 </div>

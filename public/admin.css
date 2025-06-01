@@ -247,4 +247,11 @@ input[type="checkbox"] {
     padding: 15px;
     border-radius: 4px;
     border: 1px solid #efefef;
+}
+
+hr.prompt-separator {
+    border: 0;
+    height: 1px;
+    background-color: #dde; /* Um pouco mais escuro que o hr normal */
+    margin: 25px 0;
 } 
