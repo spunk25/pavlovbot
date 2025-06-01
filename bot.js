@@ -917,39 +917,61 @@ async function initializeBotStatus() {
   const closeTime = closeTimeDetails.hour * 60 + closeTimeDetails.minute;
   const warningTime = oneHourBeforeOpenDetails.hour * 60 + oneHourBeforeOpenDetails.minute;
 
-  console.log(`initializeBotStatus: now=${timeNow}, warning=${warningTime}, open=${openTime}, close=${closeTime}`);
+  console.log(`initializeBotStatus: now=${timeNow} (${Math.floor(timeNow/60)}:${String(timeNow%60).padStart(2,'0')})`);
+  console.log(`  - warning=${warningTime} (${Math.floor(warningTime/60)}:${String(warningTime%60).padStart(2,'0')})`);
+  console.log(`  - open=${openTime} (${Math.floor(openTime/60)}:${String(openTime%60).padStart(2,'0')})`);
+  console.log(`  - close=${closeTime} (${Math.floor(closeTime/60)}:${String(closeTime%60).padStart(2,'0')})`);
+
+  // Determina qual DEVERIA ser o status baseado no horário atual
+  let expectedStatus = '🔴'; // Padrão fechado
 
   // Verifica se está na janela de aviso (1h antes de abrir)
   let inWarningWindow = false;
   if (warningTime < openTime) {
     // Caso normal: 18:00 até 19:00
     inWarningWindow = (timeNow >= warningTime && timeNow < openTime);
+    console.log(`  - Warning check (normal): ${timeNow} >= ${warningTime} && ${timeNow} < ${openTime} = ${inWarningWindow}`);
   } else {
     // Cruza meia-noite: 23:00 até 00:00 do dia seguinte
     inWarningWindow = (timeNow >= warningTime || timeNow < openTime);
+    console.log(`  - Warning check (midnight): ${timeNow} >= ${warningTime} || ${timeNow} < ${openTime} = ${inWarningWindow}`);
   }
 
   // Verifica se está na janela de abertura
   let inOpenWindow = false;
   if (openTime < closeTime) {
-    // Caso normal: 19:00 até 23:00
+    // Caso normal: 19:00 até 23:59
     inOpenWindow = (timeNow >= openTime && timeNow < closeTime);
+    console.log(`  - Open check (normal): ${timeNow} >= ${openTime} && ${timeNow} < ${closeTime} = ${inOpenWindow}`);
   } else {
     // Cruza meia-noite: 22:00 até 02:00 do dia seguinte
     inOpenWindow = (timeNow >= openTime || timeNow < closeTime);
+    console.log(`  - Open check (midnight): ${timeNow} >= ${openTime} || ${timeNow} < ${closeTime} = ${inOpenWindow}`);
   }
 
-  console.log(`Windows: warning=${inWarningWindow}, open=${inOpenWindow}`);
-
-  if (inWarningWindow && !inOpenWindow) {
-    console.log("Inicialização: dentro da janela de aviso (1h antes). Disparando aviso com enquete.");
-    await triggerServerOpeningSoon();
-  } else if (inOpenWindow) {
-    console.log("Inicialização: já dentro do horário de abertura. Disparando status aberto e ciclo.");
-    await triggerServerOpen();
+  // Define o status esperado baseado nas janelas
+  if (inOpenWindow) {
+    expectedStatus = '🟢';
+  } else if (inWarningWindow) {
+    expectedStatus = '🟡';
   } else {
-    currentServerStatus = '🔴';
-    console.log("Status inicial 'fechado' detectado fora de horário. Nome do grupo NÃO será alterado.");
+    expectedStatus = '🔴';
+  }
+
+  console.log(`Windows: warning=${inWarningWindow}, open=${inOpenWindow}, expectedStatus=${expectedStatus}`);
+
+  // APENAS define o status interno, sem disparar ações completas
+  // Os triggers completos só devem ser chamados pelos crons nos horários exatos
+  currentServerStatus = expectedStatus;
+  
+  if (expectedStatus === '🟢') {
+    console.log("Inicialização: horário de servidor aberto detectado. Iniciando apenas o ciclo de mensagens.");
+    // Só inicia o ciclo de mensagens, sem alterar nome do grupo nem enviar aviso
+    serverOpenMessagesSent = 0;
+    if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId);
+    scheduleNextRandomMessage('serverOpen');
+  } else {
+    console.log(`Inicialização: status definido como ${expectedStatus}. Aguardando próximo cron para ações.`);
   }
 
   // Mensagens aleatórias diurnas
