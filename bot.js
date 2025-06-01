@@ -474,19 +474,17 @@ function isFromMe(data) {
       return res.status(400).send("Payload inválido: propriedade 'payload' ausente.");
     }
 
-    const innerPayload = receivedPayload.payload; 
+    const innerPayload = receivedPayload.payload;
     const event = (innerPayload.event || '').toLowerCase();
   
-    // Mapeia event → rota interna
     if (event === 'messages.upsert') {
-      req.url = '/webhook/messages-upsert';
-      // No need to set req.webhook_data if req.body in sub-route becomes innerPayload
-      // console.log('[DEBUG /webhook] Routing to /webhook/messages-upsert. innerPayload.data exists:', !!innerPayload.data);
-      return app.handle(req, res, next); 
+      req.url  = '/webhook/messages-upsert';
+      req.body = innerPayload;
+      return app.handle(req, res, next);
     }
     if (event === 'group.participants.update') {
-      req.url = '/webhook/group-participants-update';
-      // console.log('[DEBUG /webhook] Routing to /webhook/group-participants-update. innerPayload.data exists:', !!innerPayload.data);
+      req.url  = '/webhook/group-participants-update';
+      req.body = innerPayload;
       return app.handle(req, res, next);
     }
     // Caso nenhum case, devolve 200 normal
@@ -498,28 +496,15 @@ function isFromMe(data) {
 
   app.post('/webhook/messages-upsert', async (req, res) => {
     // console.log('[DEBUG /webhook/messages-upsert] req.body AT START:', JSON.stringify(req.body, null, 2));
+    // console.log('[DEBUG /webhook/messages-upsert] req._body AT START:', req._body);
+    // console.log('[DEBUG /webhook/messages-upsert] req.webhook_data AT START:', JSON.stringify(req.webhook_data, null, 2));
 
-    // In this sub-route, req.body is expected to be the innerPayload from the main /webhook route.
-    // So, req.body = { event: "...", instance: "...", data: { ... }, ... }
-    const currentReqBody = req.body; 
-    const data = currentReqBody.data; // Access data directly from currentReqBody.data
+    const fullReceivedPayload = req.body;           // { event, instance, data, … }
+    const data                 = fullReceivedPayload.data;
 
-    // Salva o payload em payloads.json (auditoria/debug)
-    // currentReqBody here is the inner payload.
-    try {
-      const timestamp = new Date().toISOString();
-      fs.appendFileSync(
-        'payloads.json',
-        JSON.stringify({ timestamp, payload: currentReqBody }, null, 2) + '\n'
-      );
-      console.log("Payload messages.upsert salvo em payloads.json");
-    } catch (error) {
-      console.error("Erro ao salvar payload messages.upsert:", error);
-    }
-    
     if (!data) {
-        console.warn("messages.upsert: 'data' (from req.body.data) is missing. Current req.body:", JSON.stringify(currentReqBody, null, 2));
-        return res.status(400).send("Payload inválido para messages.upsert (req.body.data missing).");
+      console.warn("messages.upsert: data ausente", JSON.stringify(fullReceivedPayload, null, 2));
+      return res.status(400).send("Payload inválido para messages.upsert.");
     }
   
     // Se não houver data (already checked), ou não for a partir do grupo alvo, ou for mensagem do bot, ignora
@@ -669,28 +654,16 @@ function isFromMe(data) {
   
 
   app.post('/webhook/group-participants-update', async (req, res) => {
-    // In this sub-route, req.body is expected to be the innerPayload.
-    const currentReqBody = req.body; 
-    const data = currentReqBody.data; // Access data directly from currentReqBody.data
-
-    // Salva o payload em payloads.json (auditoria/debug)
-    try {
-      const timestamp = new Date().toISOString();
-      fs.appendFileSync(
-        'payloads.json',
-        JSON.stringify({ timestamp, payload: currentReqBody }, null, 2) + '\n'
-      );
-      console.log("Payload group.participants.update salvo em payloads.json");
-    } catch (error) {
-      console.error("Erro ao salvar payload group.participants.update:", error);
-    }
+    const fullReceivedPayload = req.body;           // { event, instance, data, … }
+    const data                 = fullReceivedPayload.data;
 
     if (!data) {
-        console.warn("group.participants.update: 'data' (from req.body.data) is missing. Current req.body:", JSON.stringify(currentReqBody, null, 2));
-        return res.status(400).send("Payload inválido para group.participants.update (req.body.data missing).");
+      console.warn("group.participants.update: data ausente", JSON.stringify(fullReceivedPayload, null, 2));
+      return res.status(400).send("Payload inválido para group.participants.update.");
     }
   
     // Verifica se é o grupo correto e se há participantes
+    // Ensure 'data' itself is checked before accessing its properties like data.id or data.participants
     if (
       (data.id === TARGET_GROUP_ID || data.chatId === TARGET_GROUP_ID) &&
       Array.isArray(data.participants)
