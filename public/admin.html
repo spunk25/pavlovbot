@@ -93,31 +93,23 @@
                             <input type="text" id="config_GROUP_BASE_NAME" name="GROUP_BASE_NAME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
                         <div>
-                            <label for="config_SERVER_OPEN_TIME" class="block text-sm font-medium text-gray-700">Hora Abertura Servidor (HH:MM):</label>
-                            <input type="time" id="config_SERVER_OPEN_TIME" name="SERVER_OPEN_TIME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                        </div>
-                        <div>
-                            <label for="config_SERVER_CLOSE_TIME" class="block text-sm font-medium text-gray-700">Hora Fechamento Servidor (HH:MM):</label>
-                            <input type="time" id="config_SERVER_CLOSE_TIME" name="SERVER_CLOSE_TIME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                        </div>
-                         <div>
                             <label for="config_TIMEZONE" class="block text-sm font-medium text-gray-700">Fuso Horário (ex: America/Sao_Paulo):</label>
                             <input type="text" id="config_TIMEZONE" name="TIMEZONE" placeholder="America/Sao_Paulo" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
                     </div>
                 </div>
 
-                <!-- Message Frequency -->
+                <!-- Server Operation Times & Message Frequency -->
                 <div>
-                    <h3 class="text-lg font-medium text-gray-600 mb-2">Frequência de Mensagens Automáticas</h3>
+                    <h3 class="text-lg font-medium text-gray-600 mb-2">Operação do Servidor e Frequência de Mensagens</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label for="config_MESSAGES_DURING_SERVER_OPEN" class="block text-sm font-medium text-gray-700">Qtd. (Servidor Aberto):</label>
-                            <input type="number" id="config_MESSAGES_DURING_SERVER_OPEN" name="MESSAGES_DURING_SERVER_OPEN" min="0" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <label for="config_SERVER_OPEN_TIME" class="block text-sm font-medium text-gray-700">Hora de Abertura (HH:MM):</label>
+                            <input type="time" id="config_SERVER_OPEN_TIME" name="SERVER_OPEN_TIME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
                         <div>
-                            <label for="config_MESSAGES_DURING_DAYTIME" class="block text-sm font-medium text-gray-700">Qtd. (Diurnas):</label>
-                            <input type="number" id="config_MESSAGES_DURING_DAYTIME" name="MESSAGES_DURING_DAYTIME" min="0" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <label for="config_SERVER_CLOSE_TIME" class="block text-sm font-medium text-gray-700">Hora de Fechamento (HH:MM):</label>
+                            <input type="time" id="config_SERVER_CLOSE_TIME" name="SERVER_CLOSE_TIME" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
                         <div>
                             <label for="config_DAYTIME_START_HOUR" class="block text-sm font-medium text-gray-700">Início Horário Diurno (0-23):</label>
@@ -126,6 +118,14 @@
                         <div>
                             <label for="config_DAYTIME_END_HOUR" class="block text-sm font-medium text-gray-700">Fim Horário Diurno (0-23):</label>
                             <input type="number" id="config_DAYTIME_END_HOUR" name="DAYTIME_END_HOUR" min="0" max="23" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_MESSAGES_DURING_SERVER_OPEN" class="block text-sm font-medium text-gray-700">Qtd. Mensagens (Servidor Aberto):</label>
+                            <input type="number" id="config_MESSAGES_DURING_SERVER_OPEN" name="MESSAGES_DURING_SERVER_OPEN" min="0" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="config_MESSAGES_DURING_DAYTIME" class="block text-sm font-medium text-gray-700">Qtd. Mensagens (Diurnas):</label>
+                            <input type="number" id="config_MESSAGES_DURING_DAYTIME" name="MESSAGES_DURING_DAYTIME" min="0" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         </div>
                     </div>
                 </div>

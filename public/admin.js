@@ -40,6 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const responseMessageGlobalDiv = document.getElementById('responseMessageGlobal');
 
+    // --- DEBUGGING ---
+    console.log("Attempting to find config_DAYTIME_END_HOUR element:", document.getElementById('config_DAYTIME_END_HOUR'));
+    console.log("configDaytimeEndHourInput variable:", configDaytimeEndHourInput);
+    // --- END DEBUGGING ---
+
     function showGlobalMessage(message, isError = false) {
         responseMessageGlobalDiv.textContent = message;
         responseMessageGlobalDiv.className = `mb-4 p-3 rounded-md text-center ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;

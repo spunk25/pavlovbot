@@ -21,11 +21,11 @@ const MESSAGES_FILE_PATH = path.join(__dirname, 'messages.json');
 const CONFIG_FILE_PATH = path.join(__dirname, 'config.json');
 
 // Configurações padrão que podem ser sobrescritas pelo config.json e depois pelo .env
-let botConfig = {
+let botConfig = { // These are the ultimate fallback defaults
   EVOLUTION_API_URL: 'https://evo.audiozap.app',
-  EVOLUTION_API_KEY: 'EEaQ1NXIlAW5Ss2bMliJNfEf3qUU2v8z',
-  INSTANCE_NAME: 'asda',
-  TARGET_GROUP_ID: '120363420105678428@g.us', // Added for panel config
+  EVOLUTION_API_KEY: '', // Prefer .env for sensitive keys
+  INSTANCE_NAME: '',
+  TARGET_GROUP_ID: '',
   BOT_WEBHOOK_PORT: 8080,
   SERVER_OPEN_TIME: '19:00',
   SERVER_CLOSE_TIME: '23:59',
@@ -34,99 +34,121 @@ let botConfig = {
   MESSAGES_DURING_DAYTIME: 4,
   DAYTIME_START_HOUR: 8,
   DAYTIME_END_HOUR: 17,
-  TIMEZONE: "America/Sao_Paulo", // Added for panel config
-  GROQ_API_KEY: '', // Added for panel config
-  BOT_PUBLIC_URL: '', // Added for panel config
+  TIMEZONE: "America/Sao_Paulo",
+  GROQ_API_KEY: '', // Prefer .env for sensitive keys
+  BOT_PUBLIC_URL: '',
   CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"]
 };
 
 function loadBotConfig() {
   // 1. Carregar de config.json
   let jsonConfig = {};
-  if (fs.existsSync(CONFIG_FILE_PATH)) {
+  const configFileExistsInitially = fs.existsSync(CONFIG_FILE_PATH);
+
+  if (configFileExistsInitially) {
     try {
       const fileContent = fs.readFileSync(CONFIG_FILE_PATH, 'utf-8');
       jsonConfig = JSON.parse(fileContent);
       console.log("Configurações carregadas de config.json");
     } catch (error) {
       console.error("Erro ao carregar config.json, usando padrões e .env:", error);
+      // jsonConfig remains {}
     }
   } else {
-    console.warn("config.json não encontrado. Usando padrões e .env. O arquivo será criado ao salvar configurações pelo painel.");
+    console.warn("config.json não encontrado. Usando padrões e .env. Será criado se não existir após esta inicialização.");
   }
   
-  // Merge defaults with jsonConfig
-  botConfig = { ...botConfig, ...jsonConfig };
+  // Start with a fresh copy of internal defaults, then layer config.json, then .env
+  // This ensures botConfig always has all keys defined.
+  let tempConfig = { ...botConfig }; // Use the initial defaults as a base
+  tempConfig = { ...tempConfig, ...jsonConfig }; // Layer with config from file (if any)
 
   // 2. Sobrescrever com variáveis de ambiente (elas têm maior precedência)
-  for (const key in botConfig) {
+  for (const key in tempConfig) {
     if (envConfig[key] !== undefined) {
-      // Tratar números e booleanos que podem vir como string do .env
-      if (key === 'CHAT_SUMMARY_TIMES') { // Special handling for CHAT_SUMMARY_TIMES from .env
+      // Special handling for CHAT_SUMMARY_TIMES from .env
+      if (key === 'CHAT_SUMMARY_TIMES') {
           if (typeof envConfig[key] === 'string') {
               try {
                   let parsedTimes = JSON.parse(envConfig[key]);
                   if (Array.isArray(parsedTimes) && parsedTimes.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
-                      botConfig[key] = parsedTimes;
+                      tempConfig[key] = parsedTimes;
                   } else {
                       throw new Error("Not a valid JSON array of HH:MM strings");
                   }
               } catch (e) {
-                  botConfig[key] = envConfig[key].split(',')
+                  // Try parsing as comma-separated string
+                  const commaParsedTimes = envConfig[key].split(',')
                       .map(s => s.trim())
                       .filter(s => s.match(/^\d{2}:\d{2}$/));
-                  if (botConfig[key].length === 0 && envConfig[key].trim() !== "") {
-                      console.warn(`CHAT_SUMMARY_TIMES from .env ("${envConfig[key]}") could not be parsed correctly. Using default or config.json value.`);
-                      // Revert to jsonConfig or default if parsing .env string fails badly
-                      botConfig[key] = jsonConfig[key] || ["10:00", "16:00", "21:00"];
+                  if (commaParsedTimes.length > 0 || envConfig[key].trim() === "") { // Allow empty string to clear
+                      tempConfig[key] = commaParsedTimes;
+                  } else {
+                      console.warn(`CHAT_SUMMARY_TIMES from .env ("${envConfig[key]}") could not be parsed as JSON array or comma-separated. Using value from config.json or default.`);
+                      // tempConfig[key] remains as it was (from jsonConfig or initial default)
                   }
               }
           } else if (Array.isArray(envConfig[key])) { // Should not happen with .env but good practice
-              botConfig[key] = envConfig[key].filter(s => typeof s === 'string' && s.match(/^\d{2}:\d{2}$/));
+              tempConfig[key] = envConfig[key].filter(s => typeof s === 'string' && s.match(/^\d{2}:\d{2}$/));
           }
-      } else if (!isNaN(parseFloat(envConfig[key])) && isFinite(envConfig[key]) && typeof botConfig[key] === 'number') {
-        botConfig[key] = parseFloat(envConfig[key]);
-      } else if ((envConfig[key].toLowerCase() === 'true' || envConfig[key].toLowerCase() === 'false') && typeof botConfig[key] === 'boolean') {
-        botConfig[key] = envConfig[key].toLowerCase() === 'true';
-      } else {
-        botConfig[key] = envConfig[key];
+      } else if (typeof tempConfig[key] === 'number' && !isNaN(parseFloat(envConfig[key])) && isFinite(envConfig[key])) {
+        tempConfig[key] = parseFloat(envConfig[key]);
+      } else if (typeof tempConfig[key] === 'boolean' && (envConfig[key].toLowerCase() === 'true' || envConfig[key].toLowerCase() === 'false')) {
+        tempConfig[key] = envConfig[key].toLowerCase() === 'true';
+      } else if (typeof tempConfig[key] === 'string') { // For all other string types
+        tempConfig[key] = String(envConfig[key]);
       }
     }
   }
+ 
+  // Assign the fully processed config to the global botConfig
+  botConfig = { ...tempConfig };
 
-   // Garante que as horas sejam strings e números sejam parseados corretamente
-   botConfig.SERVER_OPEN_TIME = String(botConfig.SERVER_OPEN_TIME);
-   botConfig.SERVER_CLOSE_TIME = String(botConfig.SERVER_CLOSE_TIME);
-   botConfig.DAYTIME_START_HOUR = parseInt(botConfig.DAYTIME_START_HOUR, 10);
-   botConfig.DAYTIME_END_HOUR = parseInt(botConfig.DAYTIME_END_HOUR, 10);
-   botConfig.MESSAGES_DURING_SERVER_OPEN = parseInt(botConfig.MESSAGES_DURING_SERVER_OPEN, 10);
-   botConfig.MESSAGES_DURING_DAYTIME = parseInt(botConfig.MESSAGES_DURING_DAYTIME, 10);
-   botConfig.BOT_WEBHOOK_PORT = parseInt(botConfig.BOT_WEBHOOK_PORT, 10);
-
-   // Ensure CHAT_SUMMARY_TIMES is an array of strings (final check after all sources)
-   if (typeof botConfig.CHAT_SUMMARY_TIMES === 'string') { // If it's still a string (e.g. from config.json and no .env override)
-     try {
-       let parsedTimes = JSON.parse(botConfig.CHAT_SUMMARY_TIMES);
-       if (Array.isArray(parsedTimes) && parsedTimes.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
-           botConfig.CHAT_SUMMARY_TIMES = parsedTimes;
-       } else {
-           throw new Error("Not a valid JSON array of HH:MM strings");
-       }
-     } catch (e) {
-       botConfig.CHAT_SUMMARY_TIMES = botConfig.CHAT_SUMMARY_TIMES.split(',')
-           .map(s => s.trim())
-           .filter(s => s.match(/^\d{2}:\d{2}$/));
-       if (botConfig.CHAT_SUMMARY_TIMES.length === 0 && typeof botConfig.CHAT_SUMMARY_TIMES === 'string' && botConfig.CHAT_SUMMARY_TIMES.trim() !== "") {
-            console.warn("CHAT_SUMMARY_TIMES from config.json string could not be parsed. Using default.");
-            botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"];
-       }
-     }
-   }
-   if (!Array.isArray(botConfig.CHAT_SUMMARY_TIMES) || !botConfig.CHAT_SUMMARY_TIMES.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
-       console.warn("CHAT_SUMMARY_TIMES is not a valid array of HH:MM strings after all parsing. Using default.");
-       botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"];
-   }
-
+  // Garante que as horas sejam strings e números sejam parseados corretamente
+  botConfig.SERVER_OPEN_TIME = String(botConfig.SERVER_OPEN_TIME);
+  botConfig.SERVER_CLOSE_TIME = String(botConfig.SERVER_CLOSE_TIME);
+  botConfig.MESSAGES_DURING_SERVER_OPEN = parseInt(String(botConfig.MESSAGES_DURING_SERVER_OPEN), 10) || 0;
+  botConfig.MESSAGES_DURING_DAYTIME = parseInt(String(botConfig.MESSAGES_DURING_DAYTIME), 10) || 0;
+  botConfig.DAYTIME_START_HOUR = parseInt(String(botConfig.DAYTIME_START_HOUR), 10) || 0;
+  botConfig.DAYTIME_END_HOUR = parseInt(String(botConfig.DAYTIME_END_HOUR), 10) || 0;
+  botConfig.BOT_WEBHOOK_PORT = parseInt(String(botConfig.BOT_WEBHOOK_PORT), 10) || 8080;
+ 
+  // Ensure CHAT_SUMMARY_TIMES is a valid array of HH:MM strings (final check after all sources)
+  if (typeof botConfig.CHAT_SUMMARY_TIMES === 'string') { // If it's still a string (e.g. from config.json and no .env override)
+    try {
+      let parsedTimes = JSON.parse(botConfig.CHAT_SUMMARY_TIMES);
+      if (Array.isArray(parsedTimes) && parsedTimes.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
+          botConfig.CHAT_SUMMARY_TIMES = parsedTimes;
+      } else {
+          throw new Error("Not a valid JSON array of HH:MM strings");
+      }
+    } catch (e) {
+      const commaParsedTimes = botConfig.CHAT_SUMMARY_TIMES.split(',')
+          .map(s => s.trim())
+          .filter(s => s.match(/^\d{2}:\d{2}$/));
+      if (commaParsedTimes.length > 0 || botConfig.CHAT_SUMMARY_TIMES.trim() === "") {
+          botConfig.CHAT_SUMMARY_TIMES = commaParsedTimes;
+      } else {
+           console.warn(`CHAT_SUMMARY_TIMES from config.json string ("${botConfig.CHAT_SUMMARY_TIMES}") could not be parsed. Using default.`);
+           botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"]; // Fallback to hardcoded default
+      }
+    }
+  }
+  if (!Array.isArray(botConfig.CHAT_SUMMARY_TIMES) || !botConfig.CHAT_SUMMARY_TIMES.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
+      console.warn("CHAT_SUMMARY_TIMES is not a valid array of HH:MM strings after all parsing. Using default.");
+      botConfig.CHAT_SUMMARY_TIMES = ["10:00", "16:00", "21:00"]; // Fallback to hardcoded default
+  }
+ 
+  // If config.json didn't exist at the start, save the current botConfig to create it.
+  if (!configFileExistsInitially) {
+    console.log("config.json não existia. Criando agora com as configurações atuais (padrões + .env).");
+    // This is an async function, but for the initial load, we might not need to await it
+    // if subsequent operations don't immediately depend on the file being written.
+    // However, calling it without await can lead to unhandled promise rejections if it fails.
+    saveBotConfig().catch(err => {
+        console.error("Erro ao tentar criar config.json na inicialização:", err);
+    });
+  }
 
   console.log("Configurações finais do bot:", { 
       ...botConfig, 
@@ -137,42 +159,39 @@ function loadBotConfig() {
 
 async function saveBotConfig() {
   try {
-    // Salva todas as configurações que estão em botConfig e são relevantes para config.json
-    // Chaves sensíveis como API keys serão salvas se o usuário as inserir pelo painel.
-    // A prioridade do .env na função loadBotConfig() garante que as variáveis de ambiente
-    // ainda possam sobrescrever o que está em config.json.
     const configToSave = {
       EVOLUTION_API_URL: botConfig.EVOLUTION_API_URL,
-      // EVOLUTION_API_KEY: botConfig.EVOLUTION_API_KEY, // Prefer .env, but save if panel sets it
+      // EVOLUTION_API_KEY: botConfig.EVOLUTION_API_KEY, // Only save if non-empty, prefer .env
       INSTANCE_NAME: botConfig.INSTANCE_NAME,
       TARGET_GROUP_ID: botConfig.TARGET_GROUP_ID,
-      BOT_WEBHOOK_PORT: parseInt(botConfig.BOT_WEBHOOK_PORT, 10),
+      BOT_WEBHOOK_PORT: parseInt(String(botConfig.BOT_WEBHOOK_PORT), 10) || 8080,
       SERVER_OPEN_TIME: botConfig.SERVER_OPEN_TIME,
       SERVER_CLOSE_TIME: botConfig.SERVER_CLOSE_TIME,
       GROUP_BASE_NAME: botConfig.GROUP_BASE_NAME,
-      MESSAGES_DURING_SERVER_OPEN: parseInt(botConfig.MESSAGES_DURING_SERVER_OPEN, 10),
-      MESSAGES_DURING_DAYTIME: parseInt(botConfig.MESSAGES_DURING_DAYTIME, 10),
-      DAYTIME_START_HOUR: parseInt(botConfig.DAYTIME_START_HOUR, 10),
-      DAYTIME_END_HOUR: parseInt(botConfig.DAYTIME_END_HOUR, 10),
+      MESSAGES_DURING_SERVER_OPEN: parseInt(String(botConfig.MESSAGES_DURING_SERVER_OPEN), 10) || 0,
+      MESSAGES_DURING_DAYTIME: parseInt(String(botConfig.MESSAGES_DURING_DAYTIME), 10) || 0,
+      DAYTIME_START_HOUR: parseInt(String(botConfig.DAYTIME_START_HOUR), 10) || 0,
+      DAYTIME_END_HOUR: parseInt(String(botConfig.DAYTIME_END_HOUR), 10) || 0,
       TIMEZONE: botConfig.TIMEZONE,
-      // GROQ_API_KEY: botConfig.GROQ_API_KEY, // Prefer .env, but save if panel sets it
+      // GROQ_API_KEY: botConfig.GROQ_API_KEY, // Only save if non-empty, prefer .env
       BOT_PUBLIC_URL: botConfig.BOT_PUBLIC_URL,
       CHAT_SUMMARY_TIMES: Array.isArray(botConfig.CHAT_SUMMARY_TIMES) ? botConfig.CHAT_SUMMARY_TIMES : []
     };
-
-    // Explicitly save API keys if they are present in botConfig and potentially set via panel
-    // This allows panel override if .env is not set for these.
+ 
+    // Explicitly save API keys if they are present in botConfig (e.g., set via panel or loaded from a previous config.json)
+    // This allows the panel to set them if .env is not used for these keys.
     if (botConfig.EVOLUTION_API_KEY) {
         configToSave.EVOLUTION_API_KEY = botConfig.EVOLUTION_API_KEY;
     }
     if (botConfig.GROQ_API_KEY) {
         configToSave.GROQ_API_KEY = botConfig.GROQ_API_KEY;
     }
-
+ 
     await fs.promises.writeFile(CONFIG_FILE_PATH, JSON.stringify(configToSave, null, 2), 'utf-8');
     console.log("Configurações salvas em config.json");
   } catch (error) {
-    console.error("Erro ao salvar config.json:", error);
+    console.error("Erro ao salvar configurações em config.json:", error);
+    // throw error; // Optionally re-throw if this is critical for startup
   }
 }
 
