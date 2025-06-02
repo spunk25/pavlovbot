@@ -87,12 +87,13 @@ async function sendPoll(title, values, recipientJid, selectableCount = 1) {
     };
 
     if (currentConfig.POLL_MENTION_EVERYONE) {
-      //"mentionsEveryOne":true,"mentioned":["{{remoteJID}}"]
+      //"mentionsEveryOne":true,"mentioned":["{{remoteJID}}"] 
+      //remover @s.whatsapp.net dos participants
       payload.mentionsEveryOne = true;
       console.log("EvolutionApiService: Enviando enquete com mentionsEveryOne=true."); 
       const participants = await getGroupParticipants(targetJid);
       if (participants && participants.length > 0) {        
-        payload.mentioned = participants;
+        payload.mentioned = participants.map(p => p.replace('@s.whatsapp.net', ''));
         console.log(`EvolutionApiService: Enviando enquete mencionando ${participants.length} participantes.`);
       }
       console.log(payload);
