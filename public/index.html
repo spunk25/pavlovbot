@@ -269,6 +269,34 @@
 
         <hr>
 
+        <section id="chatHistoryManagementSection">
+            <h2>Gerenciamento do Histórico de Chat (Banco de Dados)</h2>
+            <p>Visualize o histórico de mensagens usado para resumos, simule um resumo ou limpe o histórico do banco de dados.</p>
+            <div class="form-group">
+                <button type="button" id="loadDbChatHistoryBtn">Carregar Histórico do Chat (DB)</button>
+                <div id="dbChatHistorySpinner" class="ai-spinner" style="display: none;">Carregando histórico...</div>
+            </div>
+            <div class="form-group">
+                <label for="dbChatHistoryTextarea">Histórico de Chat (Conteúdo do DB):</label>
+                <textarea id="dbChatHistoryTextarea" rows="10" readonly placeholder="O histórico do chat do banco de dados aparecerá aqui..."></textarea>
+            </div>
+            <div class="form-group">
+                <button type="button" id="simulateSummaryBtn">Simular Resumo do Histórico Acima</button>
+                <div id="simulateSummarySpinner" class="ai-spinner" style="display: none;">Gerando resumo...</div>
+            </div>
+            <div class="form-group">
+                <label for="simulatedSummaryResult">Resultado da Simulação do Resumo:</label>
+                <textarea id="simulatedSummaryResult" rows="5" readonly placeholder="O resumo simulado aparecerá aqui..."></textarea>
+            </div>
+             <div class="form-group">
+                <button type="button" id="clearDbChatHistoryBtn" class="danger-button">Limpar TODO Histórico de Chat (DB)</button>
+                <div id="clearDbChatHistorySpinner" class="ai-spinner" style="display: none;">Limpando...</div>
+            </div>
+            <div id="responseMessageChatHistory" class="response-message"></div>
+        </section>
+
+        <hr>
+
         <section id="aiPromptsSection">
             <h2>Prompts da Inteligência Artificial</h2>
             <p>Edite os prompts base usados para gerar mensagens com IA. Estes serão usados tanto pelas funções automáticas do bot quanto pelos botões "Gerar com IA" acima.</p>

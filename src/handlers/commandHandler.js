@@ -146,7 +146,8 @@ async function handleCommand(command, args, fullMessage, senderJid, isGroupMessa
           break;
         case '!resumo':
         case '!summarynow':
-          if (ChatHistoryService.getChatHistory().length > 0) {
+          const currentChatHistory = await ChatHistoryService.getChatHistory();
+          if (currentChatHistory.length > 0) {
             await EvolutionApiService.sendMessageToGroup("⏳ Gerando resumo do chat sob demanda...", senderJid);
             await SchedulerService.triggerChatSummary(); // This sends to TARGET_GROUP_ID
             await EvolutionApiService.sendMessageToGroup("✅ Resumo do chat solicitado. Verifique o grupo.", senderJid);

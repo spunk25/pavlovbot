@@ -76,6 +76,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const responseMessageReplaceAllDiv = document.getElementById('responseMessageReplaceAll');
     const replaceAllSpinner = document.getElementById('replaceAllSpinner');
 
+    // Novos elementos para gerenciamento de histórico de chat
+    const loadDbChatHistoryBtn = document.getElementById('loadDbChatHistoryBtn');
+    const dbChatHistorySpinner = document.getElementById('dbChatHistorySpinner');
+    const dbChatHistoryTextarea = document.getElementById('dbChatHistoryTextarea');
+    const simulateSummaryBtn = document.getElementById('simulateSummaryBtn');
+    const simulateSummarySpinner = document.getElementById('simulateSummarySpinner');
+    const simulatedSummaryResult = document.getElementById('simulatedSummaryResult');
+    const clearDbChatHistoryBtn = document.getElementById('clearDbChatHistoryBtn');
+    const clearDbChatHistorySpinner = document.getElementById('clearDbChatHistorySpinner');
+    const responseMessageChatHistoryDiv = document.getElementById('responseMessageChatHistory');
+
     // --- EXTENDED DEBUGGING ---
     console.log("--- Checking Config Input Elements ---");
     console.log("configEvolutionApiUrlInput:", configEvolutionApiUrlInput);
@@ -509,6 +520,110 @@ document.addEventListener('DOMContentLoaded', () => {
             } finally {
                 replaceAllSpinner.classList.add('hidden');
                 replaceAllMessagesBtn.disabled = false;
+            }
+        });
+    }
+
+    // Funções para o gerenciamento de histórico de chat
+    if (loadDbChatHistoryBtn) {
+        loadDbChatHistoryBtn.addEventListener('click', async () => {
+            dbChatHistorySpinner.style.display = 'inline-block';
+            loadDbChatHistoryBtn.disabled = true;
+            dbChatHistoryTextarea.value = '';
+            simulatedSummaryResult.value = '';
+            responseMessageChatHistoryDiv.textContent = '';
+            responseMessageChatHistoryDiv.className = 'response-message';
+
+            try {
+                const response = await fetch('/admin/api/chat-history-db');
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    if (result.history && result.history.length > 0) {
+                        const formattedHistory = result.history.map(msg => {
+                            const date = new Date(msg.timestamp).toLocaleString('pt-BR');
+                            return `[${date}] ${msg.sender}: ${msg.text}`;
+                        }).join('\n');
+                        dbChatHistoryTextarea.value = formattedHistory;
+                        showFormMessage(responseMessageChatHistoryDiv, `Histórico carregado com ${result.history.length} mensagens.`, false);
+                    } else {
+                        dbChatHistoryTextarea.value = 'Nenhuma mensagem no histórico do banco de dados.';
+                        showFormMessage(responseMessageChatHistoryDiv, 'Nenhum histórico de chat encontrado no banco de dados.', false);
+                    }
+                } else {
+                    throw new Error(result.message || 'Falha ao carregar histórico do chat.');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar histórico do chat:', error);
+                showFormMessage(responseMessageChatHistoryDiv, `Erro ao carregar histórico: ${error.message}`, true);
+            } finally {
+                dbChatHistorySpinner.style.display = 'none';
+                loadDbChatHistoryBtn.disabled = false;
+            }
+        });
+    }
+
+    if (simulateSummaryBtn) {
+        simulateSummaryBtn.addEventListener('click', async () => {
+            simulateSummarySpinner.style.display = 'inline-block';
+            simulateSummaryBtn.disabled = true;
+            simulatedSummaryResult.value = '';
+            responseMessageChatHistoryDiv.textContent = '';
+            responseMessageChatHistoryDiv.className = 'response-message';
+
+            // Validação: verifica se há algo no textarea para simular (opcional, pois o backend usará o DB)
+            // Poderia ser uma chamada direta sem depender do textarea, se a ideia é simular o estado atual do DB.
+            // Para este exemplo, vamos assumir que o backend sempre pega o estado atual do DB.
+
+            try {
+                const response = await fetch('/admin/api/simulate-chat-summary-db', { method: 'POST' });
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    simulatedSummaryResult.value = result.summary || "Nenhum resumo gerado (histórico vazio ou IA falhou).";
+                    showFormMessage(responseMessageChatHistoryDiv, 'Simulação de resumo concluída.', false);
+                } else {
+                    throw new Error(result.message || 'Falha ao simular resumo do chat.');
+                }
+            } catch (error) {
+                console.error('Erro ao simular resumo:', error);
+                simulatedSummaryResult.value = `Erro: ${error.message}`;
+                showFormMessage(responseMessageChatHistoryDiv, `Erro na simulação: ${error.message}`, true);
+            } finally {
+                simulateSummarySpinner.style.display = 'none';
+                simulateSummaryBtn.disabled = false;
+            }
+        });
+    }
+
+    if (clearDbChatHistoryBtn) {
+        clearDbChatHistoryBtn.addEventListener('click', async () => {
+            if (!confirm('Tem certeza que deseja apagar TODO o histórico de chat do banco de dados? Esta ação é irreversível.')) {
+                return;
+            }
+
+            clearDbChatHistorySpinner.style.display = 'inline-block';
+            clearDbChatHistoryBtn.disabled = true;
+            responseMessageChatHistoryDiv.textContent = '';
+            responseMessageChatHistoryDiv.className = 'response-message';
+
+            try {
+                const response = await fetch('/admin/api/clear-chat-history-db', { method: 'POST' });
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    dbChatHistoryTextarea.value = 'Histórico de chat limpo.';
+                    simulatedSummaryResult.value = '';
+                    showFormMessage(responseMessageChatHistoryDiv, result.message || 'Histórico de chat do banco de dados limpo com sucesso!', false);
+                } else {
+                    throw new Error(result.message || 'Falha ao limpar o histórico do chat.');
+                }
+            } catch (error) {
+                console.error('Erro ao limpar histórico do chat:', error);
+                showFormMessage(responseMessageChatHistoryDiv, `Erro ao limpar histórico: ${error.message}`, true);
+            } finally {
+                clearDbChatHistorySpinner.style.display = 'none';
+                clearDbChatHistoryBtn.disabled = false;
             }
         });
     }

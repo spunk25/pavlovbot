@@ -96,7 +96,7 @@ router.post('/messages-upsert', async (req, res) => {
   // Add to chat history if it's a relevant group message and not a command
   if (isGroupMessage && remoteJid === config.TARGET_GROUP_ID && messageContent && !commandText.startsWith("!")) {
     const senderName = data.pushName || actualSenderJid.split('@')[0];
-    ChatHistoryService.addMessageToHistory(senderName, messageContent);
+    await ChatHistoryService.addMessageToHistory(senderName, messageContent);
   }
 
   let commandProcessed = false;

@@ -397,13 +397,18 @@ async function scheduleNextRandomMessage(type) {
 
 async function triggerChatSummary() {
   const config = ConfigService.getConfig();
+  if (!config.CHAT_SUMMARY_ENABLED) {
+    console.log("SchedulerService: Resumo do chat desabilitado nas configurações. Limpando histórico se existir.");
+    await ChatHistoryService.clearChatHistory();
+    return;
+  }
   if (!config.GROQ_API_KEY) {
     console.warn("SchedulerService: GROQ_API_KEY não configurada. Resumo do chat desabilitado.");
-    ChatHistoryService.clearChatHistory();
+    await ChatHistoryService.clearChatHistory();
     return;
   }
 
-  const history = ChatHistoryService.getChatHistory();
+  const history = await ChatHistoryService.getChatHistory();
   if (history.length === 0) {
     console.log("SchedulerService: Nenhuma mensagem no histórico para resumir.");
     const config = ConfigService.getConfig(); // Get current config
@@ -427,7 +432,7 @@ async function triggerChatSummary() {
   }
 
   const chatToSummarize = [...history]; // Copy before clearing
-  ChatHistoryService.clearChatHistory();
+  await ChatHistoryService.clearChatHistory();
 
   const baseChatSummaryPrompt = MessageService.getAIPrompt('chatSummary');
   const prompt = baseChatSummaryPrompt.replace('{CHAT_PLACEHOLDER}', ChatHistoryService.formatChatForSummary(chatToSummarize));

@@ -1,61 +1,61 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import DatabaseService from './DatabaseService.js'; // Alterado de fs e path
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const CHAT_HISTORY_COLLECTION_NAME = 'chat_history_log';
 
-const CHAT_HISTORY_FILE_PATH = path.join(__dirname, '..', '..', 'chatHistory.json');
-let chatHistory = [];
-
+// Esta função agora apenas registra o estado inicial ou pode ser usada para carregar um cache limitado.
+// A fonte principal de verdade será o banco de dados para getChatHistory.
 async function loadChatHistory() {
   try {
-    const data = await fs.promises.readFile(CHAT_HISTORY_FILE_PATH, 'utf8');
-    chatHistory = JSON.parse(data);
-    console.log(`ChatHistoryService: Histórico carregado (${chatHistory.length} mensagens).`);
+    const db = await DatabaseService.getDb();
+    const collection = db.collection(CHAT_HISTORY_COLLECTION_NAME);
+    const count = await collection.countDocuments();
+    console.log(`ChatHistoryService: Histórico de chat no DB contém ${count} mensagens.`);
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      chatHistory = [];
-      console.log('ChatHistoryService: Nenhum histórico anterior. Iniciando vazio.');
-    } else {
-      console.error('ChatHistoryService: Erro ao carregar chatHistory:', err);
-    }
+    console.error('ChatHistoryService: Erro ao verificar histórico de chat no DB:', err);
   }
 }
 
-async function saveChatHistory() {
-  try {
-    await fs.promises.writeFile(
-      CHAT_HISTORY_FILE_PATH,
-      JSON.stringify(chatHistory, null, 2),
-      'utf8'
-    );
-    // console.log(`ChatHistoryService: Histórico salvo (${chatHistory.length} mensagens).`); // Can be too verbose
-  } catch (err) {
-    console.error('ChatHistoryService: Erro ao salvar chatHistory:', err);
-  }
-}
-
-function addMessageToHistory(sender, text) {
-  chatHistory.push({
+async function addMessageToHistory(sender, text) {
+  const message = {
     sender,
     text,
     timestamp: new Date()
-  });
-  saveChatHistory();
+  };
+  try {
+    const db = await DatabaseService.getDb();
+    const collection = db.collection(CHAT_HISTORY_COLLECTION_NAME);
+    await collection.insertOne(message);
+    // console.log("ChatHistoryService: Mensagem adicionada ao histórico do DB."); // Pode ser muito verboso
+  } catch (error) {
+    console.error("ChatHistoryService: Erro ao adicionar mensagem ao histórico do DB:", error);
+  }
 }
 
-function getChatHistory() {
-  return [...chatHistory]; // Return a copy
+async function getChatHistory() {
+  try {
+    const db = await DatabaseService.getDb();
+    const collection = db.collection(CHAT_HISTORY_COLLECTION_NAME);
+    // Ordena por timestamp para manter a ordem cronológica
+    const history = await collection.find({}).sort({ timestamp: 1 }).toArray();
+    return history;
+  } catch (error) {
+    console.error("ChatHistoryService: Erro ao buscar histórico do DB:", error);
+    return [];
+  }
 }
 
-function clearChatHistory() {
-  chatHistory = [];
-  saveChatHistory();
-  console.log("ChatHistoryService: Histórico de chat limpo.");
+async function clearChatHistory() {
+  try {
+    const db = await DatabaseService.getDb();
+    const collection = db.collection(CHAT_HISTORY_COLLECTION_NAME);
+    await collection.deleteMany({});
+    console.log("ChatHistoryService: Histórico de chat limpo no DB.");
+  } catch (error) {
+    console.error("ChatHistoryService: Erro ao limpar histórico do DB:", error);
+  }
 }
 
-function formatChatForSummary(historyArray = chatHistory) {
+function formatChatForSummary(historyArray) { // historyArray será fornecido por quem chama
   return historyArray.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
 }
 
@@ -64,7 +64,7 @@ loadChatHistory();
 
 export default {
   loadChatHistory,
-  saveChatHistory,
+  // saveChatHistory, // Removido, pois cada mensagem é salva individualmente
   addMessageToHistory,
   getChatHistory,
   clearChatHistory,

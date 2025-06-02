@@ -3,6 +3,7 @@ import ConfigService from '../core/ConfigService.js';
 import MessageService from '../core/MessageService.js';
 import GroqApiService from '../core/GroqApiService.js'; // For test and generate
 import SchedulerService from '../core/SchedulerService.js'; // For re-initializing time details
+import ChatHistoryService from '../core/ChatHistoryService.js'; // Novo import
 
 const router = express.Router();
 
@@ -135,6 +136,63 @@ router.post('/messages/replace-all', express.json({ limit: '5mb' }), async (req,
     } catch (error) {
         console.error("AdminApiHandler: Erro ao substituir todas as mensagens:", error);
         res.status(500).json({ success: false, message: `Erro interno do servidor: ${error.message}` });
+    }
+});
+
+// Endpoints para Gerenciamento de Histórico de Chat
+router.get('/chat-history-db', async (req, res) => {
+    try {
+        const history = await ChatHistoryService.getChatHistory();
+        res.json({ success: true, history });
+    } catch (error) {
+        console.error("AdminApiHandler: Erro ao buscar histórico de chat do DB:", error);
+        res.status(500).json({ success: false, message: "Erro ao buscar histórico de chat do banco de dados." });
+    }
+});
+
+router.post('/simulate-chat-summary-db', async (req, res) => {
+    try {
+        const currentHistory = await ChatHistoryService.getChatHistory();
+        if (!currentHistory || currentHistory.length === 0) {
+            return res.json({ success: true, summary: "Nenhuma mensagem no histórico do banco de dados para resumir." });
+        }
+
+        const config = ConfigService.getConfig();
+        if (!config.GROQ_API_KEY) {
+            return res.status(400).json({ success: false, message: "Chave da API Groq não configurada. Não é possível gerar resumo." });
+        }
+
+        const chatToSummarizeFormatted = ChatHistoryService.formatChatForSummary(currentHistory);
+        const baseChatSummaryPrompt = MessageService.getAIPrompt('chatSummary');
+        
+        if (!baseChatSummaryPrompt) {
+             return res.status(400).json({ success: false, message: "Prompt base para resumo de chat não encontrado nas configurações de mensagens." });
+        }
+
+        const prompt = baseChatSummaryPrompt.replace('{CHAT_PLACEHOLDER}', chatToSummarizeFormatted);
+
+        console.log(`AdminApiHandler: Tentando gerar resumo simulado para ${currentHistory.length} mensagens.`);
+        const summary = await GroqApiService.callGroqAPI(prompt);
+
+        if (summary && !summary.startsWith("Erro") && !summary.startsWith("Não foi possível")) {
+            res.json({ success: true, summary });
+        } else {
+            console.warn("AdminApiHandler: Falha ao gerar resumo simulado ou resumo inválido:", summary);
+            res.json({ success: false, message: `Falha ao gerar resumo pela IA: ${summary}` });
+        }
+    } catch (error) {
+        console.error("AdminApiHandler: Erro ao simular resumo do chat:", error);
+        res.status(500).json({ success: false, message: `Erro interno ao simular resumo: ${error.message}` });
+    }
+});
+
+router.post('/clear-chat-history-db', async (req, res) => {
+    try {
+        await ChatHistoryService.clearChatHistory();
+        res.json({ success: true, message: "Histórico de chat do banco de dados limpo com sucesso." });
+    } catch (error) {
+        console.error("AdminApiHandler: Erro ao limpar histórico de chat do DB:", error);
+        res.status(500).json({ success: false, message: "Erro ao limpar histórico de chat do banco de dados." });
     }
 });
 
