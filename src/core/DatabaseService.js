@@ -4,50 +4,60 @@ let client;
 let db;
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = MONGODB_URI ? new URL(MONGODB_URI).pathname.substring(1) : 'pavlov_bot_db'; // Extract DB name or use default
+const DB_NAME = process.env.DB_NAME || 'pavlovBotDb'; // Default DB name if not in .env
 
 async function connect() {
-  if (db) {
-    return db;
-  }
   if (!MONGODB_URI) {
-    console.error("DatabaseService: MONGODB_URI is not defined in .env. Database connection failed.");
-    throw new Error("MONGODB_URI not configured.");
+    console.error("DatabaseService: MONGODB_URI não está definida nas variáveis de ambiente.");
+    throw new Error("MONGODB_URI não configurada.");
+  }
+  if (db) {
+    console.warn("DatabaseService: Tentativa de conectar quando já conectado.");
+    return db;
   }
   try {
     client = new MongoClient(MONGODB_URI, {
-      // useNewUrlParser: true, // No longer needed in v4+ of the driver
-      // useUnifiedTopology: true, // No longer needed in v4+ of the driver
+      // useNewUrlParser: true, // No longer needed in recent versions
+      // useUnifiedTopology: true, // No longer needed in recent versions
     });
     await client.connect();
     db = client.db(DB_NAME);
-    console.log(`DatabaseService: Successfully connected to MongoDB at ${MONGODB_URI.split('@').pop().split('/')[0]} - Database: ${DB_NAME}`);
-    
-    // Optional: Create indexes for collections if they don't exist
-    // Example for a future chat_history collection with TTL
-    // await db.collection('chat_history').createIndex({ "timestamp": 1 }, { expireAfterSeconds: 60 * 60 * 24 * 7 }); // 7 days TTL
-    // console.log("DatabaseService: Ensured indexes for collections.");
-
+    console.log(`DatabaseService: Conectado com sucesso ao MongoDB (DB: ${DB_NAME}).`);
     return db;
-  } catch (err) {
-    console.error('DatabaseService: Failed to connect to MongoDB', err);
-    process.exit(1); // Exit if DB connection fails
+  } catch (error) {
+    console.error("DatabaseService: Erro ao conectar ao MongoDB:", error);
+    throw error; // Re-throw para ser tratado pelo chamador (app.js)
   }
 }
 
 async function getDb() {
   if (!db) {
-    return await connect();
+    console.warn("DatabaseService: Banco de dados não conectado. Tentando conectar...");
+    // Poderia tentar reconectar aqui ou lançar um erro mais direto
+    // Por simplicidade, vamos assumir que connect() foi chamado na inicialização.
+    // Se a conexão cair, o ideal seria ter uma lógica de reconexão mais robusta.
+    // throw new Error("DatabaseService: Conexão com o banco de dados não estabelecida. Chame connect() primeiro.");
+    // Ou, para resiliência básica, tentar conectar:
+    try {
+        return await connect();
+    } catch (e) {
+        console.error("DatabaseService: Falha ao tentar reconectar em getDb().");
+        throw new Error("DatabaseService: Conexão com o banco de dados não estabelecida e falha ao reconectar.");
+    }
   }
   return db;
 }
 
 async function close() {
   if (client) {
-    await client.close();
-    client = null;
-    db = null;
-    console.log('DatabaseService: MongoDB connection closed.');
+    try {
+      await client.close();
+      console.log("DatabaseService: Conexão com MongoDB fechada.");
+      client = null;
+      db = null;
+    } catch (error) {
+      console.error("DatabaseService: Erro ao fechar a conexão com MongoDB:", error);
+    }
   }
 }
 

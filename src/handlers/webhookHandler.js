@@ -114,7 +114,11 @@ router.post('/messages-upsert', async (req, res) => {
       // Non-command PM to the bot
       const messages = MessageService.getMessages();
       const defaultReply = getRandomElement(messages.botInfo?.defaultPmReply) || "Olá! Sou um bot. Para comandos (se você for admin), digite !start em uma conversa privada comigo.";
-      await EvolutionApiService.sendMessageToGroup(defaultReply, actualSenderJid);
+      try {
+        await EvolutionApiService.sendMessageToGroup(defaultReply, actualSenderJid);
+      } catch (error) {
+        console.error(`WebhookHandler: Erro ao enviar resposta PM padrão para ${actualSenderJid}:`, error);
+      }
   }
 
 
@@ -149,7 +153,13 @@ router.post('/group-participants-update', async (req, res) => {
       } else {
           welcomeMsg = getRandomElement(messages.newMember) || "Bem-vindo(a) ao grupo!";
       }
-      if (welcomeMsg) await EvolutionApiService.sendMessageToGroup(welcomeMsg);
+      if (welcomeMsg) {
+        try {
+          await EvolutionApiService.sendMessageToGroup(welcomeMsg);
+        } catch (error) {
+          console.error(`WebhookHandler: Erro ao enviar mensagem de boas-vindas para o grupo ${config.TARGET_GROUP_ID}:`, error);
+        }
+      }
 
     } else if (action === 'remove' || action === 'leave') {
       const useAI = MessageService.getAIUsageSetting('memberLeft') && config.GROQ_API_KEY;
@@ -162,7 +172,13 @@ router.post('/group-participants-update', async (req, res) => {
       } else {
           farewellMsg = getRandomElement(messages.memberLeft) || "Um membro nos deixou.";
       }
-      if (farewellMsg) await EvolutionApiService.sendMessageToGroup(farewellMsg);
+      if (farewellMsg) {
+        try {
+          await EvolutionApiService.sendMessageToGroup(farewellMsg);
+        } catch (error) {
+          console.error(`WebhookHandler: Erro ao enviar mensagem de despedida para o grupo ${config.TARGET_GROUP_ID}:`, error);
+        }
+      }
     }
   }
 

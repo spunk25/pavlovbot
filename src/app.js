@@ -36,6 +36,9 @@ async function startBot() {
   await ConfigService.loadConfig();
   let currentConfig = ConfigService.getConfig();
 
+  // Load messages (MessageService.loadMessages now fetches from DB or initializes)
+  await MessageService.loadMessages();
+
   // Validate critical configurations
   if (!currentConfig.EVOLUTION_API_URL || !currentConfig.EVOLUTION_API_KEY ||
       !currentConfig.INSTANCE_NAME || !currentConfig.TARGET_GROUP_ID ||
@@ -102,7 +105,7 @@ startBot().catch(error => {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('SIGINT recebido. Desligando o bot...');
-  await SchedulerService.stop(); // Assuming you add a stop method to clear intervals
+  SchedulerService.stop(); // Removido await pois stop não é async
   await DatabaseService.close();
   console.log('Bot desligado.');
   process.exit(0);
@@ -110,7 +113,7 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   console.log('SIGTERM recebido. Desligando o bot...');
-  await SchedulerService.stop();
+  SchedulerService.stop(); // Removido await pois stop não é async
   await DatabaseService.close();
   console.log('Bot desligado.');
   process.exit(0);

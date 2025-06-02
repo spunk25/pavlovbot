@@ -84,13 +84,16 @@ async function sendPoll(title, values, recipientJid, selectableCount = 1) {
       selectableCount: selectableCount,
       delay: 1200,
       linkPreview: true,
-      mentionsEveryOne: currentConfig.POLL_MENTION_EVERYONE
     };
 
-    if (targetJid.endsWith('@g.us')) {
+    if (currentConfig.POLL_MENTION_EVERYONE) {
+      payload.mentionsEveryOne = true;
+      console.log("EvolutionApiService: Enviando enquete com mentionsEveryOne=true.");
+    } else if (targetJid.endsWith('@g.us')) {
       const participants = await getGroupParticipants(targetJid);
       if (participants && participants.length > 0) {
         payload.mentioned = participants;
+        console.log(`EvolutionApiService: Enviando enquete mencionando ${participants.length} participantes.`);
       }
     }
 
