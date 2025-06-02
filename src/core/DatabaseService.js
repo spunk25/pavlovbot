@@ -23,6 +23,18 @@ async function connect() {
     await client.connect();
     db = client.db(DB_NAME);
     console.log(`DatabaseService: Conectado com sucesso ao MongoDB (DB: ${DB_NAME}).`);
+
+    // Listar coleções existentes no banco de dados
+    const collections = await db.listCollections().toArray();
+    if (collections.length > 0) {
+      console.log("DatabaseService: Coleções existentes no banco de dados:");
+      collections.forEach(collection => {
+        console.log(`  - ${collection.name}`);
+      });
+    } else {
+      console.log("DatabaseService: Nenhuma coleção encontrada neste banco de dados ainda.");
+    }
+
     return db;
   } catch (error) {
     console.error("DatabaseService: Erro ao conectar ao MongoDB:", error);
