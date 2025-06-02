@@ -216,11 +216,10 @@ function isFromMe(messageData) {
 }
 
 /**
- * Busca as últimas N mensagens de um grupo.
- * ESTA FUNÇÃO É BASEADA EM UM ENDPOINT HIPOTÉTICO DA EVOLUTION API.
- * VOCÊ DEVE VERIFICAR E AJUSTAR CONFORME A DOCUMENTAÇÃO DA SUA API.
+ * Busca as últimas N mensagens de um grupo usando o payload oficial.
+ * A API pode retornar um lote de mensagens; filtramos as últimas N no lado do cliente.
  * @param {string} groupId O JID do grupo.
- * @param {number} count O número de mensagens a buscar.
+ * @param {number} count O número de mensagens a buscar (as mais recentes).
  * @returns {Promise<Array<{sender: string, text: string, timestamp: Date}>>} Um array de mensagens formatadas.
  */
 async function getLatestGroupMessages(groupId, count = 20) {
@@ -230,64 +229,57 @@ async function getLatestGroupMessages(groupId, count = 20) {
   }
   const targetJid = groupId || currentConfig.TARGET_GROUP_ID;
   try {
-    // Endpoint e payload hipotéticos. Verifique a documentação da sua API Evolution.
-    // Alguns APIs podem ter `client.fetchMessages(targetJid, count)` ou similar.
-    // Outras podem usar um POST para um endpoint específico.
-    const response = await evolutionAPIClient.post(`/message/findMessages/${currentConfig.INSTANCE_NAME}`, { // Exemplo de endpoint
-      remoteJid: targetJid,
-      limit: count,
-      // fromMe: false, // Opcional: para excluir mensagens do próprio bot, se a API suportar
-      // direction: 'before', // Opcional: para pegar mensagens anteriores a um certo ponto, se suportado
-    });
+    const requestBody = {
+      where: {
+        key: {
+          remoteJid: targetJid
+        }
+      }
+    };
 
-    // O mapeamento da resposta da API é crucial e depende da estrutura de dados que sua API retorna.
-    if (response.data && Array.isArray(response.data.messages)) { // Supondo que as mensagens estejam em response.data.messages
-      return response.data.messages
-        .filter(msg => msg.message?.conversation || msg.message?.extendedTextMessage?.text) // Filtrar apenas mensagens com texto
-        .map(msg => {
-          const messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-          // Obter o nome do remetente pode ser complexo.
-          // Priorizar pushName, depois participant JID, depois um fallback.
-          let senderName = 'Desconhecido';
-          if (msg.pushName && msg.pushName.trim() !== '') {
-            senderName = msg.pushName;
-          } else if (msg.key?.participant) {
-            senderName = msg.key.participant.split('@')[0];
-          } else if (msg.remoteJid && !msg.key?.fromMe) { // Para mensagens diretas (não de grupo) se aplicável
-             senderName = msg.remoteJid.split('@')[0];
-          }
+    const response = await evolutionAPIClient.post(`/chat/findMessages/${currentConfig.INSTANCE_NAME}`, requestBody);
 
-          return {
-            sender: senderName,
-            text: messageContent,
-            // O timestamp pode vir em formatos diferentes (segundos, milissegundos). Ajuste conforme necessário.
-            timestamp: msg.messageTimestamp ? new Date(parseInt(msg.messageTimestamp, 10) * 1000) : new Date()
-          };
+    // A API parece retornar um array diretamente no response.data, baseado no exemplo de fetch.
+    if (response.data && Array.isArray(response.data)) {
+      const allFetchedMessages = response.data
+        .filter(msg => { // Filtrar mensagens que não são do bot e têm conteúdo de texto
+            if (msg.key?.fromMe) return false; // Ignorar mensagens do próprio bot
+            return msg.message?.conversation || msg.message?.extendedTextMessage?.text;
         })
-        .sort((a, b) => a.timestamp - b.timestamp); // Garantir ordem cronológica
-    } else if (response.data && Array.isArray(response.data)) { // Estrutura alternativa comum
-        return response.data
-        .filter(msg => msg.message?.conversation || msg.message?.extendedTextMessage?.text)
         .map(msg => {
           const messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
           let senderName = 'Desconhecido';
           if (msg.pushName && msg.pushName.trim() !== '') {
             senderName = msg.pushName;
-          } else if (msg.key?.participant) {
+          } else if (msg.key?.participant) { // Para mensagens de grupo
             senderName = msg.key.participant.split('@')[0];
+          } else if (msg.key?.remoteJid && !msg.key?.fromMe) { // Para mensagens diretas (se aplicável e não do bot)
+             senderName = msg.key.remoteJid.split('@')[0];
           }
+          // O timestamp pode vir em formatos diferentes (segundos, milissegundos).
+          // O exemplo da Evolution API geralmente usa segundos para messageTimestamp.
+          const timestampSeconds = msg.messageTimestamp?.low || msg.messageTimestamp; // Alguns payloads têm .low para o número
           return {
             sender: senderName,
             text: messageContent,
-            timestamp: msg.messageTimestamp ? new Date(parseInt(msg.messageTimestamp, 10) * 1000) : new Date()
+            timestamp: timestampSeconds ? new Date(parseInt(timestampSeconds, 10) * 1000) : new Date()
           };
         })
-        .sort((a, b) => a.timestamp - b.timestamp);
+        .sort((a, b) => a.timestamp - b.timestamp); // Ordenar cronologicamente
+
+      // Pegar as últimas 'count' mensagens do array ordenado
+      const latestMessages = allFetchedMessages.slice(-count);
+      console.log(`EvolutionApiService: Processadas ${allFetchedMessages.length} mensagens, retornando as últimas ${latestMessages.length}.`);
+      return latestMessages;
     }
-    console.warn("EvolutionApiService: Resposta da API para buscar mensagens não continha um array de mensagens esperado.");
+    console.warn("EvolutionApiService: Resposta da API para buscar mensagens não continha um array de mensagens esperado ou estava vazia. Resposta:", response.data);
     return [];
   } catch (error) {
     console.error(`EvolutionApiService: Erro ao buscar últimas mensagens para ${targetJid}:`, error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+    if (error.response && error.response.status === 404 && error.response.data?.message?.includes("No messages found")) {
+        console.log(`EvolutionApiService: Nenhuma mensagem encontrada para ${targetJid} via API.`);
+        return [];
+    }
     return [];
   }
 }
