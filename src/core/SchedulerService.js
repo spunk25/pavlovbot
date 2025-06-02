@@ -191,9 +191,6 @@ async function triggerServerClose() {
 
   await updateGroupNameAndSendStatusMessage('🔴', 'closed');
   TaskStatusDbService.setTaskExecuted('serverClose', today);
-  // If server closes, implicitly "serverOpen" for this cycle is done.
-  // This helps if server restarts after close but before midnight for the open flag.
-  TaskStatusDbService.setTaskExecuted('serverOpen', today);
 
   if (serverOpenMessageTimeoutId) {
     clearTimeout(serverOpenMessageTimeoutId);
@@ -557,12 +554,12 @@ async function checkScheduledTasks() {
   const SUNDAY_NIGHT_MESSAGE_TIME_DETAILS = config.SUNDAY_NIGHT_MESSAGE_TIME ? parseTime(config.SUNDAY_NIGHT_MESSAGE_TIME) : { hour: 20, minute: 0 };
   const FRIDAY_MESSAGE_TIME_DETAILS = config.FRIDAY_MESSAGE_TIME ? parseTime(config.FRIDAY_MESSAGE_TIME) : { hour: 17, minute: 0 };
 
-  if (currentDay === 0 && timeNowMinutes >= (SUNDAY_NIGHT_MESSAGE_TIME_DETAILS.hour * 60 + SUNDAY_NIGHT_MESSAGE_TIME_DETAILS.minute) && !TaskStatusDbService.isTaskExecuted('sundayNightMessage', currentDate)) {
+  if (currentDay === 0 && currentHour === SUNDAY_NIGHT_MESSAGE_TIME_DETAILS.hour && currentMinute === SUNDAY_NIGHT_MESSAGE_TIME_DETAILS.minute && !TaskStatusDbService.isTaskExecuted('sundayNightMessage', currentDate)) {
     console.log("SchedulerService: Hora da mensagem de Domingo à noite.");
     await sendSpecialMessage('extras_sundayNightMessage'); // Will set flag in DB
   }
 
-  if (currentDay === 5 && timeNowMinutes >= (FRIDAY_MESSAGE_TIME_DETAILS.hour * 60 + FRIDAY_MESSAGE_TIME_DETAILS.minute) && !TaskStatusDbService.isTaskExecuted('fridayMessage', currentDate)) {
+  if (currentDay === 5 && currentHour === FRIDAY_MESSAGE_TIME_DETAILS.hour && currentMinute === FRIDAY_MESSAGE_TIME_DETAILS.minute && !TaskStatusDbService.isTaskExecuted('fridayMessage', currentDate)) {
     console.log("SchedulerService: Hora da mensagem de Sexta-feira.");
     await sendSpecialMessage('extras_fridayMessage'); // Will set flag in DB
   }
@@ -588,16 +585,22 @@ async function initializeBotStatus() {
     const config = ConfigService.getConfig();
     const now = new Date();
     const localTime = new Date(now.toLocaleString("en-US", { timeZone: config.TIMEZONE }));
+    
+    // Define these crucial variables at the top and use them consistently
+    const currentDate = localTime.toISOString().slice(0, 10);
     const timeNowMinutes = localTime.getHours() * 60 + localTime.getMinutes();
+    const currentHour = localTime.getHours();
+    const currentMinute = localTime.getMinutes();
+    const currentDay = localTime.getDay(); // 0 for Sunday, ..., 6 for Saturday
 
     const openTimeMinutes = openTimeDetails.hour * 60 + openTimeDetails.minute;
     const closeTimeMinutes = closeTimeDetails.hour * 60 + closeTimeDetails.minute;
     const warningTimeMinutes = oneHourBeforeOpenDetails.hour * 60 + oneHourBeforeOpenDetails.minute;
-    // const fiveMinWarningTimeMinutes = fiveMinBeforeOpenDetails.hour * 60 + fiveMinBeforeOpenDetails.minute;
+    const fiveMinWarningTimeMinutes = fiveMinBeforeOpenDetails.hour * 60 + fiveMinBeforeOpenDetails.minute;
 
     // Ensure today's tasks are initialized in DB if not already
-    TaskStatusDbService.getTasksForDate(new Date().toISOString().slice(0, 10)); // This initializes if not present
-    TaskStatusDbService.syncChatSummaryTasksForDate(new Date().toISOString().slice(0, 10)); // Ensure chat summary tasks are up-to-date with config
+    TaskStatusDbService.getTasksForDate(currentDate); // This initializes if not present
+    TaskStatusDbService.syncChatSummaryTasksForDate(currentDate); // Ensure chat summary tasks are up-to-date with config
 
     // Detect current status from group name
     try {
@@ -634,74 +637,64 @@ async function initializeBotStatus() {
     }
     console.log(`SchedulerService: Status esperado pela lógica de horário: ${expectedStatusLogic}`);
 
-    // Catch-up logic: Check tasks that should have run by now but haven't
-    // Server Opening Soon (1h warning)
-    if (timeNowMinutes >= (oneHourBeforeOpenDetails.hour * 60 + oneHourBeforeOpenDetails.minute) &&
-        timeNowMinutes < (openTimeDetails.hour * 60 + openTimeDetails.minute) && // Before actual open time
-        !TaskStatusDbService.isTaskExecuted('serverOpeningSoon', new Date().toISOString().slice(0, 10)) &&
-        !TaskStatusDbService.isTaskExecuted('serverOpen', new Date().toISOString().slice(0, 10))) { // And not already open
+    // --- Refined Open/Close Catch-up ---
+    const serverOpenExecutedToday = TaskStatusDbService.isTaskExecuted('serverOpen', currentDate);
+    const serverCloseExecutedToday = TaskStatusDbService.isTaskExecuted('serverClose', currentDate);
+
+    if (expectedStatusLogic === '🟢') {
+        if (!serverOpenExecutedToday) {
+            console.log("SchedulerService (Catch-up): Servidor deveria estar ABERTO (lógica de horário), tarefa 'serverOpen' não executada. Acionando.");
+            await triggerServerOpen();
+        } else if (serverCloseExecutedToday && openTimeMinutes > closeTimeMinutes) {
+            // This means server was opened, but also closed for today, which is unusual for an overnight schedule
+            // if we are still on the "opening day" and expect it to be open.
+            // Re-trigger open to correct the state if currentServerStatus is not green.
+            console.log("SchedulerService (Catch-up): Servidor deveria estar ABERTO (overnight), mas 'serverClose' foi marcada. Re-avaliando ABERTO.");
+            if (currentServerStatus !== '🟢') {
+                 await triggerServerOpen(); // This will set status to green and send message.
+            }
+        }
+    } else if (expectedStatusLogic === '🔴') {
+        if (serverOpenExecutedToday && !serverCloseExecutedToday) {
+            console.log("SchedulerService (Catch-up): Servidor deveria estar FECHADO (lógica de horário), 'serverOpen' executado mas 'serverClose' não. Acionando.");
+            await triggerServerClose();
+        } else if (!serverOpenExecutedToday && !serverCloseExecutedToday) {
+            // Expected to be closed (e.g., before open time, or after close on same-day schedule)
+            // and no open/close actions have been logged for today.
+            // Just ensure the group name is correct if it's not.
+            if (currentServerStatus !== '🔴') {
+                console.log("SchedulerService (Catch-up): Servidor deveria estar FECHADO (lógica de horário), status atual não é 🔴. Corrigindo nome do grupo.");
+                // Only update name, don't trigger full close sequence or mark tasks,
+                // as no open sequence was active to be closed.
+                const groupBaseName = config.GROUP_BASE_NAME || "Pavlov VR Server";
+                const newName = `${groupBaseName} 🔴`;
+                try {
+                    await EvolutionApiService.setGroupName(newName);
+                    currentServerStatus = '🔴';
+                    console.log(`SchedulerService: Nome do grupo corrigido para FECHADO na inicialização: ${newName}`);
+                } catch (error) {
+                    console.error(`SchedulerService: Erro ao corrigir nome do grupo para FECHADO na inicialização:`, error);
+                }
+            }
+        }
+    }
+
+    // Server Opening Soon (1h warning) - only if server isn't already open
+    if (timeNowMinutes >= warningTimeMinutes &&
+        timeNowMinutes < openTimeMinutes && // Before actual open time
+        !TaskStatusDbService.isTaskExecuted('serverOpeningSoon', currentDate) &&
+        !TaskStatusDbService.isTaskExecuted('serverOpen', currentDate)) { // And not already open
         console.log("SchedulerService (Catch-up): Horário do aviso de 1h passou, tarefa não executada. Acionando.");
         await triggerServerOpeningSoon();
     }
 
-    // Server Opening in 5 Min
-    if (timeNowMinutes >= (fiveMinBeforeOpenDetails.hour * 60 + fiveMinBeforeOpenDetails.minute) &&
-        timeNowMinutes < (openTimeDetails.hour * 60 + openTimeDetails.minute) && // Before actual open time
-        !TaskStatusDbService.isTaskExecuted('serverOpeningIn5Min', new Date().toISOString().slice(0, 10)) &&
-        !TaskStatusDbService.isTaskExecuted('serverOpen', new Date().toISOString().slice(0, 10))) { // And not already open
+    // Server Opening in 5 Min - only if server isn't already open
+    if (timeNowMinutes >= fiveMinWarningTimeMinutes &&
+        timeNowMinutes < openTimeMinutes && // Before actual open time
+        !TaskStatusDbService.isTaskExecuted('serverOpeningIn5Min', currentDate) &&
+        !TaskStatusDbService.isTaskExecuted('serverOpen', currentDate)) { // And not already open
         console.log("SchedulerService (Catch-up): Horário do aviso de 5min passou, tarefa não executada. Acionando.");
         await triggerServerOpeningIn5Min();
-    }
-
-    // Server Open
-    // Condition: current time is within open hours OR (current time is past open time AND server hasn't closed yet for the day)
-    let shouldBeOpenNow = false;
-    if (openTimeMinutes <= closeTimeMinutes) { // Same day open/close
-        if (timeNowMinutes >= openTimeMinutes && timeNowMinutes < closeTimeMinutes) {
-            shouldBeOpenNow = true;
-        }
-    } else { // Overnight open/close
-        if (timeNowMinutes >= openTimeMinutes || timeNowMinutes < closeTimeMinutes) {
-            shouldBeOpenNow = true;
-        }
-    }
-
-    if (shouldBeOpenNow && !TaskStatusDbService.isTaskExecuted('serverOpen', new Date().toISOString().slice(0, 10))) {
-        console.log("SchedulerService (Catch-up): Horário de abertura do servidor passou, tarefa não executada. Acionando.");
-        await triggerServerOpen();
-    }
-
-    // Server Close
-    // Condition: current time is past close time AND ( (same day close AND before midnight) OR (overnight close AND before next open cycle's warning) )
-    let shouldBeClosedNow = false;
-    if (openTimeMinutes <= closeTimeMinutes) { // Same day
-        if (timeNowMinutes >= closeTimeMinutes) {
-            shouldBeClosedNow = true;
-        }
-    } else { // Overnight
-        // If current time is between close time and effectively the end of the "day" or before next open cycle starts
-        if (timeNowMinutes >= closeTimeMinutes && timeNowMinutes < (24*60) ) { // Assuming close is before midnight for this logic branch
-             shouldBeClosedNow = true;
-        }
-    }
-     // More robust check: if it's past close time AND serverOpen was executed, but serverClose was not.
-    if (TaskStatusDbService.isTaskExecuted('serverOpen', new Date().toISOString().slice(0, 10)) && !TaskStatusDbService.isTaskExecuted('serverClose', new Date().toISOString().slice(0, 10))) {
-        // If server was opened, and current time is past the close time, then trigger close.
-        if (openTimeMinutes <= closeTimeMinutes) { // Same day
-            if (timeNowMinutes >= (closeTimeDetails.hour * 60 + closeTimeDetails.minute)) {
-                 console.log("SchedulerService (Catch-up): Horário de fechamento (mesmo dia) passou, servidor estava aberto. Acionando fechamento.");
-                 await triggerServerClose();
-            }
-        } else { // Overnight
-            // If current time is past close time (which is on the next calendar day effectively)
-            // This needs careful handling with date changes. The daily task reset handles new days.
-            // For catch-up, if it's past the close hour/minute on the *current calendar day* AND the open was for *this calendar day's cycle*
-            if (timeNowMinutes >= (closeTimeDetails.hour * 60 + closeTimeDetails.minute) &&
-                (localTime.getHours() >= closeTimeDetails.hour) ) { // Ensure we are indeed past close time on this day
-                 console.log("SchedulerService (Catch-up): Horário de fechamento (pernoite) passou, servidor estava aberto. Acionando fechamento.");
-                 await triggerServerClose();
-            }
-        }
     }
 
     // Chat Summaries Catch-up
@@ -709,12 +702,12 @@ async function initializeBotStatus() {
         for (const timeStr of config.CHAT_SUMMARY_TIMES) {
             if (typeof timeStr === 'string' && timeStr.match(/^\d{2}:\d{2}$/)) {
                 const summaryTime = parseTime(timeStr);
-                const summaryTimeMinutes = summaryTime.hour * 60 + summaryTime.minute;
+                const summaryTimeInMinutes = summaryTime.hour * 60 + summaryTime.minute;
                 const taskKey = `chatSummary_${timeStr.replace(":", "")}`;
-                if (timeNowMinutes >= summaryTimeMinutes && !TaskStatusDbService.isTaskExecuted(taskKey, new Date().toISOString().slice(0, 10))) {
+                if (timeNowMinutes >= summaryTimeInMinutes && !TaskStatusDbService.isTaskExecuted(taskKey, currentDate)) {
                     console.log(`SchedulerService (Catch-up): Horário de resumo (${timeStr}) passou, tarefa não executada. Acionando.`);
                     await triggerChatSummary(); // This function handles its own logic (like history check)
-                    TaskStatusDbService.setTaskExecuted(taskKey, new Date().toISOString().slice(0, 10)); // Mark as attempted/done
+                    TaskStatusDbService.setTaskExecuted(taskKey, currentDate); // Mark as attempted/done
                 }
             }
         }
@@ -724,24 +717,56 @@ async function initializeBotStatus() {
     const SUNDAY_NIGHT_MESSAGE_TIME_DETAILS = config.SUNDAY_NIGHT_MESSAGE_TIME ? parseTime(config.SUNDAY_NIGHT_MESSAGE_TIME) : { hour: 20, minute: 0 };
     const FRIDAY_MESSAGE_TIME_DETAILS = config.FRIDAY_MESSAGE_TIME ? parseTime(config.FRIDAY_MESSAGE_TIME) : { hour: 17, minute: 0 };
 
-    if (currentDay === 0 && timeNowMinutes >= (SUNDAY_NIGHT_MESSAGE_TIME_DETAILS.hour * 60 + SUNDAY_NIGHT_MESSAGE_TIME_DETAILS.minute) && !TaskStatusDbService.isTaskExecuted('sundayNightMessage', new Date().toISOString().slice(0, 10))) {
+    if (currentDay === 0 && timeNowMinutes >= (SUNDAY_NIGHT_MESSAGE_TIME_DETAILS.hour * 60 + SUNDAY_NIGHT_MESSAGE_TIME_DETAILS.minute) && !TaskStatusDbService.isTaskExecuted('sundayNightMessage', currentDate)) {
         console.log("SchedulerService (Catch-up): Horário da mensagem de Domingo à noite passou, tarefa não executada. Acionando.");
         await sendSpecialMessage('extras_sundayNightMessage');
     }
-    if (currentDay === 5 && timeNowMinutes >= (FRIDAY_MESSAGE_TIME_DETAILS.hour * 60 + FRIDAY_MESSAGE_TIME_DETAILS.minute) && !TaskStatusDbService.isTaskExecuted('fridayMessage', new Date().toISOString().slice(0, 10))) {
+    if (currentDay === 5 && timeNowMinutes >= (FRIDAY_MESSAGE_TIME_DETAILS.hour * 60 + FRIDAY_MESSAGE_TIME_DETAILS.minute) && !TaskStatusDbService.isTaskExecuted('fridayMessage', currentDate)) {
         console.log("SchedulerService (Catch-up): Horário da mensagem de Sexta-feira passou, tarefa não executada. Acionando.");
         await sendSpecialMessage('extras_fridayMessage');
     }
 
-    // Re-evaluate currentServerStatus based on potentially executed tasks
-    if (TaskStatusDbService.isTaskExecuted('serverOpen', new Date().toISOString().slice(0, 10)) && !TaskStatusDbService.isTaskExecuted('serverClose', new Date().toISOString().slice(0, 10))) {
+    // Re-evaluate currentServerStatus based on potentially executed tasks and expected logic
+    // This is important because catch-up actions might have changed the DB state.
+    const finalOpenExecuted = TaskStatusDbService.isTaskExecuted('serverOpen', currentDate);
+    const finalCloseExecuted = TaskStatusDbService.isTaskExecuted('serverClose', currentDate);
+    const finalOpeningSoonExecuted = TaskStatusDbService.isTaskExecuted('serverOpeningSoon', currentDate);
+
+    if (finalOpenExecuted && !finalCloseExecuted) {
         currentServerStatus = '🟢';
-    } else if (TaskStatusDbService.isTaskExecuted('serverOpeningSoon', new Date().toISOString().slice(0, 10)) && !TaskStatusDbService.isTaskExecuted('serverOpen', new Date().toISOString().slice(0, 10))) {
+    } else if (finalOpeningSoonExecuted && !finalOpenExecuted && !finalCloseExecuted) {
+        // If opening soon was triggered and it's not yet open (and not closed for the day)
         currentServerStatus = '🟡';
-    } else {
-        currentServerStatus = '🔴'; // Default or if closed
+    } else { // Includes closed, or before any relevant action today
+        currentServerStatus = '🔴';
     }
-    console.log(`SchedulerService: Status do servidor após catch-up e avaliação: ${currentServerStatus}`);
+    // If expected logic strongly dictates a state, and DB is somehow conflicting, expected logic might take precedence for currentServerStatus
+    // For example, if expected is green, but DB says closed, we might have just opened it.
+    if (expectedStatusLogic === '🟢' && currentServerStatus !== '🟢' && finalOpenExecuted && !finalCloseExecuted) {
+        currentServerStatus = '🟢';
+    } else if (expectedStatusLogic === '🔴' && currentServerStatus !== '🔴' && (finalCloseExecuted || !finalOpenExecuted) ) {
+        currentServerStatus = '🔴';
+    } else if (expectedStatusLogic === '🟡' && currentServerStatus !== '🟡' && finalOpeningSoonExecuted && !finalOpenExecuted) {
+        currentServerStatus = '🟡';
+    }
+
+    console.log(`SchedulerService: Status do servidor após catch-up e avaliação final: ${currentServerStatus}`);
+
+    // Start random message loops if applicable based on current status
+    if (currentServerStatus !== '🟢') {
+        if (currentHour >= config.DAYTIME_START_HOUR && currentHour < config.DAYTIME_END_HOUR) {
+            if (daytimeMessageTimeoutId === null && daytimeMessagesSent < config.MESSAGES_DURING_DAYTIME) {
+                // console.log("SchedulerService: Dentro do horário diurno, agendando próxima mensagem diurna.");
+                scheduleNextRandomMessage('daytime');
+            }
+        } else {
+            if (daytimeMessageTimeoutId !== null) {
+                // console.log("SchedulerService: Fora do horário diurno, parando mensagens diurnas.");
+                clearTimeout(daytimeMessageTimeoutId);
+                daytimeMessageTimeoutId = null;
+            }
+        }
+    }
 }
 
 
