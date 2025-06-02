@@ -18,7 +18,6 @@ const defaultGameTips = [
 // Helper to create a full default message structure
 function getDefaultMessageStructure() {
   return {
-    _id: MESSAGES_DOC_ID, // Ensure _id is part of the structure for upsert
     status: { open: ["Servidor Aberto! Bora jogar!"], closed: ["Servidor Fechado. Até a próxima!"], openingSoon: ["Servidor abrindo em breve!"], opening5min: ["Servidor abrindo em 5 minutos!"] },
     newMember: ["Bem-vindo(a) ao grupo!"],
     memberLeft: ["Um membro nos deixou."],
@@ -102,8 +101,13 @@ async function saveMessages() {
   try {
     const db = await DatabaseService.getDb();
     const collection = db.collection(MESSAGES_COLLECTION_NAME);
-    // Prepare data for saving: ensure _id is present for upsert, remove it from the $set if it's immutable
-    const { _id, ...dataToSet } = messages; 
+    // Prepare data for saving: ensure _id is present for upsert
+    const dataToSave = { ...messages }; // messages já deve ter a estrutura correta
+    if (!dataToSave._id) { // Adiciona _id se não estiver presente (ex: vindo de um JSON externo)
+        dataToSave._id = MESSAGES_DOC_ID;
+    }
+    
+    const { _id, ...dataToSet } = dataToSave;
     
     await collection.updateOne(
       { _id: MESSAGES_DOC_ID },
@@ -242,6 +246,81 @@ async function updateMessagesAndPrompts(updatedData) {
   return changed;
 }
 
+// Nova função para substituir todas as mensagens a partir de um JSON
+async function replaceAllMessagesFromJSON(jsonData) {
+    try {
+        const db = await DatabaseService.getDb();
+        const collection = db.collection(MESSAGES_COLLECTION_NAME);
+
+        // Garante que a estrutura base e os defaults sejam aplicados ao jsonData
+        // para evitar que campos essenciais faltem.
+        const defaultStructure = getDefaultMessageStructure(); // Não tem _id
+        let newMessagesData = { ...defaultStructure, ...jsonData };
+
+        // Deep merge para objetos aninhados importantes, garantindo que não sejam sobrescritos por um objeto vazio
+        // ou que mantenham a estrutura default se não vierem no jsonData.
+        newMessagesData.aiPrompts = { ...defaultStructure.aiPrompts, ...(jsonData.aiPrompts || {}) };
+        newMessagesData.aiUsageSettings = { ...defaultStructure.aiUsageSettings, ...(jsonData.aiUsageSettings || {}) };
+        newMessagesData.status = { ...defaultStructure.status, ...(jsonData.status || {}) };
+        newMessagesData.extras = { ...defaultStructure.extras, ...(jsonData.extras || {}) };
+        newMessagesData.chatSummary = { ...defaultStructure.chatSummary, ...(jsonData.chatSummary || {}) };
+        newMessagesData.botInfo = { ...defaultStructure.botInfo, ...(jsonData.botInfo || {}) };
+
+        // Garante que campos que devem ser arrays sejam arrays
+        const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips'];
+        arrayKeys.forEach(key => {
+            if (!Array.isArray(newMessagesData[key]) && defaultStructure[key]) {
+                 // Se não for array e tiver um default que é array, usa o default
+                newMessagesData[key] = Array.isArray(jsonData[key]) ? jsonData[key] : defaultStructure[key];
+            } else if (!Array.isArray(newMessagesData[key])) {
+                newMessagesData[key] = []; // Fallback para array vazio se não houver default
+            }
+        });
+        
+        // Validação específica para sub-arrays (status, extras, etc.)
+        const ensureSubArrays = (obj, defaultObj, keys) => {
+            if (obj) {
+                keys.forEach(key => {
+                    if (!Array.isArray(obj[key])) {
+                        obj[key] = (defaultObj && Array.isArray(defaultObj[key])) ? defaultObj[key] : [];
+                    }
+                });
+            }
+        };
+
+        ensureSubArrays(newMessagesData.status, defaultStructure.status, Object.keys(defaultStructure.status || {}));
+        ensureSubArrays(newMessagesData.extras, defaultStructure.extras, Object.keys(defaultStructure.extras || {}));
+        if (newMessagesData.chatSummary && !Array.isArray(newMessagesData.chatSummary.noNewMessages)) {
+            newMessagesData.chatSummary.noNewMessages = defaultStructure.chatSummary.noNewMessages || [];
+        }
+        if (newMessagesData.botInfo && !Array.isArray(newMessagesData.botInfo.defaultPmReply)) {
+            newMessagesData.botInfo.defaultPmReply = defaultStructure.botInfo.defaultPmReply || [];
+        }
+        
+        // Adiciona o _id fixo para a operação de replaceOne/upsert
+        const documentToSave = { _id: MESSAGES_DOC_ID, ...newMessagesData };
+        
+        // Remove o _id do objeto que vai no $set, pois não se pode atualizar _id
+        const { _id, ...dataToSet } = documentToSave;
+
+        await collection.replaceOne(
+            { _id: MESSAGES_DOC_ID }, // Filtro para encontrar o documento
+            dataToSet,                // O novo documento (sem _id, pois _id está no filtro)
+            { upsert: true }          // Cria o documento se não existir
+        );
+
+        // Atualiza o cache em memória
+        messages = { ...newMessagesData }; // newMessagesData já é a estrutura completa sem o _id no nível raiz
+                                        // mas o cache 'messages' pode ou não ter _id dependendo de como é usado.
+                                        // Para consistência com loadMessages, vamos manter o cache sem _id no topo.
+        console.log("MessageService: Todas as mensagens e prompts foram substituídos no MongoDB a partir do JSON fornecido.");
+        return true;
+    } catch (error) {
+        console.error("MessageService: Erro ao substituir todas as mensagens a partir do JSON:", error);
+        return false;
+    }
+}
+
 // Initial load should be called from app.js after DB connection
 // For now, we export it.
 export default {
@@ -251,5 +330,6 @@ export default {
   getAIUsageSetting,
   getSystemPrompt,
   updateMessagesAndPrompts,
+  replaceAllMessagesFromJSON, // Exporta a nova função
   // saveMessages // Not typically public, used by updateMessagesAndPrompts
 }; 

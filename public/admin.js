@@ -68,6 +68,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const responseMessageGlobalDiv = document.getElementById('responseMessageGlobal');
 
+    // Novos elementos para substituir todas as mensagens via JSON
+    const replaceAllMessagesJsonTextarea = document.getElementById('replaceAllMessagesJson');
+    const replaceAllMessagesBtn = document.getElementById('replaceAllMessagesBtn');
+    const responseMessageReplaceAllDiv = document.getElementById('responseMessageReplaceAll');
+    const replaceAllSpinner = document.getElementById('replaceAllSpinner');
+
     // --- EXTENDED DEBUGGING ---
     console.log("--- Checking Config Input Elements ---");
     console.log("configEvolutionApiUrlInput:", configEvolutionApiUrlInput);
@@ -103,6 +109,10 @@ document.addEventListener('DOMContentLoaded', () => {
         div.textContent = message;
         div.className = `mt-4 p-3 rounded-md text-center ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
         div.classList.remove('hidden');
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            div.classList.add('hidden');
+        }, 5000);
     }
     
     function toggleSpinner(spinnerId, show) {
@@ -401,6 +411,63 @@ document.addEventListener('DOMContentLoaded', () => {
             button.addEventListener('click', handleGenerateAIMessageClick);
         }
     });
+
+    // Lógica para substituir todas as mensagens via JSON
+    if (replaceAllMessagesBtn) {
+        replaceAllMessagesBtn.addEventListener('click', async () => {
+            const jsonContent = replaceAllMessagesJsonTextarea.value;
+            responseMessageReplaceAllDiv.classList.add('hidden');
+            replaceAllSpinner.classList.remove('hidden');
+            replaceAllMessagesBtn.disabled = true;
+
+            if (!jsonContent.trim()) {
+                showFormMessage(responseMessageReplaceAllDiv, 'O campo JSON não pode estar vazio.', true);
+                replaceAllSpinner.classList.add('hidden');
+                replaceAllMessagesBtn.disabled = false;
+                return;
+            }
+
+            let parsedJson;
+            try {
+                parsedJson = JSON.parse(jsonContent);
+            } catch (error) {
+                showFormMessage(responseMessageReplaceAllDiv, `Erro ao parsear JSON: ${error.message}`, true);
+                replaceAllSpinner.classList.add('hidden');
+                replaceAllMessagesBtn.disabled = false;
+                return;
+            }
+
+            if (typeof parsedJson !== 'object' || parsedJson === null) {
+                showFormMessage(responseMessageReplaceAllDiv, 'O conteúdo fornecido não é um objeto JSON válido.', true);
+                replaceAllSpinner.classList.add('hidden');
+                replaceAllMessagesBtn.disabled = false;
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/api/messages/replace-all', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(parsedJson), // Envia o JSON parseado
+                });
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showGlobalMessage(result.message || 'Todas as mensagens e prompts foram substituídos com sucesso no banco de dados! Recarregando dados...');
+                    replaceAllMessagesJsonTextarea.value = ''; // Limpa o textarea
+                    await loadMessages(); // Recarrega as mensagens no painel para refletir as mudanças
+                } else {
+                    throw new Error(result.message || 'Falha ao substituir mensagens no banco de dados.');
+                }
+            } catch (error) {
+                console.error('Erro ao substituir mensagens:', error);
+                showFormMessage(responseMessageReplaceAllDiv, `Erro: ${error.message}`, true);
+            } finally {
+                replaceAllSpinner.classList.add('hidden');
+                replaceAllMessagesBtn.disabled = false;
+            }
+        });
+    }
 
     // Carregar dados iniciais
     loadMessages();

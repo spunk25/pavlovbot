@@ -116,5 +116,28 @@ router.post('/test-groq', express.json(), async (req, res) => {
     }
 });
 
+// Novo endpoint para substituir todas as mensagens e prompts
+router.post('/messages/replace-all', express.json({ limit: '5mb' }), async (req, res) => {
+    try {
+        const newMessagesData = req.body;
+
+        if (typeof newMessagesData !== 'object' || newMessagesData === null) {
+            return res.status(400).json({ success: false, message: "Payload inválido: esperado um objeto JSON." });
+        }
+
+        // Chamar uma nova função no MessageService para lidar com a substituição
+        const success = await MessageService.replaceAllMessagesFromJSON(newMessagesData);
+
+        if (success) {
+            res.json({ success: true, message: "Todas as mensagens e prompts foram substituídos com sucesso no banco de dados." });
+        } else {
+            // MessageService.replaceAllMessagesFromJSON deve logar erros específicos
+            res.status(500).json({ success: false, message: "Falha ao substituir mensagens. Verifique os logs do servidor." });
+        }
+    } catch (error) {
+        console.error("AdminApiHandler: Erro ao substituir todas as mensagens:", error);
+        res.status(500).json({ success: false, message: `Erro interno do servidor: ${error.message}` });
+    }
+});
 
 export default router; 
