@@ -215,6 +215,82 @@ function isFromMe(messageData) {
     return messageData && messageData.key && messageData.key.fromMe;
 }
 
+/**
+ * Busca as últimas N mensagens de um grupo.
+ * ESTA FUNÇÃO É BASEADA EM UM ENDPOINT HIPOTÉTICO DA EVOLUTION API.
+ * VOCÊ DEVE VERIFICAR E AJUSTAR CONFORME A DOCUMENTAÇÃO DA SUA API.
+ * @param {string} groupId O JID do grupo.
+ * @param {number} count O número de mensagens a buscar.
+ * @returns {Promise<Array<{sender: string, text: string, timestamp: Date}>>} Um array de mensagens formatadas.
+ */
+async function getLatestGroupMessages(groupId, count = 20) {
+  if (!currentConfig || !currentConfig.EVOLUTION_API_URL || !currentConfig.EVOLUTION_API_KEY || !currentConfig.INSTANCE_NAME) {
+    console.warn("EvolutionApiService: API não configurada para buscar mensagens.");
+    return [];
+  }
+  const targetJid = groupId || currentConfig.TARGET_GROUP_ID;
+  try {
+    // Endpoint e payload hipotéticos. Verifique a documentação da sua API Evolution.
+    // Alguns APIs podem ter `client.fetchMessages(targetJid, count)` ou similar.
+    // Outras podem usar um POST para um endpoint específico.
+    const response = await evolutionAPIClient.post(`/message/findMessages/${currentConfig.INSTANCE_NAME}`, { // Exemplo de endpoint
+      remoteJid: targetJid,
+      limit: count,
+      // fromMe: false, // Opcional: para excluir mensagens do próprio bot, se a API suportar
+      // direction: 'before', // Opcional: para pegar mensagens anteriores a um certo ponto, se suportado
+    });
+
+    // O mapeamento da resposta da API é crucial e depende da estrutura de dados que sua API retorna.
+    if (response.data && Array.isArray(response.data.messages)) { // Supondo que as mensagens estejam em response.data.messages
+      return response.data.messages
+        .filter(msg => msg.message?.conversation || msg.message?.extendedTextMessage?.text) // Filtrar apenas mensagens com texto
+        .map(msg => {
+          const messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
+          // Obter o nome do remetente pode ser complexo.
+          // Priorizar pushName, depois participant JID, depois um fallback.
+          let senderName = 'Desconhecido';
+          if (msg.pushName && msg.pushName.trim() !== '') {
+            senderName = msg.pushName;
+          } else if (msg.key?.participant) {
+            senderName = msg.key.participant.split('@')[0];
+          } else if (msg.remoteJid && !msg.key?.fromMe) { // Para mensagens diretas (não de grupo) se aplicável
+             senderName = msg.remoteJid.split('@')[0];
+          }
+
+          return {
+            sender: senderName,
+            text: messageContent,
+            // O timestamp pode vir em formatos diferentes (segundos, milissegundos). Ajuste conforme necessário.
+            timestamp: msg.messageTimestamp ? new Date(parseInt(msg.messageTimestamp, 10) * 1000) : new Date()
+          };
+        })
+        .sort((a, b) => a.timestamp - b.timestamp); // Garantir ordem cronológica
+    } else if (response.data && Array.isArray(response.data)) { // Estrutura alternativa comum
+        return response.data
+        .filter(msg => msg.message?.conversation || msg.message?.extendedTextMessage?.text)
+        .map(msg => {
+          const messageContent = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
+          let senderName = 'Desconhecido';
+          if (msg.pushName && msg.pushName.trim() !== '') {
+            senderName = msg.pushName;
+          } else if (msg.key?.participant) {
+            senderName = msg.key.participant.split('@')[0];
+          }
+          return {
+            sender: senderName,
+            text: messageContent,
+            timestamp: msg.messageTimestamp ? new Date(parseInt(msg.messageTimestamp, 10) * 1000) : new Date()
+          };
+        })
+        .sort((a, b) => a.timestamp - b.timestamp);
+    }
+    console.warn("EvolutionApiService: Resposta da API para buscar mensagens não continha um array de mensagens esperado.");
+    return [];
+  } catch (error) {
+    console.error(`EvolutionApiService: Erro ao buscar últimas mensagens para ${targetJid}:`, error.response ? JSON.stringify(error.response.data, null, 2) : error.message);
+    return [];
+  }
+}
 
 export default {
   initialize,
@@ -226,5 +302,6 @@ export default {
   getGroupMetadata,
   getGroupParticipants,
   isUserAdmin,
-  isFromMe
+  isFromMe,
+  getLatestGroupMessages
 }; 

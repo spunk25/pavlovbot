@@ -4,6 +4,7 @@ import MessageService from '../core/MessageService.js';
 import GroqApiService from '../core/GroqApiService.js'; // For test and generate
 import SchedulerService from '../core/SchedulerService.js'; // For re-initializing time details
 import ChatHistoryService from '../core/ChatHistoryService.js'; // Novo import
+import EvolutionApiService from '../core/EvolutionApiService.js'; // Added for Evolution API
 
 const router = express.Router();
 
@@ -152,17 +153,27 @@ router.get('/chat-history-db', async (req, res) => {
 
 router.post('/simulate-chat-summary-db', async (req, res) => {
     try {
-        const currentHistory = await ChatHistoryService.getChatHistory();
-        if (!currentHistory || currentHistory.length === 0) {
-            return res.json({ success: true, summary: "Nenhuma mensagem no histórico do banco de dados para resumir." });
+        let historyForSummary = await ChatHistoryService.getChatHistory();
+        let sourceMessage = "histórico do banco de dados";
+
+        const config = ConfigService.getConfig(); // Mova para cima para usar antes
+
+        if (!historyForSummary || historyForSummary.length === 0) {
+            console.log("AdminApiHandler (Simulate): Histórico do DB vazio. Tentando fallback da API Evolution.");
+            const apiMessages = await EvolutionApiService.getLatestGroupMessages(config.TARGET_GROUP_ID, 20);
+            if (apiMessages && apiMessages.length > 0) {
+                historyForSummary = apiMessages;
+                sourceMessage = `API da Evolution (${apiMessages.length} mensagens recentes)`;
+            } else {
+                return res.json({ success: true, summary: `Nenhuma mensagem no histórico do banco de dados e nenhuma mensagem recente obtida da API para resumir.` });
+            }
         }
 
-        const config = ConfigService.getConfig();
         if (!config.GROQ_API_KEY) {
             return res.status(400).json({ success: false, message: "Chave da API Groq não configurada. Não é possível gerar resumo." });
         }
 
-        const chatToSummarizeFormatted = ChatHistoryService.formatChatForSummary(currentHistory);
+        const chatToSummarizeFormatted = ChatHistoryService.formatChatForSummary(historyForSummary);
         const baseChatSummaryPrompt = MessageService.getAIPrompt('chatSummary');
         
         if (!baseChatSummaryPrompt) {
@@ -171,7 +182,7 @@ router.post('/simulate-chat-summary-db', async (req, res) => {
 
         const prompt = baseChatSummaryPrompt.replace('{CHAT_PLACEHOLDER}', chatToSummarizeFormatted);
 
-        console.log(`AdminApiHandler: Tentando gerar resumo simulado para ${currentHistory.length} mensagens.`);
+        console.log(`AdminApiHandler: Tentando gerar resumo simulado para ${historyForSummary.length} mensagens de ${sourceMessage}.`);
         const summary = await GroqApiService.callGroqAPI(prompt);
 
         if (summary && !summary.startsWith("Erro") && !summary.startsWith("Não foi possível")) {

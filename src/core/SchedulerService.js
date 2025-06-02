@@ -408,9 +408,23 @@ async function triggerChatSummary() {
     return;
   }
 
-  const history = await ChatHistoryService.getChatHistory();
-  if (history.length === 0) {
-    console.log("SchedulerService: Nenhuma mensagem no histórico para resumir.");
+  let historyForSummary = await ChatHistoryService.getChatHistory();
+  let usedApiFallback = false;
+
+  if (historyForSummary.length === 0) {
+    console.log("SchedulerService: Histórico do DB vazio. Tentando buscar últimas 20 mensagens da API Evolution.");
+    const apiMessages = await EvolutionApiService.getLatestGroupMessages(config.TARGET_GROUP_ID, 20);
+    if (apiMessages && apiMessages.length > 0) {
+      console.log(`SchedulerService: Obtidas ${apiMessages.length} mensagens da API para o resumo.`);
+      historyForSummary = apiMessages; // Usa as mensagens da API
+      usedApiFallback = true;
+    } else {
+      console.log("SchedulerService: Nenhuma mensagem obtida da API Evolution ou API retornou vazio.");
+    }
+  }
+
+  if (historyForSummary.length === 0) {
+    console.log("SchedulerService: Nenhuma mensagem no histórico do DB nem da API para resumir.");
     const config = ConfigService.getConfig(); // Get current config
     if (config.SEND_NO_SUMMARY_MESSAGE) { // Check new config flag
         const messages = MessageService.getMessages();
@@ -431,8 +445,15 @@ async function triggerChatSummary() {
     return;
   }
 
-  const chatToSummarize = [...history]; // Copy before clearing
-  await ChatHistoryService.clearChatHistory();
+  const chatToSummarize = [...historyForSummary]; // Copia as mensagens a serem resumidas
+
+  if (!usedApiFallback) {
+    // Limpa o histórico do DB APENAS se não estivermos usando o fallback da API
+    await ChatHistoryService.clearChatHistory();
+    console.log("SchedulerService: Histórico do DB limpo após cópia para resumo.");
+  } else {
+    console.log("SchedulerService: Resumo gerado com fallback da API, histórico do DB não foi limpo.");
+  }
 
   const baseChatSummaryPrompt = MessageService.getAIPrompt('chatSummary');
   const prompt = baseChatSummaryPrompt.replace('{CHAT_PLACEHOLDER}', ChatHistoryService.formatChatForSummary(chatToSummarize));
