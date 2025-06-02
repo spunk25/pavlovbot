@@ -20,6 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Novo campo para gameTips
     const gameTipsTextarea = document.getElementById('gameTips');
+    const generateAIGameTipsBtn = document.getElementById('generateAIGameTipsBtn');
+    const aiMessageSpinnerGameTips = document.getElementById('aiMessageSpinnerGameTips');
+
+    // Campos para "Mensagem Apagada"
+    const messageDeletedTextarea = document.getElementById('messageDeleted');
+    const aiUsageMessageDeletedCheckbox = document.getElementById('aiUsage_messageDeleted');
 
     // Seletores para os textareas dos prompts de IA
     const aiPromptRandomActiveTextarea = document.getElementById('aiPrompt_randomActive');
@@ -33,6 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiPromptExtrasSundayNightTextarea = document.getElementById('aiPrompt_extras_sundayNight');
     const aiPromptExtrasFridayTextarea = document.getElementById('aiPrompt_extras_friday');
     const aiPromptSystemPromptTextarea = document.getElementById('aiPrompt_systemPrompt');
+    const aiPromptGameTipsTextarea = document.getElementById('aiPrompt_gameTips');
+    const aiPromptMessageDeletedTextarea = document.getElementById('aiPrompt_messageDeleted');
 
     // Seletores para os checkboxes de uso da IA
     const aiUsageStatusClosedCheckbox = document.getElementById('aiUsage_status_closed');
@@ -44,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiUsageInGameRandomCheckbox = document.getElementById('aiUsage_inGameRandom');
     const aiUsageExtrasSundayNightCheckbox = document.getElementById('aiUsage_extras_sundayNight');
     const aiUsageExtrasFridayCheckbox = document.getElementById('aiUsage_extras_friday');
+    const aiUsageGameTipsCheckbox = document.getElementById('aiUsage_gameTips');
+
 
     // Formulário de Configurações Gerais
     const configForm = document.getElementById('configForm');
@@ -150,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
             memberLeftTextarea.value = Array.isArray(messages.memberLeft) ? messages.memberLeft.join('\n') : '';
             randomActiveTextarea.value = Array.isArray(messages.randomActive) ? messages.randomActive.join('\n') : '';
             inGameRandomTextarea.value = Array.isArray(messages.inGameRandom) ? messages.inGameRandom.join('\n') : '';
+            messageDeletedTextarea.value = Array.isArray(messages.messageDeleted) ? messages.messageDeleted.join('\n') : '';
             if (messages.extras) {
                 extrasSundayNightInput.value = Array.isArray(messages.extras.sundayNight) ? messages.extras.sundayNight.join('\n') : (messages.extras.sundayNight || '');
                 extrasFridayInput.value = Array.isArray(messages.extras.friday) ? messages.extras.friday.join('\n') : (messages.extras.friday || '');
@@ -171,6 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (aiPromptMemberLeftTextarea && messages.aiPrompts.memberLeft !== undefined) aiPromptMemberLeftTextarea.value = messages.aiPrompts.memberLeft;
                 if (aiPromptExtrasSundayNightTextarea && messages.aiPrompts.extras_sundayNight !== undefined) aiPromptExtrasSundayNightTextarea.value = messages.aiPrompts.extras_sundayNight;
                 if (aiPromptExtrasFridayTextarea && messages.aiPrompts.extras_friday !== undefined) aiPromptExtrasFridayTextarea.value = messages.aiPrompts.extras_friday;
+                if (aiPromptGameTipsTextarea && messages.aiPrompts.gameTips !== undefined) aiPromptGameTipsTextarea.value = messages.aiPrompts.gameTips;
+                if (aiPromptMessageDeletedTextarea && messages.aiPrompts.messageDeleted !== undefined) aiPromptMessageDeletedTextarea.value = messages.aiPrompts.messageDeleted;
             }
 
             // Carregar configurações de uso da IA
@@ -178,7 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 status_closed: false, status_openingSoon: false, status_open: false,
                 newMember: false, memberLeft: false,
                 randomActive: true, inGameRandom: true,
-                extras_sundayNight: false, extras_friday: false
+                extras_sundayNight: false, extras_friday: false,
+                messageDeleted: false
             };
             const currentAiUsage = messages.aiUsageSettings || defaultAiUsage;
 
@@ -191,6 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (aiUsageInGameRandomCheckbox) aiUsageInGameRandomCheckbox.checked = currentAiUsage.inGameRandom !== undefined ? currentAiUsage.inGameRandom : defaultAiUsage.inGameRandom;
             if (aiUsageExtrasSundayNightCheckbox) aiUsageExtrasSundayNightCheckbox.checked = currentAiUsage.extras_sundayNight !== undefined ? currentAiUsage.extras_sundayNight : defaultAiUsage.extras_sundayNight;
             if (aiUsageExtrasFridayCheckbox) aiUsageExtrasFridayCheckbox.checked = currentAiUsage.extras_friday !== undefined ? currentAiUsage.extras_friday : defaultAiUsage.extras_friday;
+            if (aiUsageGameTipsCheckbox) aiUsageGameTipsCheckbox.checked = currentAiUsage.gameTips !== undefined ? currentAiUsage.gameTips : defaultAiUsage.gameTips;
+            if (aiUsageMessageDeletedCheckbox) aiUsageMessageDeletedCheckbox.checked = currentAiUsage.messageDeleted !== undefined ? currentAiUsage.messageDeleted : defaultAiUsage.messageDeleted;
 
         } catch (error) {
             console.error('Erro ao carregar mensagens:', error);
@@ -237,18 +253,24 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         responseMessageMessagesDiv.textContent = '';
         responseMessageMessagesDiv.className = 'response-message';
+        const spinner = document.getElementById('saveMessagesSpinner');
+        const saveButton = messagesForm.querySelector('button[type="submit"]');
+        spinner.style.display = 'inline-block';
+        saveButton.disabled = true;
 
-        const updatedMessages = {
+        const messagesData = {
             status: {
                 closed: statusClosedInput.value.split('\n').map(s => s.trim()).filter(s => s),
                 openingSoon: statusOpeningSoonInput.value.split('\n').map(s => s.trim()).filter(s => s),
                 open: statusOpenInput.value.split('\n').map(s => s.trim()).filter(s => s),
+                opening5min: document.getElementById('status_opening5min').value.split('\n').map(s => s.trim()).filter(s => s)
             },
             newMember: newMemberTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             memberLeft: memberLeftTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             randomActive: randomActiveTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             inGameRandom: inGameRandomTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
-            gameTips: gameTipsTextarea ? gameTipsTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
+            gameTips: gameTipsTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
+            messageDeleted: messageDeletedTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             extras: {
                 sundayNight: extrasSundayNightInput.value.split('\n').map(s => s.trim()).filter(s => s),
                 friday: extrasFridayInput.value.split('\n').map(s => s.trim()).filter(s => s),
@@ -264,7 +286,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 newMember: aiPromptNewMemberTextarea ? aiPromptNewMemberTextarea.value.trim() : '',
                 memberLeft: aiPromptMemberLeftTextarea ? aiPromptMemberLeftTextarea.value.trim() : '',
                 extras_sundayNight: aiPromptExtrasSundayNightTextarea ? aiPromptExtrasSundayNightTextarea.value.trim() : '',
-                extras_friday: aiPromptExtrasFridayTextarea ? aiPromptExtrasFridayTextarea.value.trim() : ''
+                extras_friday: aiPromptExtrasFridayTextarea ? aiPromptExtrasFridayTextarea.value.trim() : '',
+                gameTips: aiPromptGameTipsTextarea ? aiPromptGameTipsTextarea.value.trim() : '',
+                messageDeleted: aiPromptMessageDeletedTextarea ? aiPromptMessageDeletedTextarea.value.trim() : ''
             },
             aiUsageSettings: {
                 status_closed: aiUsageStatusClosedCheckbox ? aiUsageStatusClosedCheckbox.checked : false,
@@ -275,7 +299,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 randomActive: aiUsageRandomActiveCheckbox ? aiUsageRandomActiveCheckbox.checked : true, // Default true
                 inGameRandom: aiUsageInGameRandomCheckbox ? aiUsageInGameRandomCheckbox.checked : true, // Default true
                 extras_sundayNight: aiUsageExtrasSundayNightCheckbox ? aiUsageExtrasSundayNightCheckbox.checked : false,
-                extras_friday: aiUsageExtrasFridayCheckbox ? aiUsageExtrasFridayCheckbox.checked : false
+                extras_friday: aiUsageExtrasFridayCheckbox ? aiUsageExtrasFridayCheckbox.checked : false,
+                gameTips: aiUsageGameTipsCheckbox ? aiUsageGameTipsCheckbox.checked : false,
+                messageDeleted: aiUsageMessageDeletedCheckbox ? aiUsageMessageDeletedCheckbox.checked : false
             }
         };
 
@@ -283,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/admin/api/messages', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedMessages),
+                body: JSON.stringify(messagesData),
             });
             const result = await response.json();
             if (response.ok && result.success) {
@@ -295,6 +321,9 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Erro ao salvar mensagens:', error);
             responseMessageMessagesDiv.textContent = `Erro ao salvar: ${error.message}`;
             responseMessageMessagesDiv.className = 'response-message error';
+        } finally {
+            spinner.style.display = 'none';
+            saveButton.disabled = false;
         }
     });
 
@@ -454,6 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     generateAIMessageBtn.addEventListener('click', handleGenerateAIMessageClick);
     generateAIInGameMessageBtn.addEventListener('click', handleGenerateAIMessageClick);
+    generateAIGameTipsBtn.addEventListener('click', handleGenerateAIMessageClick);
 
     // Adicionar event listeners para todos os novos botões "Gerar com IA"
     const allAIGenerateButtons = document.querySelectorAll('.generate-ai-btn');
@@ -462,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // ou simplesmente adicionar (não causará problemas se adicionado duas vezes para os mesmos)
         // No entanto, para evitar duplicidade, vamos garantir que os IDs originais não sejam re-adicionados aqui
         // se eles já foram pegos por getElementById.
-        if (button.id !== 'generateAIMessageBtn' && button.id !== 'generateAIInGameMessageBtn') {
+        if (button.id !== 'generateAIMessageBtn' && button.id !== 'generateAIInGameMessageBtn' && button.id !== 'generateAIGameTipsBtn') {
             button.addEventListener('click', handleGenerateAIMessageClick);
         }
     });

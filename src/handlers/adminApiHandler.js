@@ -5,6 +5,7 @@ import GroqApiService from '../core/GroqApiService.js'; // For test and generate
 import SchedulerService from '../core/SchedulerService.js'; // For re-initializing time details
 import ChatHistoryService from '../core/ChatHistoryService.js'; // Novo import
 import EvolutionApiService from '../core/EvolutionApiService.js'; // Added for Evolution API
+import { DEFAULT_AI_PROMPTS } from '../constants/aiConstants.js';
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.get('/messages', (req, res) => {
     inGameRandom: messages.inGameRandom || [],
     extras: messages.extras || {},
     gameTips: messages.gameTips || [],
+    messageDeleted: messages.messageDeleted || [],
     aiPrompts: messages.aiPrompts || {},
     aiUsageSettings: messages.aiUsageSettings || {},
     botInfo: messages.botInfo || { name: "Bot Pavlov", defaultPmReply: [] },
@@ -204,6 +206,53 @@ router.post('/clear-chat-history-db', async (req, res) => {
     } catch (error) {
         console.error("AdminApiHandler: Erro ao limpar histórico de chat do DB:", error);
         res.status(500).json({ success: false, message: "Erro ao limpar histórico de chat do banco de dados." });
+    }
+});
+
+// Rota para gerar mensagem com IA (usada pelos botões "Gerar com IA")
+router.post('/generate-ai-message', express.json(), async (req, res) => {
+    try {
+        const { promptType, currentMessages, context } = req.body;
+        const config = ConfigService.getConfig();
+
+        if (!config.GROQ_API_KEY) {
+            return res.status(400).json({ success: false, message: "Chave da API Groq não configurada." });
+        }
+
+        let basePrompt = MessageService.getAIPrompt(promptType);
+        if (!basePrompt) {
+            // Fallback para prompts padrão se não encontrado no MessageService (ex: se for um novo tipo ainda não salvo)
+            basePrompt = DEFAULT_AI_PROMPTS[promptType];
+            if (!basePrompt) {
+                return res.status(400).json({ success: false, message: `Tipo de prompt '${promptType}' desconhecido.` });
+            }
+        }
+        
+        let finalPrompt = basePrompt;
+        if (promptType === 'chatSummary' && context && context.chatHistory) {
+            finalPrompt = basePrompt.replace('{CHAT_PLACEHOLDER}', context.chatHistory);
+        } else if (promptType === 'messageDeleted' && context && context.senderName) {
+            finalPrompt = basePrompt.replace(/\[NomeDoRemetente\]/gi, context.senderName);
+        }
+        // Adicionar mais substituições de contexto aqui se necessário para outros tipos de prompt
+
+        // Adiciona mensagens existentes ao prompt para dar contexto e evitar repetição, se aplicável
+        if (currentMessages && Array.isArray(currentMessages) && currentMessages.length > 0 && promptType !== 'systemPrompt' && promptType !== 'chatSummary') {
+            finalPrompt += "\n\nMensagens atuais (evite gerar algo muito parecido com estas):\n- " + currentMessages.join("\n- ");
+        }
+        
+        console.log(`AdminApiHandler: Gerando mensagem IA para promptType '${promptType}'. Prompt final: ${finalPrompt}`);
+
+        const aiMessage = await GroqApiService.callGroqAPI(finalPrompt);
+
+        if (aiMessage && !aiMessage.startsWith("Erro:") && !aiMessage.startsWith("Não foi possível")) {
+            res.json({ success: true, aiMessage });
+        } else {
+            res.status(500).json({ success: false, message: `Falha ao gerar mensagem com IA: ${aiMessage}` });
+        }
+    } catch (error) {
+        console.error("AdminApiHandler: Erro ao gerar mensagem com IA:", error);
+        res.status(500).json({ success: false, message: `Erro interno do servidor: ${error.message}` });
     }
 });
 

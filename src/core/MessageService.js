@@ -24,6 +24,7 @@ function getDefaultMessageStructure() {
     randomActive: ["Mensagem aleatória para quando o servidor está ativo!"],
     inGameRandom: ["Mensagem aleatória para durante o jogo!"],
     extras: { sundayNight: ["Domingo à noite, hora de Pavlov?"], friday: ["Sextou! Pavlov liberado!"] },
+    messageDeleted: ["Alguém apagou uma mensagem... O que será que era? 🤔", "Mensagem autodestruída com sucesso! 💣"],
     gameTips: [...defaultGameTips],
     aiPrompts: { ...DEFAULT_AI_PROMPTS },
     aiUsageSettings: { ...DEFAULT_AI_USAGE_SETTINGS },

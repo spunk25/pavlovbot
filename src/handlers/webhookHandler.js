@@ -5,6 +5,8 @@ import ChatHistoryService from '../core/ChatHistoryService.js';
 import ConfigService from '../core/ConfigService.js';
 import CommandHandler from './commandHandler.js';
 import { getRandomElement } from '../utils/generalUtils.js';
+import GroqApiService from '../core/GroqApiService.js';
+import { DEFAULT_AI_PROMPTS } from '../constants/aiConstants.js';
 
 
 const router = express.Router();
@@ -34,6 +36,11 @@ router.post('/', async (req, res, next) => {
     }
     if (event === 'connection.update') {
       req.url = '/connection-update';
+      return next();
+    }
+    if (event === 'messages.delete' || event === 'message.delete') {
+      console.log(`[Webhook Root] Evento '${event}' recebido, roteando para lógica de deleção.`);
+      req.url = '/messages-update';
       return next();
     }
     
@@ -196,6 +203,89 @@ router.post('/connection-update', async (req, res) => {
         console.warn("WebhookHandler: Conexão com WhatsApp fechada (state: close).");
     }
     return res.status(200).send('connection.update processado.');
+});
+
+// Novo handler para messages.update
+router.post('/messages-update', async (req, res) => {
+  const fullReceivedPayload = req.body;
+  const updatesOrDeletedItems = fullReceivedPayload.data; 
+  const config = ConfigService.getConfig();
+  const eventType = (fullReceivedPayload.event || '').toLowerCase();
+
+  if (!updatesOrDeletedItems) {
+    console.warn(`WebhookHandler: ${eventType} - 'data' ausente:`, JSON.stringify(fullReceivedPayload, null, 2));
+    return res.status(200).send(`Payload inválido para ${eventType}.`);
+  }
+
+  const itemsToProcess = Array.isArray(updatesOrDeletedItems) ? updatesOrDeletedItems : [updatesOrDeletedItems];
+
+  if (itemsToProcess.length === 0) {
+    console.warn(`WebhookHandler: ${eventType} - 'data' está vazio ou não é um array processável.`);
+    return res.status(200).send(`${eventType} processado, nenhum item válido em 'data'.`);
+  }
+  
+  console.log(`WebhookHandler: Processando evento ${eventType} com ${itemsToProcess.length} item(s).`);
+
+  for (const item of itemsToProcess) {
+    const key = item.key;
+    const updateContent = item.update;
+
+    if (!key) {
+      console.warn(`WebhookHandler: ${eventType} - 'key' ausente em um item:`, JSON.stringify(item, null, 2));
+      continue; 
+    }
+
+    let isMessageEffectivelyDeleted = false;
+    if (eventType === 'messages.delete' || eventType === 'message.delete') {
+        isMessageEffectivelyDeleted = true;
+        console.log(`WebhookHandler: ${eventType} - Item de deleção direta:`, JSON.stringify(item, null, 2));
+    } else if (eventType === 'messages.update' && updateContent && updateContent.message === null) {
+        isMessageEffectivelyDeleted = true;
+        console.log(`WebhookHandler: ${eventType} - Item de atualização indicando deleção:`, JSON.stringify(item, null, 2));
+    }
+
+    if (isMessageEffectivelyDeleted && key.remoteJid === config.TARGET_GROUP_ID && !key.fromMe) {
+      console.log(`WebhookHandler: Mensagem apagada (evento: ${eventType}) detectada no grupo ${key.remoteJid}. Key:`, JSON.stringify(key));
+
+      const originalSenderJid = item.participant || key.participant || key.remoteJid;
+      let senderName = originalSenderJid.split('@')[0]; 
+
+      if (item.pushName) {
+        senderName = item.pushName;
+      }
+      
+      const messagesConfig = MessageService.getMessages();
+      const useAI = messagesConfig.aiUsageSettings?.messageDeleted;
+      let replyText = "";
+
+      if (useAI && config.GROQ_API_KEY) {
+        let prompt = MessageService.getAIPrompt('messageDeleted') || DEFAULT_AI_PROMPTS.messageDeleted;
+        prompt = prompt.replace(/\[NomeDoRemetente\]/gi, senderName);
+
+        console.log(`WebhookHandler: Gerando mensagem de IA para mensagem apagada por ${senderName}. Prompt: ${prompt}`);
+        replyText = await GroqApiService.callGroqAPI(prompt);
+        if (replyText.startsWith("Erro:") || replyText.startsWith("Não foi possível")) {
+            console.warn("WebhookHandler: Falha ao gerar mensagem de IA para mensagem apagada, usando fallback.", replyText);
+            replyText = getRandomElement(messagesConfig.messageDeleted) || "Uma mensagem foi apagada... Mistério! 🤫";
+        }
+      } else {
+        replyText = getRandomElement(messagesConfig.messageDeleted) || "Uma mensagem foi apagada... Mistério! 🤫";
+      }
+      
+      if (!replyText.toLowerCase().includes(senderName.toLowerCase()) && !useAI) {
+          const prefixOptions = ["Eita, ", "Vish, ", "Olha só, "];
+          const suffixOptions = [" apagou uma mensagem!", " fez uma mensagem sumir!", " escondeu algo!"];
+          replyText = `${getRandomElement(prefixOptions)}${senderName}${getRandomElement(suffixOptions)}`;
+      }
+
+      if (replyText) {
+        await EvolutionApiService.sendMessageToGroup(replyText, config.TARGET_GROUP_ID);
+        console.log(`WebhookHandler: Enviada mensagem sobre deleção para o grupo. Conteúdo: ${replyText}`);
+      }
+    }
+  }
+
+  return res.status(200).send('messages.update processado.');
 });
 
 

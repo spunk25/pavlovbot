@@ -9,7 +9,8 @@ export const DEFAULT_AI_PROMPTS = {
   newMember: "Gere uma mensagem de boas-vindas curta, amigável e divertida para um NOVO MEMBRO que acabou de entrar no grupo de Pavlov VR. Pode incluir um toque de humor ou referência ao jogo.",
   memberLeft: "Gere uma mensagem curta, neutra ou levemente humorística para quando um MEMBRO SAI do grupo de Pavlov VR. Exemplo: Fulano desertou! Menos um pra dividir o loot.",
   extras_sundayNight: "Gere uma mensagem curta e temática para ser enviada em um DOMINGO À NOITE para jogadores de Pavlov VR, talvez sobre o fim de semana ou a semana que começa, com um toque de Pavlov. Exemplo: Domingo acabando... última chance pra um headshot antes da segunda!",
-  extras_friday: "Gere uma mensagem curta e animada para uma SEXTA-FEIRA para jogadores de Pavlov VR, celebrando o início do fim de semana e chamando para o jogo. Exemplo: Sextou, soldados! Pavlov liberado no final de semana!"
+  extras_friday: "Gere uma mensagem curta e animada para uma SEXTA-FEIRA para jogadores de Pavlov VR, celebrando o início do fim de semana e chamando para o jogo. Exemplo: Sextou, soldados! Pavlov liberado no final de semana!",
+  messageDeleted: "Gere uma mensagem curta e engraçada para quando um usuário apaga uma mensagem no grupo. Pode ser algo como 'Ih, alguém se arrependeu!' ou 'Ops, mensagem evaporou! O que será que era?'. Se souber o nome do remetente original, pode mencioná-lo de forma leve, por exemplo: 'O [NomeDoRemetente] fez uma mágica e a mensagem sumiu! ✨'"
 };
 
 export const DEFAULT_AI_USAGE_SETTINGS = {
@@ -21,5 +22,6 @@ export const DEFAULT_AI_USAGE_SETTINGS = {
   randomActive: true,
   inGameRandom: true,
   extras_sundayNight: false,
-  extras_friday: false
+  extras_friday: false,
+  messageDeleted: false
 }; 

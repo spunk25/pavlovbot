@@ -238,6 +238,23 @@
                     </div>
                 </div>
 
+                <div class="form-group-column">
+                    <h3>Mensagens de "Mensagem Apagada"</h3>
+                    <p class="text-xs text-gray-500 mb-2">Mensagens enviadas quando um usuário apaga uma mensagem no grupo.</p>
+                    <div class="form-group">
+                        <label for="messageDeleted">Textos para "Mensagem Apagada" (um por linha):</label>
+                        <textarea id="messageDeleted" name="messageDeleted" rows="3" placeholder="Ex: Ops, sumiu!"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <input type="checkbox" id="aiUsage_messageDeleted" name="aiUsage_messageDeleted">
+                        <label for="aiUsage_messageDeleted">Usar IA para gerar mensagem de "Mensagem Apagada"?</label>
+                    </div>
+                     <div class="form-group">
+                        <button type="button" class="generate-ai-btn" data-target-textarea="messageDeleted" data-prompt-type="messageDeleted">Gerar com IA (Mensagem Apagada)</button>
+                        <div class="ai-spinner" id="aiSpinner_messageDeleted" style="display: none;">Gerando...</div>
+                    </div>
+                </div>
+
                 <button type="submit" class="save-button">Salvar Mensagens e Configurações de IA</button>
             </form>
             <div id="responseMessageMessages" class="response-message"></div>
@@ -344,6 +361,10 @@
             <div class="form-group">
                 <label for="aiPrompt_extras_friday">Prompt para IA de "Extra: Sexta-feira":</label>
                 <textarea id="aiPrompt_extras_friday" name="aiPrompt_extras_friday" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="aiPrompt_messageDeleted">Prompt para IA de "Mensagem Apagada":</label>
+                <textarea id="aiPrompt_messageDeleted" name="aiPrompt_messageDeleted" rows="3"></textarea>
             </div>
         </section>
 
