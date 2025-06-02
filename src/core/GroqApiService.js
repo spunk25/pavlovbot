@@ -9,7 +9,7 @@ function initialize(config, msgService) {
   console.log("GroqApiService: Inicializado.");
 }
 
-async function callGroqAPI(userPrompt, model = "llama3-70b-8192") {
+async function callGroqAPI(userPrompt, model = "llama-3.3-70b-versatile") {
   if (!currentConfig || !currentConfig.GROQ_API_KEY) {
     console.error("GroqApiService: GROQ_API_KEY não configurada.");
     return "Erro: Chave da API Groq não configurada no servidor.";

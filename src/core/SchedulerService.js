@@ -586,115 +586,145 @@ async function initializeBotStatus() {
     const now = new Date();
     const localTime = new Date(now.toLocaleString("en-US", { timeZone: config.TIMEZONE }));
     
-    // Define these crucial variables at the top and use them consistently
     const currentDate = localTime.toISOString().slice(0, 10);
     const timeNowMinutes = localTime.getHours() * 60 + localTime.getMinutes();
     const currentHour = localTime.getHours();
     const currentMinute = localTime.getMinutes();
-    const currentDay = localTime.getDay(); // 0 for Sunday, ..., 6 for Saturday
+    const currentDay = localTime.getDay(); 
 
     const openTimeMinutes = openTimeDetails.hour * 60 + openTimeDetails.minute;
     const closeTimeMinutes = closeTimeDetails.hour * 60 + closeTimeDetails.minute;
     const warningTimeMinutes = oneHourBeforeOpenDetails.hour * 60 + oneHourBeforeOpenDetails.minute;
     const fiveMinWarningTimeMinutes = fiveMinBeforeOpenDetails.hour * 60 + fiveMinBeforeOpenDetails.minute;
 
-    // Ensure today's tasks are initialized in DB if not already
-    TaskStatusDbService.getTasksForDate(currentDate); // This initializes if not present
-    TaskStatusDbService.syncChatSummaryTasksForDate(currentDate); // Ensure chat summary tasks are up-to-date with config
+    // Task keys
+    const serverOpenTaskKey = 'serverOpen';
+    const serverCloseTaskKey = 'serverClose';
+    const serverOpeningSoonTaskKey = 'serverOpeningSoon';
+    const serverOpeningIn5MinTaskKey = 'serverOpeningIn5Min';
 
-    // Detect current status from group name
+    TaskStatusDbService.getTasksForDate(currentDate); 
+    TaskStatusDbService.syncChatSummaryTasksForDate(currentDate);
+
+    let actualGroupStatus = '🔴'; // Default
     try {
         const groupData = await EvolutionApiService.getGroupMetadata(config.TARGET_GROUP_ID);
         if (groupData && groupData.subject) {
-            if (groupData.subject.includes('🟢')) currentServerStatus = '🟢';
-            else if (groupData.subject.includes('🟡')) currentServerStatus = '🟡';
-            else currentServerStatus = '🔴';
-            console.log(`SchedulerService: Status inicial detectado pelo nome do grupo: ${currentServerStatus}`);
+            if (groupData.subject.includes('🟢')) actualGroupStatus = '🟢';
+            else if (groupData.subject.includes('🟡')) actualGroupStatus = '🟡';
+            // else actualGroupStatus remains '🔴'
+            console.log(`SchedulerService: Actual group status detected from name: ${actualGroupStatus}`);
+            currentServerStatus = actualGroupStatus; // Sync in-memory status with actual detected status
         } else {
             console.log("SchedulerService: Não foi possível obter nome do grupo, status inicial assumido como 🔴.");
-            currentServerStatus = '🔴'; // Default if cannot fetch
+            currentServerStatus = '🔴'; 
         }
     } catch (error) {
         console.error("SchedulerService: Erro ao detectar status inicial do grupo:", error);
-        currentServerStatus = '🔴';
+        currentServerStatus = '🔴'; 
     }
 
     let expectedStatusLogic = '🔴';
-    // Logic for expected status based on time
-    if (closeTimeMinutes > openTimeMinutes) { // Opens and closes on the same day
+    if (closeTimeMinutes > openTimeMinutes) { 
         if (timeNowMinutes >= openTimeMinutes && timeNowMinutes < closeTimeMinutes) {
             expectedStatusLogic = '🟢';
         } else if (timeNowMinutes >= warningTimeMinutes && timeNowMinutes < openTimeMinutes) {
             expectedStatusLogic = '🟡';
         }
-    } else { // Opens one day, closes the next (e.g. 22:00 to 02:00)
+    } else { 
         if (timeNowMinutes >= openTimeMinutes || timeNowMinutes < closeTimeMinutes) {
             expectedStatusLogic = '🟢';
         } else if (timeNowMinutes >= warningTimeMinutes && timeNowMinutes < openTimeMinutes) {
-             // This warning logic might need adjustment if warningTime is also on the previous day
             expectedStatusLogic = '🟡';
         }
     }
     console.log(`SchedulerService: Status esperado pela lógica de horário: ${expectedStatusLogic}`);
 
-    // --- Refined Open/Close Catch-up ---
-    const serverOpenExecutedToday = TaskStatusDbService.isTaskExecuted('serverOpen', currentDate);
-    const serverCloseExecutedToday = TaskStatusDbService.isTaskExecuted('serverClose', currentDate);
+    // --- Catch-up Logic ---
 
-    if (expectedStatusLogic === '🟢') {
-        if (!serverOpenExecutedToday) {
-            console.log("SchedulerService (Catch-up): Servidor deveria estar ABERTO (lógica de horário), tarefa 'serverOpen' não executada. Acionando.");
-            await triggerServerOpen();
-        } else if (serverCloseExecutedToday && openTimeMinutes > closeTimeMinutes) {
-            // This means server was opened, but also closed for today, which is unusual for an overnight schedule
-            // if we are still on the "opening day" and expect it to be open.
-            // Re-trigger open to correct the state if currentServerStatus is not green.
-            console.log("SchedulerService (Catch-up): Servidor deveria estar ABERTO (overnight), mas 'serverClose' foi marcada. Re-avaliando ABERTO.");
-            if (currentServerStatus !== '🟢') {
-                 await triggerServerOpen(); // This will set status to green and send message.
-            }
+    // Server Opening Soon (1h warning)
+    if (
+        timeNowMinutes >= warningTimeMinutes &&
+        timeNowMinutes < openTimeMinutes && 
+        !TaskStatusDbService.isTaskExecuted(serverOpenTaskKey, currentDate) && 
+        !TaskStatusDbService.isTaskExecuted(serverOpeningSoonTaskKey, currentDate)
+    ) {
+        console.log(`SchedulerService (Catch-up): Time for '${serverOpeningSoonTaskKey}' has passed, DB task not executed.`);
+        if (actualGroupStatus !== '🟡') { 
+            console.log(`SchedulerService (Catch-up): Actual group status is '${actualGroupStatus}', not '🟡'. Triggering full '${serverOpeningSoonTaskKey}'.`);
+            await triggerServerOpeningSoon(); // This will set DB and currentServerStatus via updateGroupNameAndSendStatusMessage
+        } else {
+            console.log(`SchedulerService (Catch-up): Actual group status is already '🟡'. Marking '${serverOpeningSoonTaskKey}' as executed in DB.`);
+            TaskStatusDbService.setTaskExecuted(serverOpeningSoonTaskKey, currentDate);
+            currentServerStatus = '🟡'; // Ensure in-memory status is synced
+            // If there are other actions for openingSoon besides group name (e.g. poll), consider if they should run.
+            // For now, if group is already yellow, we assume the state is "caught up".
+            // The poll is inside triggerServerOpeningSoon, so it won't run here.
         }
-    } else if (expectedStatusLogic === '🔴') {
-        if (serverOpenExecutedToday && !serverCloseExecutedToday) {
-            console.log("SchedulerService (Catch-up): Servidor deveria estar FECHADO (lógica de horário), 'serverOpen' executado mas 'serverClose' não. Acionando.");
-            await triggerServerClose();
-        } else if (!serverOpenExecutedToday && !serverCloseExecutedToday) {
-            // Expected to be closed (e.g., before open time, or after close on same-day schedule)
-            // and no open/close actions have been logged for today.
-            // Just ensure the group name is correct if it's not.
-            if (currentServerStatus !== '🔴') {
-                console.log("SchedulerService (Catch-up): Servidor deveria estar FECHADO (lógica de horário), status atual não é 🔴. Corrigindo nome do grupo.");
-                // Only update name, don't trigger full close sequence or mark tasks,
-                // as no open sequence was active to be closed.
+    }
+
+    // Server Opening in 5 Min
+    if (
+        timeNowMinutes >= fiveMinWarningTimeMinutes &&
+        timeNowMinutes < openTimeMinutes && 
+        !TaskStatusDbService.isTaskExecuted(serverOpenTaskKey, currentDate) &&
+        !TaskStatusDbService.isTaskExecuted(serverOpeningIn5MinTaskKey, currentDate)
+    ) {
+        console.log(`SchedulerService (Catch-up): Time for '${serverOpeningIn5MinTaskKey}' has passed, DB task not executed. Triggering.`);
+        // triggerServerOpeningIn5Min primarily sends a message and doesn't change group status itself.
+        // Its internal checks will prevent re-sending if DB task is already marked.
+        await triggerServerOpeningIn5Min();
+    }
+
+    // Server Open Catch-up
+    if (expectedStatusLogic === '🟢') {
+        if (!TaskStatusDbService.isTaskExecuted(serverOpenTaskKey, currentDate)) {
+            console.log(`SchedulerService (Catch-up): Server should be OPEN (expected='🟢'), DB task '${serverOpenTaskKey}' not executed.`);
+            if (actualGroupStatus !== '🟢') {
+                console.log(`SchedulerService (Catch-up): Actual group status is '${actualGroupStatus}', not '🟢'. Triggering full '${serverOpenTaskKey}'.`);
+                await triggerServerOpen();
+            } else {
+                console.log(`SchedulerService (Catch-up): Actual group status is already '🟢'. Marking relevant tasks in DB.`);
+                TaskStatusDbService.setTaskExecuted(serverOpenTaskKey, currentDate);
+                TaskStatusDbService.setTaskExecuted(serverOpeningSoonTaskKey, currentDate); 
+                TaskStatusDbService.setTaskExecuted(serverOpeningIn5MinTaskKey, currentDate); 
+                currentServerStatus = '🟢';
+            }
+        } else if (TaskStatusDbService.isTaskExecuted(serverOpenTaskKey, currentDate) && actualGroupStatus !== '🟢' && !TaskStatusDbService.isTaskExecuted(serverCloseTaskKey, currentDate)) {
+             console.log(`SchedulerService (Catch-up): DB task '${serverOpenTaskKey}' executed, but actual group status is '${actualGroupStatus}' (not '🟢') and not closed. Re-triggering '${serverOpenTaskKey}' to correct visual state.`);
+             await triggerServerOpen(); // This will resend message and set group name
+        }
+    }
+
+    // Server Close Catch-up
+    if (expectedStatusLogic === '🔴') {
+        if (TaskStatusDbService.isTaskExecuted(serverOpenTaskKey, currentDate) && !TaskStatusDbService.isTaskExecuted(serverCloseTaskKey, currentDate)) {
+            console.log(`SchedulerService (Catch-up): Server should be CLOSED (expected='🔴', was open), DB task '${serverCloseTaskKey}' not executed.`);
+            if (actualGroupStatus !== '🔴') {
+                console.log(`SchedulerService (Catch-up): Actual group status is '${actualGroupStatus}', not '🔴'. Triggering full '${serverCloseTaskKey}'.`);
+                await triggerServerClose();
+            } else {
+                console.log(`SchedulerService (Catch-up): Actual group status is already '🔴'. Marking '${serverCloseTaskKey}' in DB.`);
+                TaskStatusDbService.setTaskExecuted(serverCloseTaskKey, currentDate);
+                currentServerStatus = '🔴';
+            }
+        } else if (!TaskStatusDbService.isTaskExecuted(serverOpenTaskKey, currentDate) && !TaskStatusDbService.isTaskExecuted(serverCloseTaskKey, currentDate)) {
+            if (actualGroupStatus !== '🔴') {
+                console.log(`SchedulerService (Catch-up): Server should be CLOSED (expected='🔴', never opened today), actual group status '${actualGroupStatus}' is not '🔴'. Correcting group name only.`);
                 const groupBaseName = config.GROUP_BASE_NAME || "Pavlov VR Server";
                 const newName = `${groupBaseName} 🔴`;
                 try {
                     await EvolutionApiService.setGroupName(newName);
-                    currentServerStatus = '🔴';
-                    console.log(`SchedulerService: Nome do grupo corrigido para FECHADO na inicialização: ${newName}`);
+                    currentServerStatus = '🔴'; 
+                    console.log(`SchedulerService: Group name corrected to FECHADO via catch-up: ${newName}`);
                 } catch (error) {
-                    console.error(`SchedulerService: Erro ao corrigir nome do grupo para FECHADO na inicialização:`, error);
+                    console.error(`SchedulerService: Error correcting group name to FECHADO via catch-up:`, error);
                 }
             }
+        } else if (TaskStatusDbService.isTaskExecuted(serverCloseTaskKey, currentDate) && actualGroupStatus !== '🔴') {
+             console.log(`SchedulerService (Catch-up): DB task '${serverCloseTaskKey}' executed, but actual group status is '${actualGroupStatus}' (not '🔴'). Re-triggering '${serverCloseTaskKey}' to correct visual state.`);
+             await triggerServerClose();
         }
-    }
-
-    // Server Opening Soon (1h warning) - only if server isn't already open
-    if (timeNowMinutes >= warningTimeMinutes &&
-        timeNowMinutes < openTimeMinutes && // Before actual open time
-        !TaskStatusDbService.isTaskExecuted('serverOpeningSoon', currentDate) &&
-        !TaskStatusDbService.isTaskExecuted('serverOpen', currentDate)) { // And not already open
-        console.log("SchedulerService (Catch-up): Horário do aviso de 1h passou, tarefa não executada. Acionando.");
-        await triggerServerOpeningSoon();
-    }
-
-    // Server Opening in 5 Min - only if server isn't already open
-    if (timeNowMinutes >= fiveMinWarningTimeMinutes &&
-        timeNowMinutes < openTimeMinutes && // Before actual open time
-        !TaskStatusDbService.isTaskExecuted('serverOpeningIn5Min', currentDate) &&
-        !TaskStatusDbService.isTaskExecuted('serverOpen', currentDate)) { // And not already open
-        console.log("SchedulerService (Catch-up): Horário do aviso de 5min passou, tarefa não executada. Acionando.");
-        await triggerServerOpeningIn5Min();
     }
 
     // Chat Summaries Catch-up
@@ -726,47 +756,30 @@ async function initializeBotStatus() {
         await sendSpecialMessage('extras_fridayMessage');
     }
 
-    // Re-evaluate currentServerStatus based on potentially executed tasks and expected logic
-    // This is important because catch-up actions might have changed the DB state.
-    const finalOpenExecuted = TaskStatusDbService.isTaskExecuted('serverOpen', currentDate);
-    const finalCloseExecuted = TaskStatusDbService.isTaskExecuted('serverClose', currentDate);
-    const finalOpeningSoonExecuted = TaskStatusDbService.isTaskExecuted('serverOpeningSoon', currentDate);
-
-    if (finalOpenExecuted && !finalCloseExecuted) {
-        currentServerStatus = '🟢';
-    } else if (finalOpeningSoonExecuted && !finalOpenExecuted && !finalCloseExecuted) {
-        // If opening soon was triggered and it's not yet open (and not closed for the day)
-        currentServerStatus = '🟡';
-    } else { // Includes closed, or before any relevant action today
-        currentServerStatus = '🔴';
-    }
-    // If expected logic strongly dictates a state, and DB is somehow conflicting, expected logic might take precedence for currentServerStatus
-    // For example, if expected is green, but DB says closed, we might have just opened it.
-    if (expectedStatusLogic === '🟢' && currentServerStatus !== '🟢' && finalOpenExecuted && !finalCloseExecuted) {
-        currentServerStatus = '🟢';
-    } else if (expectedStatusLogic === '🔴' && currentServerStatus !== '🔴' && (finalCloseExecuted || !finalOpenExecuted) ) {
-        currentServerStatus = '🔴';
-    } else if (expectedStatusLogic === '🟡' && currentServerStatus !== '🟡' && finalOpeningSoonExecuted && !finalOpenExecuted) {
-        currentServerStatus = '🟡';
-    }
-
-    console.log(`SchedulerService: Status do servidor após catch-up e avaliação final: ${currentServerStatus}`);
-
-    // Start random message loops if applicable based on current status
-    if (currentServerStatus !== '🟢') {
+    // Start random message loops if applicable based on final currentServerStatus
+    if (currentServerStatus === '🟢') {
+        console.log("SchedulerService (Init): Server is 🟢, ensuring 'serverOpen' message loop is active.");
+        scheduleNextRandomMessage('serverOpen');
+    } else { // Server is not 🟢 (could be 🔴 or 🟡)
+        if (serverOpenMessageTimeoutId) {
+            clearTimeout(serverOpenMessageTimeoutId);
+            serverOpenMessageTimeoutId = null;
+            console.log("SchedulerService (Init): Server not 🟢, stopped 'serverOpen' message loop.");
+        }
         if (currentHour >= config.DAYTIME_START_HOUR && currentHour < config.DAYTIME_END_HOUR) {
             if (daytimeMessageTimeoutId === null && daytimeMessagesSent < config.MESSAGES_DURING_DAYTIME) {
-                // console.log("SchedulerService: Dentro do horário diurno, agendando próxima mensagem diurna.");
-                scheduleNextRandomMessage('daytime');
+                 console.log("SchedulerService (Init): Server not 🟢, but in daytime. Ensuring 'daytime' message loop is active.");
+                 scheduleNextRandomMessage('daytime');
             }
         } else {
             if (daytimeMessageTimeoutId !== null) {
-                // console.log("SchedulerService: Fora do horário diurno, parando mensagens diurnas.");
                 clearTimeout(daytimeMessageTimeoutId);
                 daytimeMessageTimeoutId = null;
+                console.log("SchedulerService (Init): Server not 🟢 and outside daytime, stopped 'daytime' message loop.");
             }
         }
     }
+    console.log(`SchedulerService: Initialization complete. Final in-memory server status: ${currentServerStatus}`);
 }
 
 
