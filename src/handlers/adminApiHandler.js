@@ -38,36 +38,34 @@ router.post('/messages', express.json(), async (req, res) => {
 
 // Get current bot configuration (safe subset)
 router.get('/config', (req, res) => {
-  const fullConfig = ConfigService.getConfig();
-  // Return only editable and safe config values
-  const safeConfig = {
-    GROUP_BASE_NAME: fullConfig.GROUP_BASE_NAME,
-    MESSAGES_DURING_SERVER_OPEN: fullConfig.MESSAGES_DURING_SERVER_OPEN,
-    MESSAGES_DURING_DAYTIME: fullConfig.MESSAGES_DURING_DAYTIME,
-    DAYTIME_START_HOUR: fullConfig.DAYTIME_START_HOUR,
-    DAYTIME_END_HOUR: fullConfig.DAYTIME_END_HOUR,
-    SERVER_OPEN_TIME: fullConfig.SERVER_OPEN_TIME,
-    SERVER_CLOSE_TIME: fullConfig.SERVER_CLOSE_TIME,
-    CHAT_SUMMARY_TIMES: fullConfig.CHAT_SUMMARY_TIMES,
-    TARGET_GROUP_ID: fullConfig.TARGET_GROUP_ID,
-    CHAT_SUMMARY_COUNT_PER_DAY: fullConfig.CHAT_SUMMARY_COUNT_PER_DAY,
-    SEND_NO_SUMMARY_MESSAGE: fullConfig.SEND_NO_SUMMARY_MESSAGE,
-    POLL_MENTION_EVERYONE: fullConfig.POLL_MENTION_EVERYONE,
-    // Add any other config items the admin panel should see/edit
-  };
-  res.json(safeConfig);
+    try {
+        const config = ConfigService.getConfig();
+        res.json({ success: true, config });
+    } catch (error) {
+        console.error("AdminApiHandler: Erro ao obter configurações:", error);
+        res.status(500).json({ success: false, message: "Erro ao buscar configurações." });
+    }
 });
 
 // Update bot configuration
 router.post('/config', express.json(), async (req, res) => {
-  try {
-    const configChanged = ConfigService.updateConfig(req.body); // updateConfig now calls onConfigChange
-                                                              // which SchedulerService listens to.
-    res.json({ success: true, message: "Configurações atualizadas com sucesso!" });
-  } catch (error) {
-    console.error("AdminApiHandler: Erro ao atualizar config.json:", error);
-    res.status(500).json({ success: false, message: "Erro ao atualizar configurações." });
-  }
+    try {
+        const newConfigData = req.body;
+        console.log("AdminApiHandler: Recebido POST /config com dados:", JSON.stringify(newConfigData, null, 2));
+
+        if (typeof newConfigData !== 'object' || newConfigData === null) {
+            return res.status(400).json({ success: false, message: "Payload inválido: esperado um objeto JSON." });
+        }
+
+        const updatedConfig = await ConfigService.updateConfig(newConfigData);
+        
+        // updateConfig agora sempre retorna o currentConfig (ou lança erro)
+        res.json({ success: true, message: "Configurações gerais salvas com sucesso!", config: updatedConfig });
+
+    } catch (error) {
+        console.error("AdminApiHandler: Erro ao salvar configurações gerais:", error);
+        res.status(500).json({ success: false, message: `Erro interno do servidor: ${error.message}` });
+    }
 });
 
 // Test Groq API or generate a message based on a prompt

@@ -63,6 +63,16 @@
                     <label for="config_CHAT_SUMMARY_COUNT_PER_DAY">Qtd. Resumos do Chat por Dia:</label>
                     <input type="number" id="config_CHAT_SUMMARY_COUNT_PER_DAY" name="CHAT_SUMMARY_COUNT_PER_DAY" min="1" max="24">
                 </div>
+                <div class="form-group">
+                    <label for="config_POLL_MENTION_EVERYONE">Mencionar Todos em Enquetes:</label>
+                    <input type="checkbox" id="config_POLL_MENTION_EVERYONE" name="POLL_MENTION_EVERYONE">
+                    <span class="checkbox-label-text">Ativar (se desativado, mencionará participantes individualmente)</span>
+                </div>
+                <div class="form-group">
+                    <label for="config_CHAT_SUMMARY_ENABLED">Resumo Automático do Chat:</label>
+                    <input type="checkbox" id="config_CHAT_SUMMARY_ENABLED" name="CHAT_SUMMARY_ENABLED">
+                    <span class="checkbox-label-text">Ativar resumo automático do chat</span>
+                </div>
                 <button type="submit">Salvar Configurações Gerais</button>
             </form>
             <div id="responseMessageConfig" class="response-message"></div>

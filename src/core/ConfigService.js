@@ -1,158 +1,95 @@
 import { parseTime } from '../utils/generalUtils.js';
 import DatabaseService from './DatabaseService.js'; // New import
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const envConfig = process.env;
 const CONFIG_COLLECTION_NAME = 'configurations';
-const CONFIG_DOC_ID = 'botConfig';
+const CONFIG_DOC_ID = 'mainBotConfig';
 
-let botConfig = {
-  EVOLUTION_API_URL: 'https://evo.audiozap.app',
-  EVOLUTION_API_KEY: '',
-  INSTANCE_NAME: '',
-  TARGET_GROUP_ID: '',
-  BOT_WEBHOOK_PORT: 8080,
-  SERVER_OPEN_TIME: '19:00',
-  SERVER_CLOSE_TIME: '23:59',
-  GROUP_BASE_NAME: "BRASIL PAVLOV SND 6/24",
-  MESSAGES_DURING_SERVER_OPEN: 4,
-  MESSAGES_DURING_DAYTIME: 4,
-  DAYTIME_START_HOUR: 8,
-  DAYTIME_END_HOUR: 17,
-  TIMEZONE: "America/Sao_Paulo",
-  GROQ_API_KEY: '',
-  BOT_PUBLIC_URL: '',
-  CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"],
-  CHAT_SUMMARY_COUNT_PER_DAY: 3,
-  SEND_NO_SUMMARY_MESSAGE: false,
-  POLL_MENTION_EVERYONE: true
+// Valores padrão, usados se não encontrados no DB ou para garantir que todas as chaves existam.
+// Prioriza variáveis de ambiente, depois valores codificados.
+const DEFAULTS = {
+    EVOLUTION_API_URL: process.env.EVOLUTION_API_URL || '',
+    INSTANCE_NAME: process.env.INSTANCE_NAME || '',
+    EVOLUTION_API_KEY: process.env.EVOLUTION_API_KEY || '',
+    GROQ_API_KEY: process.env.GROQ_API_KEY || '',
+    TARGET_GROUP_ID: process.env.TARGET_GROUP_ID || '',
+    GROUP_BASE_NAME: process.env.GROUP_BASE_NAME || 'Pavlov VR Server',
+    SERVER_OPEN_TIME: process.env.SERVER_OPEN_TIME || '19:00',
+    SERVER_CLOSE_TIME: process.env.SERVER_CLOSE_TIME || '23:59',
+    TIMEZONE: process.env.TIMEZONE || 'America/Sao_Paulo',
+    MESSAGES_DURING_SERVER_OPEN: parseInt(process.env.MESSAGES_DURING_SERVER_OPEN, 10) || 3,
+    MESSAGES_DURING_DAYTIME: parseInt(process.env.MESSAGES_DURING_DAYTIME, 10) || 2,
+    DAYTIME_START_HOUR: parseInt(process.env.DAYTIME_START_HOUR, 10) || 9,
+    DAYTIME_END_HOUR: parseInt(process.env.DAYTIME_END_HOUR, 10) || 18,
+    CHAT_SUMMARY_TIMES: (process.env.CHAT_SUMMARY_TIMES || '12:00,22:00').split(',').map(t => t.trim()).filter(t => t),
+    BOT_WEBHOOK_PORT: parseInt(process.env.BOT_WEBHOOK_PORT, 10) || 3000,
+    BOT_PUBLIC_URL: process.env.BOT_PUBLIC_URL || '',
+    POLL_MENTION_EVERYONE: process.env.POLL_MENTION_EVERYONE === 'true', // Booleano
+    CHAT_SUMMARY_ENABLED: process.env.CHAT_SUMMARY_ENABLED === 'true',   // Booleano
+    CHAT_SUMMARY_COUNT_PER_DAY: parseInt(process.env.CHAT_SUMMARY_COUNT_PER_DAY, 10) || 2,
 };
 
-let onConfigChangeCallback = () => {};
+let currentConfig = { ...DEFAULTS }; // Inicializa com padrões
+let onConfigChangeCallback = null;
 
 async function loadConfig() {
-  const db = await DatabaseService.getDb();
-  const collection = db.collection(CONFIG_COLLECTION_NAME);
-  let dbConfig = await collection.findOne({ _id: CONFIG_DOC_ID });
+    console.log("ConfigService: Iniciando carregamento de configurações...");
+    try {
+        const db = await DatabaseService.getDb();
+        const collection = db.collection(CONFIG_COLLECTION_NAME);
+        const dbConfig = await collection.findOne({ _id: CONFIG_DOC_ID });
 
-  const initialDefaultConfig = { // Define the base structure and defaults
-    EVOLUTION_API_URL: 'https://evo.audiozap.app',
-    EVOLUTION_API_KEY: '',
-    INSTANCE_NAME: '',
-    TARGET_GROUP_ID: '',
-    BOT_WEBHOOK_PORT: 8080,
-    SERVER_OPEN_TIME: '19:00',
-    SERVER_CLOSE_TIME: '23:59',
-    GROUP_BASE_NAME: "BRASIL PAVLOV SND 6/24",
-    MESSAGES_DURING_SERVER_OPEN: 4,
-    MESSAGES_DURING_DAYTIME: 4,
-    DAYTIME_START_HOUR: 8,
-    DAYTIME_END_HOUR: 17,
-    TIMEZONE: "America/Sao_Paulo",
-    GROQ_API_KEY: '',
-    BOT_PUBLIC_URL: '',
-    CHAT_SUMMARY_TIMES: ["10:00", "16:00", "21:00"],
-    CHAT_SUMMARY_COUNT_PER_DAY: 3,
-    SEND_NO_SUMMARY_MESSAGE: false,
-    POLL_MENTION_EVERYONE: true
-  };
+        if (dbConfig) {
+            console.log("ConfigService: Configuração encontrada no MongoDB.");
+            // Remove _id de dbConfig antes de fazer o merge para não sobrescrever DEFAULTS._id se existir
+            const { _id, ...configFromDb } = dbConfig;
+            currentConfig = { ...DEFAULTS, ...configFromDb };
 
-  if (!dbConfig) {
-    console.warn(`ConfigService: No configuration found in DB for ID '${CONFIG_DOC_ID}'. Initializing with defaults and .env overrides.`);
-    dbConfig = { ...initialDefaultConfig, _id: CONFIG_DOC_ID };
-    // Apply .env overrides to this initial structure before saving
-    for (const key in dbConfig) {
-      if (envConfig[key] !== undefined) {
-        // Special handling for CHAT_SUMMARY_TIMES from .env
-        if (key === 'CHAT_SUMMARY_TIMES') {
-          if (typeof envConfig[key] === 'string') {
-            try {
-              let parsedTimes = JSON.parse(envConfig[key]);
-              if (Array.isArray(parsedTimes) && parsedTimes.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
-                dbConfig[key] = parsedTimes;
-              } else { throw new Error("Not a valid JSON array of HH:MM strings"); }
-            } catch (e) {
-              const commaParsedTimes = envConfig[key].split(',').map(s => s.trim()).filter(s => s.match(/^\d{2}:\d{2}$/));
-              if (commaParsedTimes.length > 0 || envConfig[key].trim() === "") { dbConfig[key] = commaParsedTimes; }
-              else { console.warn(`CHAT_SUMMARY_TIMES from .env ("${envConfig[key]}") could not be parsed for initial config.`);}
-            }
-          } else if (Array.isArray(envConfig[key])) {
-            dbConfig[key] = envConfig[key].filter(s => typeof s === 'string' && s.match(/^\d{2}:\d{2}$/));
-          }
-        } else if (typeof dbConfig[key] === 'boolean') {
-          dbConfig[key] = (envConfig[key] === 'true' || envConfig[key] === '1');
-        } else if (typeof dbConfig[key] === 'number') {
-          dbConfig[key] = parseInt(envConfig[key], 10);
+            // Garantir tipos corretos após carregar do DB
+            Object.keys(DEFAULTS).forEach(key => {
+                if (currentConfig[key] === undefined) { // Se uma nova chave default foi adicionada e não está no DB
+                    currentConfig[key] = DEFAULTS[key];
+                } else if (typeof DEFAULTS[key] === 'number') {
+                    currentConfig[key] = parseInt(currentConfig[key], 10);
+                    if (isNaN(currentConfig[key])) currentConfig[key] = DEFAULTS[key];
+                } else if (typeof DEFAULTS[key] === 'boolean') {
+                    currentConfig[key] = String(currentConfig[key]).toLowerCase() === 'true';
+                } else if (key === 'CHAT_SUMMARY_TIMES') {
+                    if (typeof currentConfig[key] === 'string') {
+                        currentConfig[key] = currentConfig[key].split(',').map(t => t.trim()).filter(t => t);
+                    } else if (!Array.isArray(currentConfig[key])) {
+                        currentConfig[key] = DEFAULTS[key]; // Fallback para o array padrão
+                    }
+                }
+            });
         } else {
-          dbConfig[key] = envConfig[key];
+            console.warn(`ConfigService: Nenhuma configuração encontrada no MongoDB para ID '${CONFIG_DOC_ID}'. Usando e salvando padrões.`);
+            currentConfig = { ...DEFAULTS };
+            await collection.insertOne({ _id: CONFIG_DOC_ID, ...currentConfig });
+            console.log("ConfigService: Configurações padrão salvas no MongoDB.");
         }
-      }
+        console.log("ConfigService: Configuração final carregada:", JSON.stringify(currentConfig, null, 2));
+    } catch (error) {
+        console.error("ConfigService: Erro ao carregar configuração do MongoDB. Usando padrões em memória.", error);
+        currentConfig = { ...DEFAULTS }; // Fallback para padrões em caso de erro grave
     }
-    await collection.insertOne(dbConfig); // Save the initial config to DB
-    console.log("ConfigService: Initial configuration document created in MongoDB.");
-  }
-
-  // Merge DB config with .env overrides (env takes precedence for keys it defines)
-  let tempConfig = { ...initialDefaultConfig, ...dbConfig }; // Start with defaults, layer DB, then .env
-
-  for (const key in tempConfig) {
-    if (envConfig[key] !== undefined) {
-      if (key === 'CHAT_SUMMARY_TIMES') {
-        // Same parsing logic as above for .env
-        if (typeof envConfig[key] === 'string') {
-            try {
-              let parsedTimes = JSON.parse(envConfig[key]);
-              if (Array.isArray(parsedTimes) && parsedTimes.every(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/))) {
-                tempConfig[key] = parsedTimes;
-              } else { throw new Error("Not a valid JSON array of HH:MM strings"); }
-            } catch (e) {
-              const commaParsedTimes = envConfig[key].split(',').map(s => s.trim()).filter(s => s.match(/^\d{2}:\d{2}$/));
-              if (commaParsedTimes.length > 0 || envConfig[key].trim() === "") { tempConfig[key] = commaParsedTimes; }
-              else { console.warn(`CHAT_SUMMARY_TIMES from .env ("${envConfig[key]}") could not be parsed. Using value from DB or default.`); }
-            }
-          } else if (Array.isArray(envConfig[key])) {
-            tempConfig[key] = envConfig[key].filter(s => typeof s === 'string' && s.match(/^\d{2}:\d{2}$/));
-          }
-      } else if (typeof tempConfig[key] === 'boolean') {
-        tempConfig[key] = (envConfig[key] === 'true' || envConfig[key] === '1');
-      } else if (typeof tempConfig[key] === 'number' && !isNaN(parseInt(envConfig[key],10))) {
-        tempConfig[key] = parseInt(envConfig[key], 10);
-      } else {
-        tempConfig[key] = envConfig[key];
-      }
-    }
-  }
-  
-  // Assign to the global botConfig object
-  botConfig = { ...tempConfig };
-
-  // Ensure types after all merges
-  botConfig.BOT_WEBHOOK_PORT = parseInt(String(botConfig.BOT_WEBHOOK_PORT), 10) || 8080;
-  botConfig.MESSAGES_DURING_SERVER_OPEN = parseInt(String(botConfig.MESSAGES_DURING_SERVER_OPEN), 10) || 0;
-  botConfig.MESSAGES_DURING_DAYTIME = parseInt(String(botConfig.MESSAGES_DURING_DAYTIME), 10) || 0;
-  botConfig.DAYTIME_START_HOUR = parseInt(String(botConfig.DAYTIME_START_HOUR), 10) || 0;
-  botConfig.DAYTIME_END_HOUR = parseInt(String(botConfig.DAYTIME_END_HOUR), 10) || 0;
-  botConfig.CHAT_SUMMARY_COUNT_PER_DAY = parseInt(String(botConfig.CHAT_SUMMARY_COUNT_PER_DAY), 10) || 1;
-  botConfig.TIMEZONE = String(botConfig.TIMEZONE || "America/Sao_Paulo");
-  botConfig.CHAT_SUMMARY_TIMES = Array.isArray(botConfig.CHAT_SUMMARY_TIMES) ? botConfig.CHAT_SUMMARY_TIMES.filter(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/)) : [];
-  botConfig.SEND_NO_SUMMARY_MESSAGE = typeof botConfig.SEND_NO_SUMMARY_MESSAGE === 'boolean' ? botConfig.SEND_NO_SUMMARY_MESSAGE : false;
-  botConfig.POLL_MENTION_EVERYONE = typeof botConfig.POLL_MENTION_EVERYONE === 'boolean' ? botConfig.POLL_MENTION_EVERYONE : true;
-
-  console.log("ConfigService: Configurations loaded and merged from DB and .env.");
-  logCurrentConfig();
-  onConfigChangeCallback(botConfig, false); // Initial load, assume no specific time settings changed that require immediate re-init beyond normal startup
+    return currentConfig;
 }
 
 function logCurrentConfig() {
   console.log("Configurações finais do bot:", {
-    ...botConfig,
-    EVOLUTION_API_KEY: botConfig.EVOLUTION_API_KEY ? '***' : '',
-    GROQ_API_KEY: botConfig.GROQ_API_KEY ? '***' : '',
-    TIMEZONE: botConfig.TIMEZONE,
-    BOT_PUBLIC_URL: botConfig.BOT_PUBLIC_URL,
-    CHAT_SUMMARY_TIMES: Array.isArray(botConfig.CHAT_SUMMARY_TIMES) ? botConfig.CHAT_SUMMARY_TIMES : [],
-    CHAT_SUMMARY_COUNT_PER_DAY: botConfig.CHAT_SUMMARY_COUNT_PER_DAY,
-    SEND_NO_SUMMARY_MESSAGE: botConfig.SEND_NO_SUMMARY_MESSAGE,
-    POLL_MENTION_EVERYONE: botConfig.POLL_MENTION_EVERYONE
+    ...currentConfig,
+    EVOLUTION_API_KEY: currentConfig.EVOLUTION_API_KEY ? '***' : '',
+    GROQ_API_KEY: currentConfig.GROQ_API_KEY ? '***' : '',
+    TIMEZONE: currentConfig.TIMEZONE,
+    BOT_PUBLIC_URL: currentConfig.BOT_PUBLIC_URL,
+    CHAT_SUMMARY_TIMES: Array.isArray(currentConfig.CHAT_SUMMARY_TIMES) ? currentConfig.CHAT_SUMMARY_TIMES : [],
+    CHAT_SUMMARY_COUNT_PER_DAY: currentConfig.CHAT_SUMMARY_COUNT_PER_DAY,
+    SEND_NO_SUMMARY_MESSAGE: currentConfig.SEND_NO_SUMMARY_MESSAGE,
+    POLL_MENTION_EVERYONE: currentConfig.POLL_MENTION_EVERYONE
   });
 }
 
@@ -162,11 +99,11 @@ async function saveConfig() {
     const collection = db.collection(CONFIG_COLLECTION_NAME);
 
     // Prepare the config to save, excluding _id for the update operation's $set
-    const { _id, ...configToSaveToDb } = botConfig; 
+    const { _id, ...configToSaveToDb } = currentConfig; 
 
     // Only save non-env overridden values to DB, or values that are part of the base schema
-    // This is tricky. For now, let's save the current state of botConfig that isn't directly from .env
-    // OR, more simply, save all fields that are part of our defined `initialDefaultConfig` structure.
+    // This is tricky. For now, let's save the current state of currentConfig that isn't directly from .env
+    // OR, more simply, save all fields that are part of our defined `DEFAULTS` structure.
     // This ensures that if an .env var is removed, the DB value persists.
     
     const dbPayload = {};
@@ -182,12 +119,12 @@ async function saveConfig() {
     });
 
     for (const key of defaultConfigKeys) {
-        if (botConfig[key] !== undefined) {
+        if (currentConfig[key] !== undefined) {
             // Do not save API keys to DB if they are coming from .env
             if ((key === 'EVOLUTION_API_KEY' || key === 'GROQ_API_KEY') && envConfig[key]) {
                 continue; // Skip saving to DB if .env provides it
             }
-            dbPayload[key] = botConfig[key];
+            dbPayload[key] = currentConfig[key];
         }
     }
 
@@ -203,47 +140,98 @@ async function saveConfig() {
 }
 
 function getConfig() {
-  return { ...botConfig };
+  return { ...currentConfig };
 }
 
-async function updateConfig(newConfigPartial) {
-    let changed = false;
+async function updateConfig(newConfigDataFromForm) {
+    console.log("ConfigService: Recebido para atualização (dados do formulário):", JSON.stringify(newConfigDataFromForm, null, 2));
+    
+    const oldConfigSnapshot = { ...currentConfig };
     let timeSettingsChanged = false;
-    const allowedKeys = [
-      "GROUP_BASE_NAME", "MESSAGES_DURING_SERVER_OPEN", "MESSAGES_DURING_DAYTIME",
-      "DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME",
-      "CHAT_SUMMARY_TIMES", "TARGET_GROUP_ID", "CHAT_SUMMARY_COUNT_PER_DAY",
-      "SEND_NO_SUMMARY_MESSAGE", "POLL_MENTION_EVERYONE"
-      // Add other keys that can be updated via admin panel if necessary
-    ];
+    
+    // Crie uma cópia para modificação, começando com os padrões para garantir que todas as chaves existam
+    let processedConfig = { ...DEFAULTS }; 
 
-    for (const key of allowedKeys) {
-        if (newConfigPartial[key] !== undefined) {
-            if (JSON.stringify(botConfig[key]) !== JSON.stringify(newConfigPartial[key])) {
-                changed = true;
-                if (["DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "SERVER_OPEN_TIME", "SERVER_CLOSE_TIME", "CHAT_SUMMARY_TIMES"].includes(key)) {
-                    timeSettingsChanged = true;
+    // Mescle com a configuração atual em memória (que pode ter vindo do DB)
+    processedConfig = { ...processedConfig, ...currentConfig };
+
+    // Agora, mescle com os novos dados do formulário, aplicando conversões de tipo
+    for (const key in newConfigDataFromForm) {
+        if (Object.prototype.hasOwnProperty.call(newConfigDataFromForm, key)) {
+            let formValue = newConfigDataFromForm[key];
+            let defaultValueType = typeof DEFAULTS[key];
+            let targetValue = formValue; // Valor que será atribuído
+
+            if (DEFAULTS[key] !== undefined) { // Processa apenas chaves conhecidas (presentes em DEFAULTS)
+                if (defaultValueType === 'number') {
+                    targetValue = parseInt(formValue, 10);
+                    if (isNaN(targetValue)) targetValue = DEFAULTS[key]; // Fallback se NaN
+                } else if (defaultValueType === 'boolean') {
+                    targetValue = String(formValue).toLowerCase() === 'true' || formValue === true;
+                } else if (key === 'CHAT_SUMMARY_TIMES') {
+                    if (typeof formValue === 'string') {
+                        targetValue = formValue.split(',').map(t => t.trim()).filter(t => t);
+                    } else if (!Array.isArray(formValue)) { // Se não for string nem array, usa o default
+                        targetValue = DEFAULTS[key];
+                    }
                 }
-                if (["MESSAGES_DURING_SERVER_OPEN", "MESSAGES_DURING_DAYTIME", "DAYTIME_START_HOUR", "DAYTIME_END_HOUR", "CHAT_SUMMARY_COUNT_PER_DAY"].includes(key)) {
-                    botConfig[key] = parseInt(newConfigPartial[key], 10);
-                } else if (key === "CHAT_SUMMARY_TIMES") {
-                    botConfig[key] = Array.isArray(newConfigPartial[key]) ? newConfigPartial[key].filter(t => typeof t === 'string' && t.match(/^\d{2}:\d{2}$/)) : [];
-                } else if (key === "SEND_NO_SUMMARY_MESSAGE" || key === "POLL_MENTION_EVERYONE") {
-                    botConfig[key] = typeof newConfigPartial[key] === 'boolean' ? newConfigPartial[key] : (newConfigPartial[key] === 'true');
-                }
-                else {
-                    botConfig[key] = newConfigPartial[key];
+                // Strings e outros tipos são atribuídos diretamente
+                
+                if (processedConfig[key] !== targetValue) {
+                    processedConfig[key] = targetValue;
+                    if (['SERVER_OPEN_TIME', 'SERVER_CLOSE_TIME', 'TIMEZONE', 'CHAT_SUMMARY_TIMES', 'DAYTIME_START_HOUR', 'DAYTIME_END_HOUR'].includes(key)) {
+                        timeSettingsChanged = true;
+                    }
                 }
             }
         }
     }
-
-    if (changed) {
-        await saveConfig();
-        console.log("ConfigService: Configuração atualizada e salva no MongoDB.");
-        onConfigChangeCallback(botConfig, timeSettingsChanged);
+    
+    // Garante que todas as chaves de DEFAULTS estejam presentes, caso alguma tenha sido omitida no formulário
+    // e não estivesse no currentConfig (improvável com a lógica acima, mas seguro).
+    for (const key in DEFAULTS) {
+        if (processedConfig[key] === undefined) {
+            processedConfig[key] = DEFAULTS[key];
+        }
     }
-    return changed;
+
+    currentConfig = processedConfig; // Atualiza o cache interno
+    console.log("ConfigService: Configuração após merge e conversão (pronta para salvar):", JSON.stringify(currentConfig, null, 2));
+
+    try {
+        const db = await DatabaseService.getDb();
+        const collection = db.collection(CONFIG_COLLECTION_NAME);
+        
+        // O objeto a ser salvo no $set não deve incluir _id
+        const { _id, ...configToSetInDb } = currentConfig; 
+
+        const result = await collection.updateOne(
+            { _id: CONFIG_DOC_ID },
+            { $set: configToSetInDb },
+            { upsert: true }
+        );
+        console.log("ConfigService: Resultado da atualização no MongoDB:", JSON.stringify(result, null, 2));
+
+        if (result.modifiedCount > 0 || result.upsertedCount > 0) {
+            console.log("ConfigService: Configuração salva com sucesso no MongoDB.");
+        } else if (result.matchedCount > 0 && result.modifiedCount === 0) {
+            console.log("ConfigService: Configuração no MongoDB já estava atualizada (nenhuma alteração nos valores).");
+        } else {
+            console.warn("ConfigService: Configuração não foi salva no MongoDB (nem modificada, nem inserida). Verifique o filtro e os dados.");
+        }
+        
+        if (onConfigChangeCallback) {
+            // Notifica mesmo se não houve alteração no DB, pois a intenção de salvar existiu
+            // e o estado em memória (currentConfig) foi atualizado.
+            onConfigChangeCallback(currentConfig, timeSettingsChanged);
+        }
+
+    } catch (error) {
+        console.error("ConfigService: Erro ao salvar configuração no MongoDB:", error);
+        // Considerar reverter currentConfig para oldConfigSnapshot em caso de falha crítica no salvamento.
+        // currentConfig = oldConfigSnapshot; // Exemplo de rollback em memória
+    }
+    return currentConfig;
 }
 
 function setOnConfigChange(callback) {

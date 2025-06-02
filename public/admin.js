@@ -65,6 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const configBotWebhookPortInput = document.getElementById('config_BOT_WEBHOOK_PORT');
     const configBotPublicUrlInput = document.getElementById('config_BOT_PUBLIC_URL');
     const configChatSummaryCountPerDayInput = document.getElementById('config_CHAT_SUMMARY_COUNT_PER_DAY');
+    const configPollMentionEveryoneCheckbox = document.getElementById('config_POLL_MENTION_EVERYONE');
+    const configChatSummaryEnabledCheckbox = document.getElementById('config_CHAT_SUMMARY_ENABLED');
 
     const responseMessageGlobalDiv = document.getElementById('responseMessageGlobal');
 
@@ -189,32 +191,34 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadConfig() {
         try {
             const response = await fetch('/admin/api/config');
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const config = await response.json();
-
-            if (configEvolutionApiUrlInput) configEvolutionApiUrlInput.value = config.EVOLUTION_API_URL || '';
-            if (configInstanceNameInput) configInstanceNameInput.value = config.INSTANCE_NAME || '';
-            if (configEvolutionApiKeyInput) configEvolutionApiKeyInput.value = config.EVOLUTION_API_KEY || '';
-            if (configGroqApiKeyInput) configGroqApiKeyInput.value = config.GROQ_API_KEY || '';
-            if (configTargetGroupIdInput) configTargetGroupIdInput.value = config.TARGET_GROUP_ID || '';
-            if (configGroupBaseNameInput) configGroupBaseNameInput.value = config.GROUP_BASE_NAME || '';
-            if (configServerOpenTimeInput) configServerOpenTimeInput.value = config.SERVER_OPEN_TIME || '19:00';
-            if (configServerCloseTimeInput) configServerCloseTimeInput.value = config.SERVER_CLOSE_TIME || '23:59';
-            if (configTimezoneInput) configTimezoneInput.value = config.TIMEZONE || 'America/Sao_Paulo';
-            if (configMessagesDuringServerOpenInput) configMessagesDuringServerOpenInput.value = config.MESSAGES_DURING_SERVER_OPEN == null ? 0 : config.MESSAGES_DURING_SERVER_OPEN;
-            if (configMessagesDuringDaytimeInput) configMessagesDuringDaytimeInput.value = config.MESSAGES_DURING_DAYTIME == null ? 0 : config.MESSAGES_DURING_DAYTIME;
-            if (configDaytimeStartHourInput) configDaytimeStartHourInput.value = config.DAYTIME_START_HOUR == null ? 0 : config.DAYTIME_START_HOUR;
-            if (configDaytimeEndHourInput) configDaytimeEndHourInput.value = config.DAYTIME_END_HOUR == null ? 0 : config.DAYTIME_END_HOUR;
-            if (configChatSummaryTimesInput) configChatSummaryTimesInput.value = Array.isArray(config.CHAT_SUMMARY_TIMES) ? config.CHAT_SUMMARY_TIMES.join(',') : '';
-            if (configBotWebhookPortInput) configBotWebhookPortInput.value = config.BOT_WEBHOOK_PORT || 8080;
-            if (configBotPublicUrlInput) configBotPublicUrlInput.value = config.BOT_PUBLIC_URL || '';
-            if (configChatSummaryCountPerDayInput) configChatSummaryCountPerDayInput.value = config.CHAT_SUMMARY_COUNT_PER_DAY == null ? 3 : config.CHAT_SUMMARY_COUNT_PER_DAY;
-
+            const result = await response.json();
+            if (response.ok && result.success && result.config) {
+                const config = result.config;
+                console.log("Admin.js: Configurações carregadas do backend:", JSON.stringify(config, null, 2));
+                
+                // Populate form fields
+                for (const key in config) {
+                    if (Object.prototype.hasOwnProperty.call(config, key)) {
+                        const inputElement = document.getElementById(`config_${key}`);
+                        if (inputElement) {
+                            if (inputElement.type === 'checkbox') {
+                                inputElement.checked = !!config[key]; // Converte para booleano
+                            } else if (key === 'CHAT_SUMMARY_TIMES' && Array.isArray(config[key])) {
+                                inputElement.value = config[key].join(',');
+                            } else {
+                                inputElement.value = config[key] === null || config[key] === undefined ? '' : config[key];
+                            }
+                        } else {
+                            // console.warn(`loadConfig: Elemento de formulário não encontrado para config_${key}`);
+                        }
+                    }
+                }
+            } else {
+                throw new Error(result.message || 'Falha ao carregar configurações gerais do backend.');
+            }
         } catch (error) {
-            console.error('Erro ao carregar configurações:', error);
-            responseMessageConfigDiv.textContent = 'Erro ao carregar configurações do servidor. Verifique o console do bot e do navegador.';
-            responseMessageConfigDiv.className = 'mt-4 p-3 rounded-md text-center bg-red-100 text-red-700';
-            responseMessageConfigDiv.classList.remove('hidden');
+            console.error('Erro ao carregar configurações gerais:', error);
+            showGlobalMessage(`Erro ao carregar configurações: ${error.message}`, true);
         }
     }
 
@@ -283,56 +287,96 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    configForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        responseMessageConfigDiv.classList.add('hidden');
-        responseMessageConfigDiv.textContent = '';
+    if (configForm) {
+        configForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            responseMessageConfigDiv.classList.add('hidden');
+            const formData = new FormData(configForm);
+            const configData = {};
 
-        const updatedConfig = {           
-            TARGET_GROUP_ID: configTargetGroupIdInput ? configTargetGroupIdInput.value.trim() : '',
-            GROUP_BASE_NAME: configGroupBaseNameInput ? configGroupBaseNameInput.value.trim() : '',
-            SERVER_OPEN_TIME: configServerOpenTimeInput ? configServerOpenTimeInput.value : '19:00',
-            SERVER_CLOSE_TIME: configServerCloseTimeInput ? configServerCloseTimeInput.value : '23:59',
-            MESSAGES_DURING_SERVER_OPEN: configMessagesDuringServerOpenInput ? parseInt(configMessagesDuringServerOpenInput.value, 10) : 0,
-            MESSAGES_DURING_DAYTIME: configMessagesDuringDaytimeInput ? parseInt(configMessagesDuringDaytimeInput.value, 10) : 0,
-            DAYTIME_START_HOUR: configDaytimeStartHourInput ? parseInt(configDaytimeStartHourInput.value, 10) : 0,
-            DAYTIME_END_HOUR: configDaytimeEndHourInput ? parseInt(configDaytimeEndHourInput.value, 10) : 0,
-            CHAT_SUMMARY_TIMES: configChatSummaryTimesInput ? configChatSummaryTimesInput.value.trim() : '',
-            CHAT_SUMMARY_COUNT_PER_DAY: configChatSummaryCountPerDayInput ? parseInt(configChatSummaryCountPerDayInput.value, 10) : 3
-        };
-        
-        let validationError = false;
-        if (updatedConfig.DAYTIME_START_HOUR < 0 || updatedConfig.DAYTIME_START_HOUR > 23 ||
-            updatedConfig.DAYTIME_END_HOUR < 0 || updatedConfig.DAYTIME_END_HOUR > 23) {
-            showFormMessage(responseMessageConfigDiv, 'Hora diurna deve ser entre 0 e 23.', true);
-            validationError = true;
-        }
-        if (updatedConfig.MESSAGES_DURING_SERVER_OPEN < 0 || updatedConfig.MESSAGES_DURING_DAYTIME < 0) {
-            showFormMessage(responseMessageConfigDiv, 'Quantidade de mensagens não pode ser negativa.', true);
-            validationError = true;
-        }
-        
-        if (validationError) return;
+            // Iterar sobre as chaves DEFAULTS do ConfigService (ou uma lista similar no frontend)
+            // para garantir que todos os campos sejam processados, especialmente checkboxes.
+            const allConfigKeys = [ // Mantenha esta lista sincronizada com as chaves em DEFAULTS no ConfigService
+                'EVOLUTION_API_URL', 'INSTANCE_NAME', 'EVOLUTION_API_KEY', 'GROQ_API_KEY',
+                'TARGET_GROUP_ID', 'GROUP_BASE_NAME', 'SERVER_OPEN_TIME', 'SERVER_CLOSE_TIME',
+                'TIMEZONE', 'MESSAGES_DURING_SERVER_OPEN', 'MESSAGES_DURING_DAYTIME',
+                'DAYTIME_START_HOUR', 'DAYTIME_END_HOUR', 'CHAT_SUMMARY_TIMES',
+                'BOT_WEBHOOK_PORT', 'BOT_PUBLIC_URL', 'POLL_MENTION_EVERYONE',
+                'CHAT_SUMMARY_ENABLED', 'CHAT_SUMMARY_COUNT_PER_DAY'
+            ];
 
-        try {
-            const response = await fetch('/admin/api/config', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedConfig),
+            allConfigKeys.forEach(key => {
+                const inputElement = document.getElementById(`config_${key}`);
+                if (inputElement) {
+                    if (inputElement.type === 'checkbox') {
+                        configData[key] = inputElement.checked;
+                    } else if (inputElement.type === 'number') {
+                        configData[key] = inputElement.value === '' ? null : Number(inputElement.value);
+                    } else if (key === 'CHAT_SUMMARY_TIMES') {
+                        configData[key] = inputElement.value.split(',').map(s => s.trim()).filter(s => s);
+                    } else {
+                        configData[key] = inputElement.value;
+                    }
+                } else {
+                    // Se o campo não estiver no formulário (ex: gerenciado apenas por .env),
+                    // não o envie, para que o backend use o valor existente ou default.
+                    // Ou, se você quiser enviar todos os valores conhecidos:
+                    // if (formData.has(key)) { configData[key] = formData.get(key); }
+                    // console.warn(`Elemento de formulário config_${key} não encontrado.`);
+                }
             });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                showGlobalMessage(result.message || 'Configurações salvas com sucesso!');
-                loadConfig();
-            } else {
-                throw new Error(result.message || 'Falha ao salvar configurações.');
+            
+            // Adicionar campos que podem não estar diretamente em allConfigKeys mas são parte do form
+            // (embora o ideal seja que allConfigKeys seja completo)
+            formData.forEach((value, key) => {
+                if (!configData.hasOwnProperty(key)) { // Se não foi processado por allConfigKeys
+                     const inputElement = configForm.elements[key];
+                     if (inputElement && inputElement.type === 'checkbox') {
+                         configData[key] = inputElement.checked;
+                     } else if (inputElement && inputElement.type === 'number') {
+                         configData[key] = value === '' ? null : Number(value);
+                     } else if (key === 'CHAT_SUMMARY_TIMES') {
+                         configData[key] = value.split(',').map(s => s.trim()).filter(s => s);
+                     } else {
+                         configData[key] = value;
+                     }
+                }
+            });
+
+
+            console.log("Admin.js: Enviando dados de configuração para /admin/api/config:", JSON.stringify(configData, null, 2));
+
+            try {
+                const response = await fetch('/admin/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(configData),
+                });
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showGlobalMessage(result.message || 'Configurações gerais salvas com sucesso!');
+                    if (result.config) {
+                        console.log("Admin.js: Configurações atualizadas recebidas do backend, recarregando formulário.");
+                        // Repopular o formulário com os dados confirmados pelo backend
+                        Object.keys(result.config).forEach(k => {
+                            const el = document.getElementById(`config_${k}`);
+                            if (el) {
+                                if (el.type === 'checkbox') el.checked = !!result.config[k];
+                                else if (k === 'CHAT_SUMMARY_TIMES' && Array.isArray(result.config[k])) el.value = result.config[k].join(',');
+                                else el.value = result.config[k] ?? '';
+                            }
+                        });
+                    }
+                } else {
+                    throw new Error(result.message || 'Falha ao salvar configurações gerais.');
+                }
+            } catch (error) {
+                console.error('Erro ao salvar configurações gerais:', error);
+                showFormMessage(responseMessageConfigDiv, `Erro: ${error.message}`, true);
             }
-        } catch (error) {
-            console.error('Erro ao salvar configurações:', error);
-            responseMessageConfigDiv.textContent = `Erro ao salvar: ${error.message}`;
-            responseMessageConfigDiv.className = 'response-message error';
-        }
-    });
+        });
+    }
 
     // Função genérica para lidar com cliques nos botões de gerar IA
     async function handleGenerateAIMessageClick(event) {
