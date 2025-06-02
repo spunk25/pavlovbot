@@ -35,47 +35,77 @@ const DEFAULTS = {
 let currentConfig = { ...DEFAULTS }; // Inicializa com padrões
 let onConfigChangeCallback = null;
 
+// Função auxiliar para converter valor para o tipo esperado
+function convertToType(value, targetType, defaultValue, keyName) {
+    if (value === undefined || value === null) return defaultValue;
+
+    if (targetType === 'number') {
+        const num = parseInt(value, 10);
+        return isNaN(num) ? defaultValue : num;
+    }
+    if (targetType === 'boolean') {
+        return String(value).toLowerCase() === 'true';
+    }
+    if (keyName === 'CHAT_SUMMARY_TIMES') { // Caso especial para array de strings
+        if (typeof value === 'string') {
+            return value.split(',').map(t => t.trim()).filter(t => t);
+        }
+        if (Array.isArray(value)) {
+            return value.map(t => String(t).trim()).filter(t => t);
+        }
+        return defaultValue;
+    }
+    return String(value); // Default to string
+}
+
 async function loadConfig() {
     console.log("ConfigService: Iniciando carregamento de configurações...");
+    let loadedConfigFromDB = {};
     try {
         const db = await DatabaseService.getDb();
         const collection = db.collection(CONFIG_COLLECTION_NAME);
-        const dbConfig = await collection.findOne({ _id: CONFIG_DOC_ID });
+        const dbConfigDocument = await collection.findOne({ _id: CONFIG_DOC_ID });
 
-        if (dbConfig) {
+        if (dbConfigDocument) {
             console.log("ConfigService: Configuração encontrada no MongoDB.");
-            // Remove _id de dbConfig antes de fazer o merge para não sobrescrever DEFAULTS._id se existir
-            const { _id, ...configFromDb } = dbConfig;
-            currentConfig = { ...DEFAULTS, ...configFromDb };
-
-            // Garantir tipos corretos após carregar do DB
-            Object.keys(DEFAULTS).forEach(key => {
-                if (currentConfig[key] === undefined) { // Se uma nova chave default foi adicionada e não está no DB
-                    currentConfig[key] = DEFAULTS[key];
-                } else if (typeof DEFAULTS[key] === 'number') {
-                    currentConfig[key] = parseInt(currentConfig[key], 10);
-                    if (isNaN(currentConfig[key])) currentConfig[key] = DEFAULTS[key];
-                } else if (typeof DEFAULTS[key] === 'boolean') {
-                    currentConfig[key] = String(currentConfig[key]).toLowerCase() === 'true';
-                } else if (key === 'CHAT_SUMMARY_TIMES') {
-                    if (typeof currentConfig[key] === 'string') {
-                        currentConfig[key] = currentConfig[key].split(',').map(t => t.trim()).filter(t => t);
-                    } else if (!Array.isArray(currentConfig[key])) {
-                        currentConfig[key] = DEFAULTS[key]; // Fallback para o array padrão
-                    }
-                }
-            });
+            const { _id, ...configDataFromDb } = dbConfigDocument; // Exclui _id
+            loadedConfigFromDB = configDataFromDb;
         } else {
             console.warn(`ConfigService: Nenhuma configuração encontrada no MongoDB para ID '${CONFIG_DOC_ID}'. Usando e salvando padrões.`);
-            currentConfig = { ...DEFAULTS };
-            await collection.insertOne({ _id: CONFIG_DOC_ID, ...currentConfig });
+            // Salva os DEFAULTS no DB se não existir configuração
+            await collection.insertOne({ _id: CONFIG_DOC_ID, ...DEFAULTS });
             console.log("ConfigService: Configurações padrão salvas no MongoDB.");
+            // currentConfig já está como DEFAULTS, então não precisa mudar
+            console.log("ConfigService: Configuração final carregada (padrões):", JSON.stringify(currentConfig, null, 2));
+            return currentConfig;
         }
-        console.log("ConfigService: Configuração final carregada:", JSON.stringify(currentConfig, null, 2));
     } catch (error) {
         console.error("ConfigService: Erro ao carregar configuração do MongoDB. Usando padrões em memória.", error);
-        currentConfig = { ...DEFAULTS }; // Fallback para padrões em caso de erro grave
+        // Em caso de erro de leitura, currentConfig permanece como DEFAULTS
+        console.log("ConfigService: Configuração final carregada (padrões devido a erro):", JSON.stringify(currentConfig, null, 2));
+        return currentConfig;
     }
+
+    // Merge DEFAULTS com o que foi carregado do DB, priorizando o DB.
+    // E garante a conversão de tipos para todos os campos.
+    const newEffectiveConfig = {};
+    for (const key in DEFAULTS) {
+        if (Object.prototype.hasOwnProperty.call(DEFAULTS, key)) {
+            const dbValue = loadedConfigFromDB[key];
+            const defaultValue = DEFAULTS[key];
+            const targetType = typeof defaultValue;
+
+            // Se o valor do DB existir, use-o (após conversão), senão use o default.
+            newEffectiveConfig[key] = convertToType(
+                dbValue !== undefined ? dbValue : defaultValue,
+                targetType,
+                defaultValue,
+                key
+            );
+        }
+    }
+    currentConfig = newEffectiveConfig;
+    console.log("ConfigService: Configuração final carregada (após merge DB e defaults):", JSON.stringify(currentConfig, null, 2));
     return currentConfig;
 }
 
@@ -146,56 +176,30 @@ function getConfig() {
 async function updateConfig(newConfigDataFromForm) {
     console.log("ConfigService: Recebido para atualização (dados do formulário):", JSON.stringify(newConfigDataFromForm, null, 2));
     
-    const oldConfigSnapshot = { ...currentConfig };
     let timeSettingsChanged = false;
-    
-    // Crie uma cópia para modificação, começando com os padrões para garantir que todas as chaves existam
-    let processedConfig = { ...DEFAULTS }; 
+    const updatedConfigSnapshot = { ...currentConfig }; // Começa com a config atual (já processada)
 
-    // Mescle com a configuração atual em memória (que pode ter vindo do DB)
-    processedConfig = { ...processedConfig, ...currentConfig };
-
-    // Agora, mescle com os novos dados do formulário, aplicando conversões de tipo
-    for (const key in newConfigDataFromForm) {
-        if (Object.prototype.hasOwnProperty.call(newConfigDataFromForm, key)) {
-            let formValue = newConfigDataFromForm[key];
-            let defaultValueType = typeof DEFAULTS[key];
-            let targetValue = formValue; // Valor que será atribuído
-
-            if (DEFAULTS[key] !== undefined) { // Processa apenas chaves conhecidas (presentes em DEFAULTS)
-                if (defaultValueType === 'number') {
-                    targetValue = parseInt(formValue, 10);
-                    if (isNaN(targetValue)) targetValue = DEFAULTS[key]; // Fallback se NaN
-                } else if (defaultValueType === 'boolean') {
-                    targetValue = String(formValue).toLowerCase() === 'true' || formValue === true;
-                } else if (key === 'CHAT_SUMMARY_TIMES') {
-                    if (typeof formValue === 'string') {
-                        targetValue = formValue.split(',').map(t => t.trim()).filter(t => t);
-                    } else if (!Array.isArray(formValue)) { // Se não for string nem array, usa o default
-                        targetValue = DEFAULTS[key];
-                    }
-                }
-                // Strings e outros tipos são atribuídos diretamente
+    for (const key in DEFAULTS) { // Itera sobre as chaves conhecidas/esperadas
+        if (Object.prototype.hasOwnProperty.call(DEFAULTS, key)) {
+            if (Object.prototype.hasOwnProperty.call(newConfigDataFromForm, key)) { // Se o formulário enviou esta chave
+                const formValue = newConfigDataFromForm[key];
+                const defaultValue = DEFAULTS[key];
+                const targetType = typeof defaultValue;
                 
-                if (processedConfig[key] !== targetValue) {
-                    processedConfig[key] = targetValue;
+                const processedValue = convertToType(formValue, targetType, defaultValue, key);
+
+                if (updatedConfigSnapshot[key] !== processedValue) {
+                    updatedConfigSnapshot[key] = processedValue;
                     if (['SERVER_OPEN_TIME', 'SERVER_CLOSE_TIME', 'TIMEZONE', 'CHAT_SUMMARY_TIMES', 'DAYTIME_START_HOUR', 'DAYTIME_END_HOUR'].includes(key)) {
                         timeSettingsChanged = true;
                     }
                 }
             }
-        }
-    }
-    
-    // Garante que todas as chaves de DEFAULTS estejam presentes, caso alguma tenha sido omitida no formulário
-    // e não estivesse no currentConfig (improvável com a lógica acima, mas seguro).
-    for (const key in DEFAULTS) {
-        if (processedConfig[key] === undefined) {
-            processedConfig[key] = DEFAULTS[key];
+            // Se a chave não veio do formulário, updatedConfigSnapshot[key] mantém seu valor atual (de currentConfig)
         }
     }
 
-    currentConfig = processedConfig; // Atualiza o cache interno
+    currentConfig = updatedConfigSnapshot; // Atualiza o cache interno
     console.log("ConfigService: Configuração após merge e conversão (pronta para salvar):", JSON.stringify(currentConfig, null, 2));
 
     try {
@@ -207,7 +211,7 @@ async function updateConfig(newConfigDataFromForm) {
 
         const result = await collection.updateOne(
             { _id: CONFIG_DOC_ID },
-            { $set: configToSetInDb },
+            { $set: configToSetInDb }, // Salva o currentConfig completo (sem _id)
             { upsert: true }
         );
         console.log("ConfigService: Resultado da atualização no MongoDB:", JSON.stringify(result, null, 2));
@@ -217,21 +221,20 @@ async function updateConfig(newConfigDataFromForm) {
         } else if (result.matchedCount > 0 && result.modifiedCount === 0) {
             console.log("ConfigService: Configuração no MongoDB já estava atualizada (nenhuma alteração nos valores).");
         } else {
-            console.warn("ConfigService: Configuração não foi salva no MongoDB (nem modificada, nem inserida). Verifique o filtro e os dados.");
+            // Isso pode acontecer se o upsert falhar em criar o documento pela primeira vez e não houver match.
+            console.warn("ConfigService: Configuração não foi salva no MongoDB (nem modificada, nem inserida). Verifique o filtro e os dados. Resultado:", result);
         }
         
         if (onConfigChangeCallback) {
-            // Notifica mesmo se não houve alteração no DB, pois a intenção de salvar existiu
-            // e o estado em memória (currentConfig) foi atualizado.
             onConfigChangeCallback(currentConfig, timeSettingsChanged);
         }
 
     } catch (error) {
         console.error("ConfigService: Erro ao salvar configuração no MongoDB:", error);
-        // Considerar reverter currentConfig para oldConfigSnapshot em caso de falha crítica no salvamento.
-        // currentConfig = oldConfigSnapshot; // Exemplo de rollback em memória
+        // Não reverta currentConfig aqui, pois a intenção do usuário era atualizar.
+        // O erro de salvamento deve ser tratado (ex: notificar o usuário).
     }
-    return currentConfig;
+    return currentConfig; // Retorna a configuração atualizada (mesmo que o salvamento falhe)
 }
 
 function setOnConfigChange(callback) {
