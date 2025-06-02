@@ -815,15 +815,22 @@ function setupCronJobs() {
 
       try {
           console.log(`[scheduleJob] Tentando agendar "${name}". Cron: "${cronExpression}"`);
-          const task = cron.schedule(cronExpression, async () => {
+          const task = cron.schedule(
+            cronExpression,
+            async () => {
               try {
-                  console.log(`Executando tarefa agendada: ${name}`);
-                  await action();
-                  console.log(`Tarefa "${name}" concluída.`);
+                console.log(`Executando tarefa agendada: ${name}`);
+                await action();
+                console.log(`Tarefa "${name}" concluída.`);
               } catch (taskError) {
-                  console.error(`Erro na tarefa "${name}":`, taskError);
+                console.error(`Erro na tarefa "${name}":`, taskError);
               }
-          });
+            },
+            {
+              scheduled: true,
+              timezone: botConfig.TIMEZONE // America/Sao_Paulo
+            }
+          );
 
           if (task) {
               // calcula próxima execução via cron-parser
@@ -956,6 +963,10 @@ function setupCronJobs() {
 
   console.log("Cron jobs configurados e iniciados.");
   logCronJobs();
+
+  // Dentro de setupCronJobs, logo após parseTime dos horários:
+  console.log(`[DEBUG] SERVER_OPEN_TIME: ${SERVER_OPEN_TIME} => ${openHour}:${openMinute}`);
+  console.log(`[DEBUG] SERVER_CLOSE_TIME: ${SERVER_CLOSE_TIME} => ${closeHour}:${closeMinute}`);
 }
 
 function logCronJobs() {
@@ -1248,8 +1259,7 @@ async function callGroqAPI(prompt) {
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
       ],
-      temperature: 0.8,
-      max_tokens: 80,
+      temperature: 0.8    
     }, {
       headers: {
         'Authorization': `Bearer ${botConfig.GROQ_API_KEY}`,
@@ -1878,10 +1888,8 @@ async function triggerChatSummary() {
   console.log(`Tentando gerar resumo para ${currentChatToSummarize.length} mensagens.`);
   const summary = await callGroqAPI(prompt);
 
-  const summaryTitleText = messages.chatSummary?.summaryTitle || "📢 *Resenha da Rodada (Fofocas do Front):*";
-
   if (summary && !summary.startsWith("Erro") && !summary.startsWith("Não foi possível") && summary.length > 10) {
-    await sendMessageToGroup(`${summaryTitleText}\n\n${summary}`, botConfig.TARGET_GROUP_ID);
+    await sendMessageToGroup(`${summary}`, botConfig.TARGET_GROUP_ID);
     console.log("Resumo do chat enviado ao grupo.");
   } else {
     console.warn("Falha ao gerar resumo do chat ou resumo inválido:", summary);

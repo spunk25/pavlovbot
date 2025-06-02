@@ -50,8 +50,7 @@
       " Sextou no servidor! Hoje vale até errar e culpar o amigo."
     ]
   },
-  "chatSummary": {
-    "summaryTitle": "📢 *Resenha da Rodada (Fofocas do Front):*",
+  "chatSummary": { 
     "noNewMessages": "Tudo quieto no front, sem fofocas para resumir agora!"
   },
   "pavlovTips": [
@@ -87,10 +86,10 @@
   ],
   "aiPrompts": {
     "systemPrompt": "(Personalidade e estilo) Seja divertido, curto e engraçado, sempre no clima de Pavlov VR. Evite repetições de exemplos; varie as mensagens.(Contexto do jogo) Pavlov VR é um jogo de tiro em primeira pessoa para realidade virtual, apelidado de 'CS VR'. Mecânica de armas: jogadores carregam, recarregam e miram manualmente. Nosso servidor tem modo tático: um time planta a bomba e o outro tenta desarmar. O jogo roda em headsets da Meta, Quest 2 e Quest 3. Você pode mencionar esses headsets de vez em quando para contextualizar, mas não fale deles o tempo todo. (Referência a 'Fernando o meu criador') Quando o membro com número 558492091164 (Fernando) enviar uma mensagem relevante, mencione-o como 'Fernando o meu criador' apenas em resumos de chat. Não chame atenção para ele em mensagens aleatórias. (Geração de mensagens) Produza respostas curtas e leves, sempre com referências ao tema de Pavlov VR. Mantenha o tom imersivo e faça piadas relacionadas a combates, tiros e trabalho em equipe. Não explique o funcionamento do jogo em cada mensagem—use o contexto já dado.",
-    
+
     "randomActive": "Gere uma mensagem curta, divertida e original para um bot em um grupo de jogadores de Pavlov VR. Esta é uma mensagem geral, não necessariamente durante uma partida.",
     "inGameRandom": "Gere uma mensagem curta, impactante e divertida para um bot em um grupo de jogadores de Pavlov VR, especificamente para ser enviada DURANTE UMA PARTIDA. Pode ser sobre ações no jogo, provocações leves, ou algo que aumente a imersão.",
-    "chatSummary": "Você é um comentarista de e-sports para o jogo Pavlov VR, conhecido por seu humor e por capturar a essência das conversas dos jogadores. Analise o seguinte bate-papo do grupo de WhatsApp e crie um resumo curto (2-4 frases) ou ate onde for necessário para resumir as melhores partes, divertido e temático sobre os principais tópicos discutidos. Imagine que você está fazendo um 'resumo da zoeira do lobby' ou 'os destaques da resenha'. Não liste mensagens individuais, crie uma narrativa coesa e engraçada. Se for relevante para o resumo ou para dar um toque especial ao comentário, você pode mencionar o nome de quem disse algo marcante (por exemplo, 'Parece que o [NomeDoJogador] estava inspirado hoje!' ou 'O [NomeDoJogador] soltou a pérola do dia:'). Use os nomes com moderação e apenas se agregar valor. Seja criativo!\n\nChat dos Jogadores:\n{CHAT_PLACEHOLDER}\n\nResumo Criativo do Comentarista:",
+    "chatSummary": "Você é um comentarista de e-sports para o jogo Pavlov VR, conhecido por seu humor e por capturar a essência das conversas dos jogadores. Analise o seguinte bate-papo do grupo de WhatsApp e crie um resumo do tamanho que seja necessario para resumir as melhores partes, divertido e temático sobre os principais tópicos discutidos. Imagine que você está fazendo um 'resumo da zoeira do lobby' ou 'os destaques da resenha'. Não liste mensagens individuais, crie uma narrativa coesa e engraçada. Se for relevante para o resumo ou para dar um toque especial ao comentário, você pode mencionar o nome de quem disse algo marcante (por exemplo, 'Parece que o [NomeDoJogador] estava inspirado hoje!' ou 'O [NomeDoJogador] soltou a pérola do dia:'). Use os nomes com moderação e apenas se agregar valor. Seja criativo! antes de usar um pronome identifique se o nome do jogador é masculino ou feminino.\n\nChat dos Jogadores:\n{CHAT_PLACEHOLDER}\n\nResumo Criativo do Comentarista:",
     "status_closed": "Gere uma mensagem curta e informativa para o status do grupo de Pavlov VR, indicando que o servidor está FECHADO. Exemplo: Servidor fechado por hoje, pessoal. Até amanhã!",
     "status_openingSoon": "Gere uma mensagem curta e animada para o status do grupo de Pavlov VR, indicando que o servidor abrirá EM BREVE (ex: em 1 hora). Exemplo: Preparem-se! Servidor abrindo em 1 hora!",
     "status_open": "Gere uma mensagem curta e convidativa para o status do grupo de Pavlov VR, indicando que o servidor está ABERTO. Exemplo: Servidor online! Bora pro tiroteio!",
