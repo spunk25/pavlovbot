@@ -14,7 +14,7 @@ const router = express.Router();
 // Main webhook endpoint to route events
 router.post('/', async (req, res, next) => {
     const receivedPayload = req.body;
-    // console.log("[Webhook Root] Payload recebido:", JSON.stringify(receivedPayload, null, 2));
+    console.log("[Webhook Root] Payload recebido:", JSON.stringify(receivedPayload, null, 2));
 
     const instance = receivedPayload.instance;
     const innerPayload = receivedPayload; // Assuming the structure is flat or direct after initial common fields
@@ -51,7 +51,8 @@ router.post('/', async (req, res, next) => {
 
 
 router.post('/messages-upsert', async (req, res) => {
-  const fullReceivedPayload = req.body; // This is the innerPayload from the root webhook
+  const fullReceivedPayload = req.body;
+  console.log("[Webhook] /messages-upsert payload:", JSON.stringify(fullReceivedPayload, null, 2));
   const data = fullReceivedPayload.data;
   const config = ConfigService.getConfig();
 
