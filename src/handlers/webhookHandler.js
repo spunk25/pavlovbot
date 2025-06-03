@@ -37,7 +37,8 @@ router.post('/', async (req, res, next) => {
       req.url = '/connection-update';
       return next();
     }
-    if (event === 'messages.delete' || event === 'message.delete') {
+    //if 	/messages-delete
+    if (event === 'messages.delete') {
       console.log(`[Webhook Root] Evento '${event}' recebido, roteando para lógica de deleção.`);
       req.url = '/messages-update';
       return next();
