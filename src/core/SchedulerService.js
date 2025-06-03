@@ -754,20 +754,20 @@ async function initializeBotStatus() {
     }
 
     // Chat Summaries Catch-up
-    if (Array.isArray(config.CHAT_SUMMARY_TIMES)) {
-        for (const timeStr of config.CHAT_SUMMARY_TIMES) {
-            if (typeof timeStr === 'string' && timeStr.match(/^\d{2}:\d{2}$/)) {
-                const summaryTime = parseTime(timeStr);
-                const summaryTimeInMinutes = summaryTime.hour * 60 + summaryTime.minute;
-                const taskKey = `chatSummary_${timeStr.replace(":", "")}`;
-                if (timeNowMinutes >= summaryTimeInMinutes && !TaskStatusDbService.isTaskExecuted(taskKey, currentDate)) {
-                    console.log(`SchedulerService (Catch-up): Horário de resumo (${timeStr}) passou, tarefa não executada. Acionando.`);
-                    await triggerChatSummary(); // This function handles its own logic (like history check)
-                    TaskStatusDbService.setTaskExecuted(taskKey, currentDate); // Mark as attempted/done
-                }
-            }
-        }
-    }
+    // if (Array.isArray(config.CHAT_SUMMARY_TIMES)) {
+    //     for (const timeStr of config.CHAT_SUMMARY_TIMES) {
+    //         if (typeof timeStr === 'string' && timeStr.match(/^\d{2}:\d{2}$/)) {
+    //             const summaryTime = parseTime(timeStr);
+    //             const summaryTimeInMinutes = summaryTime.hour * 60 + summaryTime.minute;
+    //             const taskKey = `chatSummary_${timeStr.replace(":", "")}`;
+    //             if (timeNowMinutes >= summaryTimeInMinutes && !TaskStatusDbService.isTaskExecuted(taskKey, currentDate)) {
+    //                 console.log(`SchedulerService (Catch-up): Horário de resumo (${timeStr}) passou, tarefa não executada. Acionando.`);
+    //                 await triggerChatSummary(); // This function handles its own logic (like history check)
+    //                 TaskStatusDbService.setTaskExecuted(taskKey, currentDate); // Mark as attempted/done
+    //             }
+    //         }
+    //     }
+    // }
 
     // Special Messages Catch-up
     const SUNDAY_NIGHT_MESSAGE_TIME_DETAILS = config.SUNDAY_NIGHT_MESSAGE_TIME ? parseTime(config.SUNDAY_NIGHT_MESSAGE_TIME) : { hour: 20, minute: 0 };
