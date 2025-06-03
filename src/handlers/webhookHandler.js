@@ -24,7 +24,7 @@ router.post('/', async (req, res, next) => {
         return res.status(400).send("Payload inválido: evento ausente.");
     }
     const event = (innerPayload.event || '').toLowerCase();
-  
+    console.log(`[Webhook Root] Evento recebido: ${event}`);
     if (event === 'messages.upsert') {
       req.url  = '/messages-upsert'; // Reroute internally
       // req.body is already set
