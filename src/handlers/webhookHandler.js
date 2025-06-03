@@ -21,7 +21,7 @@ router.post('/', async (req, res, next) => {
         console.warn("[Webhook Root] Evento não encontrado no payload:", JSON.stringify(receivedPayload, null, 2));
         return res.status(400).send("Payload inválido: evento ausente.");
     }
-    console.log("--Webhook recebido! Payload:", JSON.stringify(req.body, null, 2));
+    
     const event = (innerPayload.event || '').toLowerCase();
     console.log(`[Webhook Root] Evento recebido: ${event}`);
     if (event === 'messages.upsert') {
@@ -210,6 +210,7 @@ router.post('/messages-update', async (req, res) => {
   const updatesOrDeletedItems = fullReceivedPayload.data; 
   const config = ConfigService.getConfig();
   const eventType = (fullReceivedPayload.event || '').toLowerCase();
+  console.log("WebhookHandler: Evento messages.update recebido:", JSON.stringify(fullReceivedPayload, null, 2));
 
   if (!updatesOrDeletedItems) {
     console.warn(`WebhookHandler: ${eventType} - 'data' ausente:`, JSON.stringify(fullReceivedPayload, null, 2));
