@@ -3,7 +3,7 @@ import { DEFAULT_AI_PROMPTS, DEFAULT_AI_USAGE_SETTINGS } from '../constants/aiCo
 import { getRandomElement } from '../utils/generalUtils.js'; // Assuming getRandomElement is here
 
 const MESSAGES_COLLECTION_NAME = 'message_configurations';
-const MESSAGES_DOC_ID = 'botMessageSettings';
+const MESSAGES_DOC_ID = 'botMessagesConfig';
 
 let messages = {}; // In-memory cache
 
@@ -18,14 +18,23 @@ const defaultGameTips = [
 // Helper to create a full default message structure
 function getDefaultMessageStructure() {
   return {
-    status: { open: ["Servidor Aberto! Bora jogar!"], closed: ["Servidor Fechado. Até a próxima!"], openingSoon: ["Servidor abrindo em breve!"], opening5min: ["Servidor abrindo em 5 minutos!"] },
-    newMember: ["Bem-vindo(a) ao grupo!"],
-    memberLeft: ["Um membro nos deixou."],
-    randomActive: ["Mensagem aleatória para quando o servidor está ativo!"],
-    inGameRandom: ["Mensagem aleatória para durante o jogo!"],
-    extras: { sundayNight: ["Domingo à noite, hora de Pavlov?"], friday: ["Sextou! Pavlov liberado!"] },
-    messageDeleted: ["Alguém apagou uma mensagem... O que será que era? 🤔", "Mensagem autodestruída com sucesso! 💣"],
-    gameTips: [...defaultGameTips],
+    _id: MESSAGES_DOC_ID,
+    status: {
+      closed: ["Servidor fechado por hoje! Até a próxima sessão de Pavlov VR!"],
+      openingSoon: ["Servidor abrindo em breve! Preparem seus headsets!"],
+      opening5min: ["Servidor abrindo em 5 minutos! Preparem-se!"],
+      open: ["Servidor aberto! Bora jogar Pavlov VR!"]
+    },
+    newMember: ["Bem-vindo(a) ao grupo! Que seus tiros sejam certeiros."],
+    memberLeft: ["Um operador nos deixou. Sentiremos sua falta nas trincheiras."],
+    randomActive: ["Manter a comunicação clara é a chave para a vitória no Pavlov!"],
+    inGameRandom: ["Recarregando! Cubram-me!", "Inimigo à vista!", "Plantei a bomba!"],
+    extras: {
+      sundayNight: ["Última chance de jogar Pavlov VR esta semana! Aproveitem!"],
+      friday: ["Sextou com Pavlov VR! Quem anima?"]
+    },
+    gameTips: ["Mantenha-se em movimento para não virar um alvo fácil.", "Comunicação é tudo! Use o rádio."],
+    messageDeleted: ["Alguém apagou uma mensagem... O que será que era? 🤔", "Ops, uma mensagem sumiu do mapa!"],
     aiPrompts: { ...DEFAULT_AI_PROMPTS },
     aiUsageSettings: { ...DEFAULT_AI_USAGE_SETTINGS },
     chatSummary: {
@@ -66,7 +75,7 @@ async function loadMessages() {
       messages.botInfo = { ...defaultStructure.botInfo, ...(dbMessages.botInfo || {}) };
       
       // Ensure arrays are arrays
-      const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips'];
+      const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips', 'messageDeleted'];
       arrayKeys.forEach(key => {
         if (!Array.isArray(messages[key])) {
           messages[key] = defaultStructure[key];
@@ -171,9 +180,9 @@ async function updateMessagesAndPrompts(updatedData) {
 
   // Status messages
   if (updatedData.status) {
-    if (updatedData.status.open !== undefined) processArrayField('status.open', updatedData.status.open);
     if (updatedData.status.closed !== undefined) processArrayField('status.closed', updatedData.status.closed);
     if (updatedData.status.openingSoon !== undefined) processArrayField('status.openingSoon', updatedData.status.openingSoon);
+    if (updatedData.status.open !== undefined) processArrayField('status.open', updatedData.status.open);
     if (updatedData.status.opening5min !== undefined) processArrayField('status.opening5min', updatedData.status.opening5min);
   }
 
@@ -183,6 +192,7 @@ async function updateMessagesAndPrompts(updatedData) {
   if (updatedData.randomActive !== undefined) processArrayField('randomActive', updatedData.randomActive);
   if (updatedData.inGameRandom !== undefined) processArrayField('inGameRandom', updatedData.inGameRandom);
   if (updatedData.gameTips !== undefined) processArrayField('gameTips', updatedData.gameTips);
+  if (updatedData.messageDeleted !== undefined) processArrayField('messageDeleted', updatedData.messageDeleted);
 
   // Extras
   if (updatedData.extras) {
@@ -268,7 +278,7 @@ async function replaceAllMessagesFromJSON(jsonData) {
         newMessagesData.botInfo = { ...defaultStructure.botInfo, ...(jsonData.botInfo || {}) };
 
         // Garante que campos que devem ser arrays sejam arrays
-        const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips'];
+        const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips', 'messageDeleted'];
         arrayKeys.forEach(key => {
             if (!Array.isArray(newMessagesData[key]) && defaultStructure[key]) {
                  // Se não for array e tiver um default que é array, usa o default

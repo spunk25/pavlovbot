@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiUsageInGameRandomCheckbox = document.getElementById('aiUsage_inGameRandom');
     const aiUsageExtrasSundayNightCheckbox = document.getElementById('aiUsage_extras_sundayNight');
     const aiUsageExtrasFridayCheckbox = document.getElementById('aiUsage_extras_friday');
+    const aiUsageMessageDeletedCheckbox = document.getElementById('aiUsage_messageDeleted');
 
     // Formulário de Configurações Gerais
     const configForm = document.getElementById('configForm');
@@ -86,6 +87,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearDbChatHistoryBtn = document.getElementById('clearDbChatHistoryBtn');
     const clearDbChatHistorySpinner = document.getElementById('clearDbChatHistorySpinner');
     const responseMessageChatHistoryDiv = document.getElementById('responseMessageChatHistory');
+
+    // Novos elementos para "Mensagem Apagada"
+    const messageDeletedTextarea = document.getElementById('messageDeleted');
+    const aiPromptMessageDeletedTextarea = document.getElementById('aiPrompt_messageDeleted');
 
     // --- EXTENDED DEBUGGING ---
     console.log("--- Checking Config Input Elements ---");
@@ -158,6 +163,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 gameTipsTextarea.value = Array.isArray(messages.gameTips) ? messages.gameTips.join('\n') : '';
             }
 
+            // Carregar mensagens de "Mensagem Apagada"
+            if (messageDeletedTextarea && messages.messageDeleted) {
+                messageDeletedTextarea.value = Array.isArray(messages.messageDeleted) ? messages.messageDeleted.join('\n') : (messages.messageDeleted || '');
+            }
+
             // Carregar prompts da IA
             if (messages.aiPrompts) {
                 if (aiPromptSystemPromptTextarea && messages.aiPrompts.systemPrompt !== undefined) aiPromptSystemPromptTextarea.value = messages.aiPrompts.systemPrompt;
@@ -171,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (aiPromptMemberLeftTextarea && messages.aiPrompts.memberLeft !== undefined) aiPromptMemberLeftTextarea.value = messages.aiPrompts.memberLeft;
                 if (aiPromptExtrasSundayNightTextarea && messages.aiPrompts.extras_sundayNight !== undefined) aiPromptExtrasSundayNightTextarea.value = messages.aiPrompts.extras_sundayNight;
                 if (aiPromptExtrasFridayTextarea && messages.aiPrompts.extras_friday !== undefined) aiPromptExtrasFridayTextarea.value = messages.aiPrompts.extras_friday;
+                if (aiPromptMessageDeletedTextarea && messages.aiPrompts.messageDeleted !== undefined) aiPromptMessageDeletedTextarea.value = messages.aiPrompts.messageDeleted;
             }
 
             // Carregar configurações de uso da IA
@@ -178,7 +189,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 status_closed: false, status_openingSoon: false, status_open: false,
                 newMember: false, memberLeft: false,
                 randomActive: true, inGameRandom: true,
-                extras_sundayNight: false, extras_friday: false
+                extras_sundayNight: false, extras_friday: false,
+                messageDeleted: false
             };
             const currentAiUsage = messages.aiUsageSettings || defaultAiUsage;
 
@@ -191,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (aiUsageInGameRandomCheckbox) aiUsageInGameRandomCheckbox.checked = currentAiUsage.inGameRandom !== undefined ? currentAiUsage.inGameRandom : defaultAiUsage.inGameRandom;
             if (aiUsageExtrasSundayNightCheckbox) aiUsageExtrasSundayNightCheckbox.checked = currentAiUsage.extras_sundayNight !== undefined ? currentAiUsage.extras_sundayNight : defaultAiUsage.extras_sundayNight;
             if (aiUsageExtrasFridayCheckbox) aiUsageExtrasFridayCheckbox.checked = currentAiUsage.extras_friday !== undefined ? currentAiUsage.extras_friday : defaultAiUsage.extras_friday;
+            if (aiUsageMessageDeletedCheckbox) aiUsageMessageDeletedCheckbox.checked = currentAiUsage.messageDeleted !== undefined ? currentAiUsage.messageDeleted : defaultAiUsage.messageDeleted;
 
         } catch (error) {
             console.error('Erro ao carregar mensagens:', error);
@@ -253,6 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sundayNight: extrasSundayNightInput.value.split('\n').map(s => s.trim()).filter(s => s),
                 friday: extrasFridayInput.value.split('\n').map(s => s.trim()).filter(s => s),
             },
+            messageDeleted: messageDeletedTextarea ? messageDeletedTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
             aiPrompts: {
                 systemPrompt: aiPromptSystemPromptTextarea ? aiPromptSystemPromptTextarea.value.trim() : '',
                 randomActive: aiPromptRandomActiveTextarea ? aiPromptRandomActiveTextarea.value.trim() : '',
@@ -264,7 +278,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 newMember: aiPromptNewMemberTextarea ? aiPromptNewMemberTextarea.value.trim() : '',
                 memberLeft: aiPromptMemberLeftTextarea ? aiPromptMemberLeftTextarea.value.trim() : '',
                 extras_sundayNight: aiPromptExtrasSundayNightTextarea ? aiPromptExtrasSundayNightTextarea.value.trim() : '',
-                extras_friday: aiPromptExtrasFridayTextarea ? aiPromptExtrasFridayTextarea.value.trim() : ''
+                extras_friday: aiPromptExtrasFridayTextarea ? aiPromptExtrasFridayTextarea.value.trim() : '',
+                messageDeleted: aiPromptMessageDeletedTextarea ? aiPromptMessageDeletedTextarea.value.trim() : ''
             },
             aiUsageSettings: {
                 status_closed: aiUsageStatusClosedCheckbox ? aiUsageStatusClosedCheckbox.checked : false,
@@ -275,7 +290,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 randomActive: aiUsageRandomActiveCheckbox ? aiUsageRandomActiveCheckbox.checked : true, // Default true
                 inGameRandom: aiUsageInGameRandomCheckbox ? aiUsageInGameRandomCheckbox.checked : true, // Default true
                 extras_sundayNight: aiUsageExtrasSundayNightCheckbox ? aiUsageExtrasSundayNightCheckbox.checked : false,
-                extras_friday: aiUsageExtrasFridayCheckbox ? aiUsageExtrasFridayCheckbox.checked : false
+                extras_friday: aiUsageExtrasFridayCheckbox ? aiUsageExtrasFridayCheckbox.checked : false,
+                messageDeleted: aiUsageMessageDeletedCheckbox ? aiUsageMessageDeletedCheckbox.checked : false
             }
         };
 

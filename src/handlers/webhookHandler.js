@@ -220,7 +220,7 @@ router.post('/messages-update', async (req, res) => {
   const itemsToProcess = Array.isArray(updatesOrDeletedItems) ? updatesOrDeletedItems : [updatesOrDeletedItems];
 
   if (itemsToProcess.length === 0) {
-    console.warn(`WebhookHandler: ${eventType} - 'data' está vazio ou não é um array processável.`);
+    console.warn(`WebhookHandler: ${eventType} - 'data' está vazio ou não é um array processável. Payload original:`, JSON.stringify(fullReceivedPayload, null, 2));
     return res.status(200).send(`${eventType} processado, nenhum item válido em 'data'.`);
   }
   
@@ -247,34 +247,40 @@ router.post('/messages-update', async (req, res) => {
     if (isMessageEffectivelyDeleted && key.remoteJid === config.TARGET_GROUP_ID && !key.fromMe) {
       console.log(`WebhookHandler: Mensagem apagada (evento: ${eventType}) detectada no grupo ${key.remoteJid}. Key:`, JSON.stringify(key));
 
-      const originalSenderJid = item.participant || key.participant || key.remoteJid;
-      let senderName = originalSenderJid.split('@')[0]; 
+      const originalSenderJid = item.participant || key.participant; // key.remoteJid seria o grupo aqui
+      let senderName = originalSenderJid ? originalSenderJid.split('@')[0] : 'Alguém'; 
 
-      if (item.pushName) {
+      // Tenta obter o pushName do item, que pode estar associado ao 'participant'
+      // O payload de 'messages.delete' pode não ter pushName no mesmo nível que 'messages.upsert'
+      // Se 'item' é o 'data' do evento 'messages.delete', ele pode ter 'pushName' se a API o fornecer nesse contexto.
+      // Para 'messages.upsert' com 'message: null', o 'pushName' estaria no 'data' original do upsert.
+      // Esta lógica assume que 'item.pushName' pode existir.
+      if (item.pushName && item.pushName.trim() !== '') {
         senderName = item.pushName;
       }
       
       const messagesConfig = MessageService.getMessages();
-      const useAI = messagesConfig.aiUsageSettings?.messageDeleted;
+      const useAI = MessageService.getAIUsageSetting('messageDeleted') && config.GROQ_API_KEY;
       let replyText = "";
 
-      if (useAI && config.GROQ_API_KEY) {
+      if (useAI) {
         let prompt = MessageService.getAIPrompt('messageDeleted') || DEFAULT_AI_PROMPTS.messageDeleted;
-        prompt = prompt.replace(/\[NomeDoRemetente\]/gi, senderName);
+        prompt = prompt.replace(/{SENDER_NAME}/gi, senderName); // Usando {SENDER_NAME} como placeholder
 
         console.log(`WebhookHandler: Gerando mensagem de IA para mensagem apagada por ${senderName}. Prompt: ${prompt}`);
         replyText = await GroqApiService.callGroqAPI(prompt);
-        if (replyText.startsWith("Erro:") || replyText.startsWith("Não foi possível")) {
+        if (!replyText || replyText.startsWith("Erro:") || replyText.startsWith("Não foi possível") || replyText.length < 5) {
             console.warn("WebhookHandler: Falha ao gerar mensagem de IA para mensagem apagada, usando fallback.", replyText);
-            replyText = getRandomElement(messagesConfig.messageDeleted) || "Uma mensagem foi apagada... Mistério! 🤫";
+            replyText = getRandomElement(messagesConfig.messageDeleted) || `Ih, ${senderName} apagou uma mensagem! Que mistério... 🤫`;
         }
       } else {
-        replyText = getRandomElement(messagesConfig.messageDeleted) || "Uma mensagem foi apagada... Mistério! 🤫";
+        replyText = getRandomElement(messagesConfig.messageDeleted) || `Vish, ${senderName} apagou uma mensagem!`;
       }
       
-      if (!replyText.toLowerCase().includes(senderName.toLowerCase()) && !useAI) {
-          const prefixOptions = ["Eita, ", "Vish, ", "Olha só, "];
-          const suffixOptions = [" apagou uma mensagem!", " fez uma mensagem sumir!", " escondeu algo!"];
+      // Garante que o nome do remetente seja incluído se não estiver e não for IA (ou se a IA falhar em incluí-lo)
+      if (!replyText.toLowerCase().includes(senderName.toLowerCase())) {
+          const prefixOptions = ["Eita, ", "Vish, ", "Olha só, ", "Ops, "];
+          const suffixOptions = [" apagou uma mensagem!", " fez uma mensagem sumir!", " escondeu algo que disse!", " deletou o que escreveu."];
           replyText = `${getRandomElement(prefixOptions)}${senderName}${getRandomElement(suffixOptions)}`;
       }
 

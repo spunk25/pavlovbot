@@ -294,6 +294,6 @@ export default {
   getGroupMetadata,
   getGroupParticipants,
   isUserAdmin,
-  isFromMe,
-  getLatestGroupMessages
+  isFromMe
+  // ,getLatestGroupMessages
 }; 

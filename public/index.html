@@ -241,17 +241,19 @@
                 <div class="form-group-column">
                     <h3>Mensagens de "Mensagem Apagada"</h3>
                     <p class="text-xs text-gray-500 mb-2">Mensagens enviadas quando um usuário apaga uma mensagem no grupo.</p>
-                    <div class="form-group">
-                        <label for="messageDeleted">Textos para "Mensagem Apagada" (um por linha):</label>
+                    <div class="message-config-group">
+                        <label for="messageDeleted" class="message-type-label">Textos para "Mensagem Apagada" (um por linha):</label>
                         <textarea id="messageDeleted" name="messageDeleted" rows="3" placeholder="Ex: Ops, sumiu!"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <input type="checkbox" id="aiUsage_messageDeleted" name="aiUsage_messageDeleted">
-                        <label for="aiUsage_messageDeleted">Usar IA para gerar mensagem de "Mensagem Apagada"?</label>
-                    </div>
-                     <div class="form-group">
-                        <button type="button" class="generate-ai-btn" data-target-textarea="messageDeleted" data-prompt-type="messageDeleted">Gerar com IA (Mensagem Apagada)</button>
-                        <div class="ai-spinner" id="aiSpinner_messageDeleted" style="display: none;">Gerando...</div>
+                        <div class="message-options">
+                            <div class="ai-manual-generate">
+                                <button type="button" class="generate-ai-btn" data-message-type="messageDeleted">Sugerir com IA</button>
+                                <div id="aiSpinner_messageDeleted" class="ai-spinner" style="display: none;">Gerando...</div>
+                            </div>
+                            <div class="ai-auto-toggle">
+                                 <input type="checkbox" id="aiUsage_messageDeleted" name="aiUsage_messageDeleted">
+                                 <label for="aiUsage_messageDeleted" class="checkbox-label">Usar IA automaticamente</label>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
