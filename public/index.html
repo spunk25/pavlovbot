@@ -52,13 +52,18 @@
                     <label for="config_DAYTIME_END_HOUR">Fim Horário Diurno (0-23):</label>
                     <input type="number" id="config_DAYTIME_END_HOUR" name="DAYTIME_END_HOUR" min="0" max="23">
                 </div>
-                
-                <!-- Se quiser permitir edição da chave Groq via painel (menos seguro)
+
+                <h3>Mensagens Automáticas (Dicas e Piadas)</h3>
                 <div class="form-group">
-                    <label for="config_GROQ_API_KEY">Chave API Groq (Opcional - Prioriza .env):</label>
-                    <input type="password" id="config_GROQ_API_KEY" name="GROQ_API_KEY">
+                    <label for="config_MESSAGES_TIPS_PER_DAY">Qtd. Dicas de Jogo por Dia:</label>
+                    <input type="number" id="config_MESSAGES_TIPS_PER_DAY" name="MESSAGES_TIPS_PER_DAY" min="0">
                 </div>
-                -->
+                <div class="form-group">
+                    <label for="config_MESSAGES_JOKES_PER_DAY">Qtd. Piadas por Dia:</label>
+                    <input type="number" id="config_MESSAGES_JOKES_PER_DAY" name="MESSAGES_JOKES_PER_DAY" min="0">
+                </div>
+                
+                <h3>Funcionalidades Adicionais</h3>
                 <div class="form-group">
                     <label for="config_CHAT_SUMMARY_COUNT_PER_DAY">Qtd. Resumos do Chat por Dia:</label>
                     <input type="number" id="config_CHAT_SUMMARY_COUNT_PER_DAY" name="CHAT_SUMMARY_COUNT_PER_DAY" min="1" max="24">
@@ -206,6 +211,22 @@
                         </div>
                     </div>
                     -->
+                </div>
+
+                <h3>Piadas Aleatórias</h3>
+                <div class="message-config-group">
+                    <label for="randomJokes" class="message-type-label">Piadas (uma por linha):</label>
+                    <textarea id="randomJokes" name="randomJokes" rows="8" placeholder="Digite as piadas aqui, uma por linha..."></textarea>
+                    <div class="message-options">
+                        <div class="ai-manual-generate">
+                            <button type="button" class="generate-ai-btn" data-message-type="randomJoke">Sugerir Piada com IA</button>
+                            <div id="aiSpinner_randomJoke" class="ai-spinner" style="display: none;">Gerando...</div>
+                        </div>
+                        <div class="ai-auto-toggle">
+                            <input type="checkbox" id="aiUsage_randomJoke" name="aiUsage_randomJoke">
+                            <label for="aiUsage_randomJoke" class="checkbox-label">Usar IA automaticamente</label>
+                        </div>
+                    </div>
                 </div>
 
                 <h3>Extras</h3>

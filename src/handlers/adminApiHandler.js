@@ -20,6 +20,7 @@ router.get('/messages', (req, res) => {
     inGameRandom: messages.inGameRandom || [],
     extras: messages.extras || {},
     gameTips: messages.gameTips || [],
+    randomJokes: messages.randomJokes || [],
     aiPrompts: messages.aiPrompts || {},
     messageDeleted: messages.messageDeleted || [],
     aiUsageSettings: messages.aiUsageSettings || {},

@@ -15,8 +15,12 @@ let fiveMinBeforeOpenDetails = { hour: 18, minute: 55 };
 
 let serverOpenMessagesSent = 0;
 let daytimeMessagesSent = 0;
+let gameTipsSentToday = 0;
+let jokesSentToday = 0; // New counter for jokes
 let serverOpenMessageTimeoutId = null;
 let daytimeMessageTimeoutId = null;
+let gameTipTimeoutId = null;
+let jokeTimeoutId = null; // New timeout for jokes
 
 let chatSummaryCountToday = 0;
 let lastChatSummaryDate = null; // For daily reset of chatSummaryCountToday
@@ -292,9 +296,6 @@ async function getAIRandomMessage() {
   const useAI = MessageService.getAIUsageSetting('randomActive') && config.GROQ_API_KEY;
 
   if (useAI) {
-    if (Math.random() < 0.3 && messagesAll.gameTips && messagesAll.gameTips.length > 0) {
-      return getRandomElement(messagesAll.gameTips);
-    }
     let promptContext = MessageService.getAIPrompt('randomActive');
     const exampleMessages = messagesAll.randomActive || [];
     if (exampleMessages.length > 0) {
@@ -309,9 +310,6 @@ async function getAIRandomMessage() {
   if (messagesAll.randomActive && messagesAll.randomActive.length > 0) {
     return getRandomElement(messagesAll.randomActive);
   }
-  if (messagesAll.gameTips && messagesAll.gameTips.length > 0) {
-    return getRandomElement(messagesAll.gameTips);
-  }
   return "Bora jogar um Pavlov maroto?";
 }
 
@@ -321,9 +319,6 @@ async function getAIInGameMessage() {
   const useAI = MessageService.getAIUsageSetting('inGameRandom') && config.GROQ_API_KEY;
 
   if (useAI) {
-    if (Math.random() < 0.3 && messagesAll.gameTips && messagesAll.gameTips.length > 0) {
-      return getRandomElement(messagesAll.gameTips);
-    }
     let promptContext = MessageService.getAIPrompt('inGameRandom');
     const exampleMessages = messagesAll.inGameRandom || [];
      if (exampleMessages.length > 0) {
@@ -338,61 +333,129 @@ async function getAIInGameMessage() {
   if (messagesAll.inGameRandom && messagesAll.inGameRandom.length > 0) {
     return getRandomElement(messagesAll.inGameRandom);
   }
-  if (messagesAll.gameTips && messagesAll.gameTips.length > 0) {
-    return getRandomElement(messagesAll.gameTips);
-  }
   return "Foco no objetivo, time!";
 }
 
+async function getGameTipMessage() {
+    const config = ConfigService.getConfig();
+    const messagesAll = MessageService.getMessages();
+    const useAI = MessageService.getAIUsageSetting('gameTips') && config.GROQ_API_KEY;
+
+    if (useAI) {
+        const promptContext = MessageService.getAIPrompt('gameTips');
+        if (promptContext) {
+            const generatedMessage = await GroqApiService.callGroqAPI(promptContext);
+            if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
+                return generatedMessage;
+            }
+        }
+    }
+    if (messagesAll.gameTips && messagesAll.gameTips.length > 0) {
+        return getRandomElement(messagesAll.gameTips);
+    }
+    return "Lembre-se: comunicação é a chave para a vitória!";
+}
+
+async function getAIJokeMessage() {
+    const messagesAll = MessageService.getMessages();
+    const useAI = MessageService.getAIUsageSetting('randomJoke');
+
+    if (useAI) {
+        const prompt = MessageService.getAIPrompt('randomJoke');
+        if (prompt) {
+            const generatedMessage = await GroqApiService.callGroqAPI(prompt);
+            if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
+                return generatedMessage;
+            }
+        }
+    }
+    if (messagesAll.randomJokes && messagesAll.randomJokes.length > 0) {
+        return getRandomElement(messagesAll.randomJokes);
+    }
+    return "Qual é o cúmulo da velocidade? Cair de um prédio e passar por um F-18.";
+}
 
 async function scheduleNextRandomMessage(type) {
   const config = ConfigService.getConfig();
-  let delay;
+  let delay, messageGetter, sentCounter, maxMessages, timeoutIdRef, setTimeoutId;
 
-  if (type === 'serverOpen') {
-    if (serverOpenMessagesSent >= config.MESSAGES_DURING_SERVER_OPEN) return;
-    delay = calculateRandomDelay(10, 30); // minutes
-  } else if (type === 'daytime') {
-    if (daytimeMessagesSent >= config.MESSAGES_DURING_DAYTIME) return;
-    delay = calculateRandomDelay(60, 120); // minutes
-  } else {
-    return;
+  switch (type) {
+    case 'serverOpen':
+      maxMessages = config.MESSAGES_DURING_SERVER_OPEN || 3;
+      if (serverOpenMessagesSent >= maxMessages) return;
+      delay = calculateRandomDelay(config.SERVER_OPEN_MSG_MIN_INTERVAL || 10, config.SERVER_OPEN_MSG_MAX_INTERVAL || 30);
+      messageGetter = getAIInGameMessage;
+      break;
+    case 'daytime':
+      maxMessages = config.MESSAGES_DURING_DAYTIME || 5;
+      if (daytimeMessagesSent >= maxMessages) return;
+      delay = calculateRandomDelay(config.DAYTIME_MSG_MIN_INTERVAL || 60, config.DAYTIME_MSG_MAX_INTERVAL || 120);
+      messageGetter = getAIRandomMessage;
+      break;
+    case 'gameTip':
+      maxMessages = config.MESSAGES_TIPS_PER_DAY || 2;
+      if (gameTipsSentToday >= maxMessages) return;
+      delay = calculateRandomDelay(config.TIPS_MSG_MIN_INTERVAL || 90, config.TIPS_MSG_MAX_INTERVAL || 180);
+      messageGetter = getGameTipMessage;
+      break;
+    case 'joke':
+      maxMessages = config.MESSAGES_JOKES_PER_DAY || 1;
+      if (jokesSentToday >= maxMessages) return;
+      delay = calculateRandomDelay(config.JOKES_MSG_MIN_INTERVAL || 120, config.JOKES_MSG_MAX_INTERVAL || 300);
+      messageGetter = getAIJokeMessage;
+      break;
+    default:
+      return;
   }
 
   const timeoutId = setTimeout(async () => {
-    let msg;
-    if (type === 'serverOpen') {
-      msg = await getAIInGameMessage();
-    } else { // 'daytime'
-      msg = await getAIRandomMessage();
-    }
-
+    const msg = await messageGetter();
     if (msg) {
-      await EvolutionApiService.sendMessageToGroup(msg);
+        await EvolutionApiService.sendMessageToGroup(msg);
     }
 
-    if (type === 'serverOpen') {
-      serverOpenMessagesSent++;
-      serverOpenMessageTimeoutId = null; // Clear self
-      if (serverOpenMessagesSent < config.MESSAGES_DURING_SERVER_OPEN) {
-        scheduleNextRandomMessage('serverOpen');
-      }
-    } else {
-      daytimeMessagesSent++;
-      daytimeMessageTimeoutId = null; // Clear self
-      if (daytimeMessagesSent < config.MESSAGES_DURING_DAYTIME) {
-        scheduleNextRandomMessage('daytime');
-      }
+    switch (type) {
+        case 'serverOpen':
+            serverOpenMessagesSent++;
+            serverOpenMessageTimeoutId = null;
+            if (serverOpenMessagesSent < maxMessages) scheduleNextRandomMessage('serverOpen');
+            break;
+        case 'daytime':
+            daytimeMessagesSent++;
+            daytimeMessageTimeoutId = null;
+            if (daytimeMessagesSent < maxMessages) scheduleNextRandomMessage('daytime');
+            break;
+        case 'gameTip':
+            gameTipsSentToday++;
+            gameTipTimeoutId = null;
+            if (gameTipsSentToday < maxMessages) scheduleNextRandomMessage('gameTip');
+            break;
+        case 'joke':
+            jokesSentToday++;
+            jokeTimeoutId = null;
+            if (jokesSentToday < maxMessages) scheduleNextRandomMessage('joke');
+            break;
     }
   }, delay);
 
-  if (type === 'serverOpen') {
-    if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId); // Clear previous if any
-    serverOpenMessageTimeoutId = timeoutId;
-  } else {
-    if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId); // Clear previous if any
-    daytimeMessageTimeoutId = timeoutId;
-  }
+    switch (type) {
+        case 'serverOpen':
+            if (serverOpenMessageTimeoutId) clearTimeout(serverOpenMessageTimeoutId);
+            serverOpenMessageTimeoutId = timeoutId;
+            break;
+        case 'daytime':
+            if (daytimeMessageTimeoutId) clearTimeout(daytimeMessageTimeoutId);
+            daytimeMessageTimeoutId = timeoutId;
+            break;
+        case 'gameTip':
+            if (gameTipTimeoutId) clearTimeout(gameTipTimeoutId);
+            gameTipTimeoutId = timeoutId;
+            break;
+        case 'joke':
+            if (jokeTimeoutId) clearTimeout(jokeTimeoutId);
+            jokeTimeoutId = timeoutId;
+            break;
+    }
 }
 
 async function triggerChatSummary() {
@@ -529,6 +592,8 @@ async function checkScheduledTasks() {
 
     serverOpenMessagesSent = 0;
     daytimeMessagesSent = 0;
+    gameTipsSentToday = 0;
+    jokesSentToday = 0;
     // chatSummaryCountToday is reset when first summary of the day is attempted/logged
     // or here if the date changes.
     if (lastChatSummaryDate !== currentDate) {
@@ -592,18 +657,41 @@ async function checkScheduledTasks() {
 
   // Random Daytime Messages (if not already running from server open)
   if (currentServerStatus !== '🟢') { // Only run if server isn't open (server open has its own loop)
-    if (currentHour >= config.DAYTIME_START_HOUR && currentHour < config.DAYTIME_END_HOUR) {
-      if (daytimeMessageTimeoutId === null && daytimeMessagesSent < config.MESSAGES_DURING_DAYTIME) {
-        // console.log("SchedulerService: Dentro do horário diurno, agendando próxima mensagem diurna.");
+    // Regular daytime messages
+    if (currentHour >= (config.DAYTIME_START_HOUR || 8) && currentHour < (config.DAYTIME_END_HOUR || 23)) {
+      if (daytimeMessageTimeoutId === null && daytimeMessagesSent < (config.MESSAGES_DURING_DAYTIME || 5)) {
         scheduleNextRandomMessage('daytime');
       }
     } else {
       if (daytimeMessageTimeoutId !== null) {
-        // console.log("SchedulerService: Fora do horário diurno, parando mensagens diurnas.");
         clearTimeout(daytimeMessageTimeoutId);
         daytimeMessageTimeoutId = null;
       }
     }
+
+    // Game Tip messages (runs independently)
+    if (currentHour >= (config.TIPS_START_HOUR || 9) && currentHour < (config.TIPS_END_HOUR || 22)) {
+        if (gameTipTimeoutId === null && gameTipsSentToday < (config.MESSAGES_TIPS_PER_DAY || 2)) {
+            scheduleNextRandomMessage('gameTip');
+        }
+    } else {
+        if (gameTipTimeoutId !== null) {
+            clearTimeout(gameTipTimeoutId);
+            gameTipTimeoutId = null;
+        }
+    }
+  }
+
+  // Joke messages (runs independently)
+  if (currentHour >= (config.JOKES_START_HOUR || 10) && currentHour < (config.JOKES_END_HOUR || 20)) {
+      if (jokeTimeoutId === null && jokesSentToday < (config.MESSAGES_JOKES_PER_DAY || 1)) {
+          scheduleNextRandomMessage('joke');
+      }
+  } else {
+      if (jokeTimeoutId !== null) {
+          clearTimeout(jokeTimeoutId);
+          jokeTimeoutId = null;
+      }
   }
 }
 
@@ -804,6 +892,32 @@ async function initializeBotStatus() {
                 console.log("SchedulerService (Init): Server not 🟢 and outside daytime, stopped 'daytime' message loop.");
             }
         }
+        // Also check for game tips loop
+        if (currentHour >= (config.TIPS_START_HOUR || 9) && currentHour < (config.TIPS_END_HOUR || 22)) {
+            if (gameTipTimeoutId === null && gameTipsSentToday < (config.MESSAGES_TIPS_PER_DAY || 2)) {
+                 console.log("SchedulerService (Init): In tips time. Ensuring 'gameTip' message loop is active.");
+                 scheduleNextRandomMessage('gameTip');
+            }
+        } else {
+            if (gameTipTimeoutId !== null) {
+                clearTimeout(gameTipTimeoutId);
+                gameTipTimeoutId = null;
+                console.log("SchedulerService (Init): Outside tips time, stopped 'gameTip' message loop.");
+            }
+        }
+        // Also check for jokes loop
+        if (currentHour >= (config.JOKES_START_HOUR || 10) && currentHour < (config.JOKES_END_HOUR || 20)) {
+            if (jokeTimeoutId === null && jokesSentToday < (config.MESSAGES_JOKES_PER_DAY || 1)) {
+                 console.log("SchedulerService (Init): In jokes time. Ensuring 'joke' message loop is active.");
+                 scheduleNextRandomMessage('joke');
+            }
+        } else {
+            if (jokeTimeoutId !== null) {
+                clearTimeout(jokeTimeoutId);
+                jokeTimeoutId = null;
+                console.log("SchedulerService (Init): Outside jokes time, stopped 'joke' message loop.");
+            }
+        }
     }
     console.log(`SchedulerService: Initialization complete. Final in-memory server status: ${currentServerStatus}`);
 }
@@ -826,6 +940,8 @@ async function start() {
     // Reset daily counters that are managed in memory here
     serverOpenMessagesSent = 0;
     daytimeMessagesSent = 0;
+    gameTipsSentToday = 0;
+    jokesSentToday = 0;
     chatSummaryCountToday = 0;
     lastChatSummaryDate = currentDateForStartup;
   } else {
@@ -856,6 +972,14 @@ function stop() {
   if (daytimeMessageTimeoutId) {
     clearTimeout(daytimeMessageTimeoutId);
     daytimeMessageTimeoutId = null;
+  }
+  if (gameTipTimeoutId) {
+    clearTimeout(gameTipTimeoutId);
+    gameTipTimeoutId = null;
+  }
+  if (jokeTimeoutId) {
+    clearTimeout(jokeTimeoutId);
+    jokeTimeoutId = null;
   }
 }
 
@@ -897,9 +1021,11 @@ function getStatusForAdmin() {
     resp += `  - Sexta (aprox. ${FRIDAY_MESSAGE_TIME_DETAILS.hour}:${String(FRIDAY_MESSAGE_TIME_DETAILS.minute).padStart(2,'0')}): ${dailyStatuses.fridayMessage ? '✅ Executado' : '⏳ Pendente'}\n\n`;
     
     resp += `*Contadores de Mensagens Aleatórias (Hoje - em memória):*\n`;
-    resp += `  - Durante Servidor Aberto: ${serverOpenMessagesSent} / ${config.MESSAGES_DURING_SERVER_OPEN}\n`;
-    resp += `  - Durante o Dia: ${daytimeMessagesSent} / ${config.MESSAGES_DURING_DAYTIME}\n`;
-    resp += `  - Resumos de Chat Enviados: ${chatSummaryCountToday} / ${config.CHAT_SUMMARY_COUNT_PER_DAY} (limite por dia)\n`;
+    resp += `  - Durante Servidor Aberto (In-Game): ${serverOpenMessagesSent} / ${config.MESSAGES_DURING_SERVER_OPEN || 3}\n`;
+    resp += `  - Durante o Dia (Aleatórias): ${daytimeMessagesSent} / ${config.MESSAGES_DURING_DAYTIME || 5}\n`;
+    resp += `  - Durante o Dia (Dicas de Jogo): ${gameTipsSentToday} / ${config.MESSAGES_TIPS_PER_DAY || 2}\n`;
+    resp += `  - Durante o Dia (Piadas): ${jokesSentToday} / ${config.MESSAGES_JOKES_PER_DAY || 1}\n`;
+    resp += `  - Resumos de Chat Enviados: ${chatSummaryCountToday} / ${config.CHAT_SUMMARY_COUNT_PER_DAY}\n`;
     return resp;
 }
 

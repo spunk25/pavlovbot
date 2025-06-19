@@ -80,7 +80,7 @@ async function sendPoll(title, values, recipientJid, selectableCount = 1) {
     const payload = {
       number: targetJid,
       name: title,
-      values: values,
+      values: values.map(v => ({ optionName: v })),
       selectableCount: selectableCount,
       delay: 1200,
       linkPreview: true,

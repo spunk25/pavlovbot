@@ -72,59 +72,22 @@ async function handleCommand(command, args, fullMessage, senderJid, isGroupMessa
           commandProcessed = true;
           break;
         case '!enquete':
-          // Basic parsing, assuming args are pre-split. Robust parsing needed for quotes.
-          // For simplicity, let's assume title is first arg, rest are options if not quoted.
-          // A more robust parser would handle quoted arguments properly.
-          if (args.length >= 2) {
-            // This is a simplified parser. A proper one would handle quotes better.
-            // Example: !enquete "My Title" "Option A" OptionB "Option C"
-            // For now, we'll assume the admin knows to quote multi-word options or use simple ones.
-            let pollTitle = "";
-            let pollOptions = [];
-            let currentArg = "";
-            let inQuotes = false;
-            const fullArgsString = args.join(" "); // Rejoin for easier parsing of quotes
-
-            // Simple quote parsing logic (can be improved)
-            let tempArgs = [];
-            let inQuote = false;
-            let currentQuotedArg = "";
-            for (let i = 0; i < fullArgsString.length; i++) {
-                const char = fullArgsString[i];
-                if (char === '"') {
-                    if (inQuote) {
-                        tempArgs.push(currentQuotedArg);
-                        currentQuotedArg = "";
-                        inQuote = false;
-                    } else {
-                        inQuote = true;
-                    }
-                } else if (char === ' ' && !inQuote) {
-                    if (currentQuotedArg.trim() !== "") {
-                         tempArgs.push(currentQuotedArg.trim());
-                    }
-                    currentQuotedArg = "";
-                }
-                else {
-                    currentQuotedArg += char;
-                }
-            }
-            if (currentQuotedArg.trim() !== "") tempArgs.push(currentQuotedArg.trim());
-            
-            if (tempArgs.length > 0) {
-                pollTitle = tempArgs[0];
-                pollOptions = tempArgs.slice(1);
-            }
-
+          const fullArgsString = args.join(" ");
+          const normalizedArgs = fullArgsString.replace(/[“”]/g, '"');
+          const pollArgs = normalizedArgs.match(/"([^"]+)"/g);
+          
+          if (pollArgs && pollArgs.length >= 2) {
+            const pollTitle = pollArgs[0].slice(1, -1);
+            const pollOptions = pollArgs.slice(1).map(opt => opt.slice(1, -1));
 
             if (pollTitle && pollOptions.length > 0) {
-              await EvolutionApiService.sendPoll(pollTitle, pollOptions, config.TARGET_GROUP_ID, pollOptions.length);
+              await EvolutionApiService.sendPoll(pollTitle, pollOptions, config.TARGET_GROUP_ID);
               await EvolutionApiService.sendMessageToGroup(`Enquete "${pollTitle}" enviada para o grupo.`, senderJid);
             } else {
               await EvolutionApiService.sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ... (Certifique-se de usar aspas para títulos/opções com espaços)', senderJid);
             }
           } else {
-            await EvolutionApiService.sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ...', senderJid);
+            await EvolutionApiService.sendMessageToGroup('Uso: !enquete "Título" "Opção1" "Opção2" ... (Certifique-se de usar aspas para títulos/opções com espaços)', senderJid);
           }
           commandProcessed = true;
           break;

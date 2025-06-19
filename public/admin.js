@@ -21,6 +21,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Novo campo para gameTips
     const gameTipsTextarea = document.getElementById('gameTips');
 
+    // Novo campo para Piadas
+    const randomJokesTextarea = document.getElementById('randomJokes');
+
     // Seletores para os textareas dos prompts de IA
     const aiPromptRandomActiveTextarea = document.getElementById('aiPrompt_randomActive');
     const aiPromptInGameRandomTextarea = document.getElementById('aiPrompt_inGameRandom');
@@ -33,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiPromptExtrasSundayNightTextarea = document.getElementById('aiPrompt_extras_sundayNight');
     const aiPromptExtrasFridayTextarea = document.getElementById('aiPrompt_extras_friday');
     const aiPromptSystemPromptTextarea = document.getElementById('aiPrompt_systemPrompt');
+    const aiPromptRandomJokeTextarea = document.getElementById('aiPrompt_randomJoke'); // prompt para piadas
 
     // Seletores para os checkboxes de uso da IA
     const aiUsageStatusClosedCheckbox = document.getElementById('aiUsage_status_closed');
@@ -45,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiUsageExtrasSundayNightCheckbox = document.getElementById('aiUsage_extras_sundayNight');
     const aiUsageExtrasFridayCheckbox = document.getElementById('aiUsage_extras_friday');
     const aiUsageMessageDeletedCheckbox = document.getElementById('aiUsage_messageDeleted');
+    const aiUsageRandomJokeCheckbox = document.getElementById('aiUsage_randomJoke'); // checkbox para piadas
 
     // Formulário de Configurações Gerais
     const configForm = document.getElementById('configForm');
@@ -62,6 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const configMessagesDuringDaytimeInput = document.getElementById('config_MESSAGES_DURING_DAYTIME');
     const configDaytimeStartHourInput = document.getElementById('config_DAYTIME_START_HOUR');
     const configDaytimeEndHourInput = document.getElementById('config_DAYTIME_END_HOUR');
+    const configMessagesTipsPerDayInput = document.getElementById('config_MESSAGES_TIPS_PER_DAY');
+    const configMessagesJokesPerDayInput = document.getElementById('config_MESSAGES_JOKES_PER_DAY');
     const configChatSummaryTimesInput = document.getElementById('config_CHAT_SUMMARY_TIMES');
     const configBotWebhookPortInput = document.getElementById('config_BOT_WEBHOOK_PORT');
     const configBotPublicUrlInput = document.getElementById('config_BOT_PUBLIC_URL');
@@ -162,6 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (gameTipsTextarea && messages.gameTips) {
                 gameTipsTextarea.value = Array.isArray(messages.gameTips) ? messages.gameTips.join('\n') : '';
             }
+            if (randomJokesTextarea && messages.randomJokes) {
+                randomJokesTextarea.value = Array.isArray(messages.randomJokes) ? messages.randomJokes.join('\n') : '';
+            }
 
             // Carregar mensagens de "Mensagem Apagada"
             if (messageDeletedTextarea && messages.messageDeleted) {
@@ -182,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (aiPromptExtrasSundayNightTextarea && messages.aiPrompts.extras_sundayNight !== undefined) aiPromptExtrasSundayNightTextarea.value = messages.aiPrompts.extras_sundayNight;
                 if (aiPromptExtrasFridayTextarea && messages.aiPrompts.extras_friday !== undefined) aiPromptExtrasFridayTextarea.value = messages.aiPrompts.extras_friday;
                 if (aiPromptMessageDeletedTextarea && messages.aiPrompts.messageDeleted !== undefined) aiPromptMessageDeletedTextarea.value = messages.aiPrompts.messageDeleted;
+                if (aiPromptRandomJokeTextarea && messages.aiPrompts.randomJoke !== undefined) aiPromptRandomJokeTextarea.value = messages.aiPrompts.randomJoke;
             }
 
             // Carregar configurações de uso da IA
@@ -190,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 newMember: false, memberLeft: false,
                 randomActive: true, inGameRandom: true,
                 extras_sundayNight: false, extras_friday: false,
-                messageDeleted: false
+                messageDeleted: false, randomJoke: true
             };
             const currentAiUsage = messages.aiUsageSettings || defaultAiUsage;
 
@@ -204,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (aiUsageExtrasSundayNightCheckbox) aiUsageExtrasSundayNightCheckbox.checked = currentAiUsage.extras_sundayNight !== undefined ? currentAiUsage.extras_sundayNight : defaultAiUsage.extras_sundayNight;
             if (aiUsageExtrasFridayCheckbox) aiUsageExtrasFridayCheckbox.checked = currentAiUsage.extras_friday !== undefined ? currentAiUsage.extras_friday : defaultAiUsage.extras_friday;
             if (aiUsageMessageDeletedCheckbox) aiUsageMessageDeletedCheckbox.checked = currentAiUsage.messageDeleted !== undefined ? currentAiUsage.messageDeleted : defaultAiUsage.messageDeleted;
+            if (aiUsageRandomJokeCheckbox) aiUsageRandomJokeCheckbox.checked = currentAiUsage.randomJoke !== undefined ? currentAiUsage.randomJoke : defaultAiUsage.randomJoke;
 
         } catch (error) {
             console.error('Erro ao carregar mensagens:', error);
@@ -262,10 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
             randomActive: randomActiveTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             inGameRandom: inGameRandomTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
             gameTips: gameTipsTextarea ? gameTipsTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
-            extras: {
-                sundayNight: extrasSundayNightInput.value.split('\n').map(s => s.trim()).filter(s => s),
-                friday: extrasFridayInput.value.split('\n').map(s => s.trim()).filter(s => s),
-            },
+            randomJokes: randomJokesTextarea ? randomJokesTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
             messageDeleted: messageDeletedTextarea ? messageDeletedTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
             aiPrompts: {
                 systemPrompt: aiPromptSystemPromptTextarea ? aiPromptSystemPromptTextarea.value.trim() : '',
@@ -279,7 +288,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 memberLeft: aiPromptMemberLeftTextarea ? aiPromptMemberLeftTextarea.value.trim() : '',
                 extras_sundayNight: aiPromptExtrasSundayNightTextarea ? aiPromptExtrasSundayNightTextarea.value.trim() : '',
                 extras_friday: aiPromptExtrasFridayTextarea ? aiPromptExtrasFridayTextarea.value.trim() : '',
-                messageDeleted: aiPromptMessageDeletedTextarea ? aiPromptMessageDeletedTextarea.value.trim() : ''
+                messageDeleted: aiPromptMessageDeletedTextarea ? aiPromptMessageDeletedTextarea.value.trim() : '',
+                randomJoke: aiPromptRandomJokeTextarea ? aiPromptRandomJokeTextarea.value.trim() : ''
             },
             aiUsageSettings: {
                 status_closed: aiUsageStatusClosedCheckbox ? aiUsageStatusClosedCheckbox.checked : false,
@@ -291,7 +301,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 inGameRandom: aiUsageInGameRandomCheckbox ? aiUsageInGameRandomCheckbox.checked : true, // Default true
                 extras_sundayNight: aiUsageExtrasSundayNightCheckbox ? aiUsageExtrasSundayNightCheckbox.checked : false,
                 extras_friday: aiUsageExtrasFridayCheckbox ? aiUsageExtrasFridayCheckbox.checked : false,
-                messageDeleted: aiUsageMessageDeletedCheckbox ? aiUsageMessageDeletedCheckbox.checked : false
+                messageDeleted: aiUsageMessageDeletedCheckbox ? aiUsageMessageDeletedCheckbox.checked : false,
+                randomJoke: aiUsageRandomJokeCheckbox ? aiUsageRandomJokeCheckbox.checked : false
             }
         };
 
