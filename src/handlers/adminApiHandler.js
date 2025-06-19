@@ -90,6 +90,18 @@ router.post('/generate-message', express.json(), async (req, res) => {
         if (type === 'randomJoke') {
             finalPrompt = MessageService.getAIPrompt('randomJoke');
             console.log(`[DEBUG] Tipo randomJoke detectado, usando prompt específico: ${finalPrompt ? finalPrompt.substring(0, 50) + '...' : 'não encontrado'}`);
+            
+            // Adicionar piadas existentes ao prompt
+            if (finalPrompt && finalPrompt.includes('{EXISTING_JOKES}')) {
+                const messages = MessageService.getMessages();
+                const existingJokes = messages.randomJokes || [];
+                const jokesText = existingJokes.length > 0 
+                    ? existingJokes.join('\n')
+                    : "Nenhuma piada existente ainda.";
+                
+                finalPrompt = finalPrompt.replace('{EXISTING_JOKES}', jokesText);
+                console.log(`[DEBUG] Adicionadas ${existingJokes.length} piadas existentes ao prompt.`);
+            }
         } else if (type === 'gameTip') {
             finalPrompt = MessageService.getAIPrompt('gameTip');
             console.log(`[DEBUG] Tipo gameTip detectado, usando prompt específico: ${finalPrompt ? finalPrompt.substring(0, 50) + '...' : 'não encontrado'}`);

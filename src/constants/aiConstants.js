@@ -11,7 +11,7 @@ export const DEFAULT_AI_PROMPTS = {
   extras_sundayNight: "Gere uma mensagem curta e temática para ser enviada em um DOMINGO À NOITE para jogadores de Pavlov VR, talvez sobre o fim de semana ou a semana que começa, com um toque de Pavlov. Exemplo: Domingo acabando... última chance pra um headshot antes da segunda!",
   extras_friday: "Gere uma mensagem curta e animada para uma SEXTA-FEIRA para jogadores de Pavlov VR, celebrando o início do fim de semana e chamando para o jogo. Exemplo: Sextou, soldados! Pavlov liberado no final de semana!",
   messageDeleted: "Gere uma mensagem curta e engraçada para quando um usuário apaga uma mensagem no grupo. Pode ser algo como 'Ih, alguém se arrependeu!' ou 'Ops, mensagem evaporou! O que será que era?'. Se souber o nome do remetente original, pode mencioná-lo de forma leve, por exemplo: 'O [NomeDoRemetente] fez uma mágica e a mensagem sumiu! ✨'",
-  randomJoke: "Gere uma piada curta e engraçada, no estilo 'tiozão' ou de humor seco. Preferencialmente no formato de pergunta e resposta, com a resposta sendo engraçada ou surpreendente.",
+  randomJoke: "Gere uma piada curta e engraçada, no estilo 'tiozão' ou de humor seco. Preferencialmente no formato de pergunta e resposta, com a resposta sendo engraçada ou surpreendente. Observe as piadas existentes como referência para entender o estilo de humor do grupo, mas crie uma piada original que não esteja na lista. PIADAS EXISTENTES: {EXISTING_JOKES}",
   gameTip: "Gere uma dica útil e curta para jogadores de Pavlov VR, relacionada a táticas, controles ou mecânicas do jogo. Seja específico e prático, algo que realmente possa ajudar os jogadores a melhorarem suas habilidades no jogo."
 };
 
