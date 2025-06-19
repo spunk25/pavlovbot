@@ -34,6 +34,7 @@ function getDefaultMessageStructure() {
       friday: ["Sextou com Pavlov VR! Quem anima?"]
     },
     gameTips: ["Mantenha-se em movimento para não virar um alvo fácil.", "Comunicação é tudo! Use o rádio."],
+    randomJokes: ["Por que o jacaré tirou o jacarezinho da escola? Porque ele réptil de ano."],
     messageDeleted: ["Alguém apagou uma mensagem... O que será que era? 🤔", "Ops, uma mensagem sumiu do mapa!"],
     aiPrompts: { ...DEFAULT_AI_PROMPTS },
     aiUsageSettings: { ...DEFAULT_AI_USAGE_SETTINGS },
@@ -75,7 +76,7 @@ async function loadMessages() {
       messages.botInfo = { ...defaultStructure.botInfo, ...(dbMessages.botInfo || {}) };
       
       // Ensure arrays are arrays
-      const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips', 'messageDeleted'];
+      const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips', 'randomJokes', 'messageDeleted'];
       arrayKeys.forEach(key => {
         if (!Array.isArray(messages[key])) {
           messages[key] = defaultStructure[key];
@@ -192,6 +193,7 @@ async function updateMessagesAndPrompts(updatedData) {
   if (updatedData.randomActive !== undefined) processArrayField('randomActive', updatedData.randomActive);
   if (updatedData.inGameRandom !== undefined) processArrayField('inGameRandom', updatedData.inGameRandom);
   if (updatedData.gameTips !== undefined) processArrayField('gameTips', updatedData.gameTips);
+  if (updatedData.randomJokes !== undefined) processArrayField('randomJokes', updatedData.randomJokes);
   if (updatedData.messageDeleted !== undefined) processArrayField('messageDeleted', updatedData.messageDeleted);
 
   // Extras
@@ -278,7 +280,7 @@ async function replaceAllMessagesFromJSON(jsonData) {
         newMessagesData.botInfo = { ...defaultStructure.botInfo, ...(jsonData.botInfo || {}) };
 
         // Garante que campos que devem ser arrays sejam arrays
-        const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips', 'messageDeleted'];
+        const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips', 'randomJokes', 'messageDeleted'];
         arrayKeys.forEach(key => {
             if (!Array.isArray(newMessagesData[key]) && defaultStructure[key]) {
                  // Se não for array e tiver um default que é array, usa o default

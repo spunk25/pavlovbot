@@ -28,6 +28,8 @@ const DEFAULTS = {
     MESSAGES_DURING_DAYTIME: parseInt(process.env.MESSAGES_DURING_DAYTIME, 10) || 2,
     DAYTIME_START_HOUR: parseInt(process.env.DAYTIME_START_HOUR, 10) || 9,
     DAYTIME_END_HOUR: parseInt(process.env.DAYTIME_END_HOUR, 10) || 18,
+    MESSAGES_TIPS_PER_DAY: parseInt(process.env.MESSAGES_TIPS_PER_DAY, 10) || 2,
+    MESSAGES_JOKES_PER_DAY: parseInt(process.env.MESSAGES_JOKES_PER_DAY, 10) || 1,
     CHAT_SUMMARY_TIMES: (process.env.CHAT_SUMMARY_TIMES || '12:00,22:00').split(',').map(t => t.trim()).filter(t => t),
     BOT_WEBHOOK_PORT: parseInt(process.env.BOT_WEBHOOK_PORT, 10) || 3000,
     BOT_PUBLIC_URL: process.env.BOT_PUBLIC_URL || '',
@@ -147,6 +149,7 @@ async function saveConfig() {
         DAYTIME_START_HOUR: 0, DAYTIME_END_HOUR: 0, TIMEZONE: '', BOT_PUBLIC_URL: '',
         CHAT_SUMMARY_TIMES: [], CHAT_SUMMARY_COUNT_PER_DAY: 0,
         SEND_NO_SUMMARY_MESSAGE: false, POLL_MENTION_EVERYONE: true,
+        MESSAGES_TIPS_PER_DAY: 0, MESSAGES_JOKES_PER_DAY: 0,
         // Include API keys if you decide to store them in DB (conditionally)
         EVOLUTION_API_KEY: '', GROQ_API_KEY: ''
     });
@@ -198,6 +201,9 @@ async function updateConfig(newConfigDataFromForm) {
                         timeSettingsChanged = true;
                     }
                 }
+            } else if (targetType === 'boolean' && !Object.prototype.hasOwnProperty.call(newConfigDataFromForm, key)) {
+                // Se a chave é um booleano e não foi enviada pelo formulário, significa 'false'
+                updatedConfigSnapshot[key] = false;
             }
             // Se a chave não veio do formulário, updatedConfigSnapshot[key] mantém seu valor atual (de currentConfig)
         }

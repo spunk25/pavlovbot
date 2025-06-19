@@ -245,23 +245,31 @@ router.post('/messages-delete', async (req, res) => {
   console.log(`WebhookHandler: Processando evento ${eventType} com ${itemsToProcess.length} item(s).`);
 
   for (const item of itemsToProcess) {
-    const key = item.key;
+    // Normaliza o objeto 'key' para lidar com diferentes formatos de payload
+    const key = item.key ? item.key : {
+        remoteJid: item.remoteJid,
+        fromMe: item.fromMe,
+        id: item.id,
+        participant: item.participant
+    };
     const updateContent = item.update;
 
-    if (!key) {
-      console.warn(`WebhookHandler: ${eventType} - 'key' ausente em um item:`, JSON.stringify(item, null, 2));
+    if (!key || !key.remoteJid || !key.id) {
+      console.warn(`WebhookHandler: ${eventType} - 'key' (ou seus campos essenciais) ausente em um item:`, JSON.stringify(item, null, 2));
       continue; 
     }
 
-    console.log(`[DEBUG] Processando item com key:`, JSON.stringify(key, null, 2));
+    console.log(`[DEBUG] Processando item com key normalizada:`, JSON.stringify(key, null, 2));
 
     let isMessageEffectivelyDeleted = false;
+    // Para 'messages.delete', o próprio evento já confirma a deleção.
+    // Para 'messages.update', verificamos se a mensagem se tornou nula.
     if (eventType.includes('delete')) {
         isMessageEffectivelyDeleted = true;
-        console.log(`WebhookHandler: ${eventType} - Item de deleção direta:`, JSON.stringify(item, null, 2));
+        console.log(`WebhookHandler: ${eventType} - Item de deleção direta.`, JSON.stringify(item, null, 2));
     } else if (eventType.includes('update') && updateContent && updateContent.message === null) {
         isMessageEffectivelyDeleted = true;
-        console.log(`WebhookHandler: ${eventType} - Item de atualização indicando deleção:`, JSON.stringify(item, null, 2));
+        console.log(`WebhookHandler: ${eventType} - Item de atualização indicando deleção.`, JSON.stringify(item, null, 2));
     }
 
     console.log(`[DEBUG] isMessageEffectivelyDeleted: ${isMessageEffectivelyDeleted}`);
@@ -274,6 +282,11 @@ router.post('/messages-delete', async (req, res) => {
 
       // Obter o autor original da mensagem a partir do key.participant (para grupos)
       const participant = key.participant || null;
+      if (!participant) {
+          console.warn(`[DEBUG] 'participant' ausente na key normalizada, não é possível identificar o autor da mensagem apagada.`, JSON.stringify(key));
+          continue; // Pula para o próximo item se não puder identificar o autor
+      }
+      
       const senderName = participant ? participant.split('@')[0] : "alguém";
       const messages = MessageService.getMessages();
       
