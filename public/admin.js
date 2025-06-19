@@ -196,12 +196,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Carregar configurações de uso da IA
-            const defaultAiUsage = { // Padrões caso não existam no messages.json
+            const defaultAiUsage = {
                 status_closed: false, status_openingSoon: false, status_open: false,
-                newMember: false, memberLeft: false,
-                randomActive: true, inGameRandom: true,
+                newMember: false, memberLeft: false, randomActive: true, inGameRandom: true,
                 extras_sundayNight: false, extras_friday: false,
-                messageDeleted: false, randomJoke: true
+                messageDeleted: true, randomJoke: true
             };
             const currentAiUsage = messages.aiUsageSettings || defaultAiUsage;
 

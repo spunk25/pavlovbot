@@ -24,6 +24,6 @@ export const DEFAULT_AI_USAGE_SETTINGS = {
   inGameRandom: true,
   extras_sundayNight: false,
   extras_friday: false,
-  messageDeleted: false,
+  messageDeleted: true,
   randomJoke: true
 }; 

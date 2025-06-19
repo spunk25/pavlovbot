@@ -295,6 +295,10 @@ router.post('/messages-delete', async (req, res) => {
       
       // Verificar se devemos responder à deleção com uma mensagem padrão ou gerada por IA
       const useAI = MessageService.getAIUsageSetting('messageDeleted') && config.GROQ_API_KEY;
+      console.log(`[DEBUG] Usar IA para mensagem apagada? ${useAI}`);
+      console.log(`[DEBUG] Configuração messageDeleted no aiUsageSettings:`, MessageService.getAIUsageSetting('messageDeleted'));
+      console.log(`[DEBUG] GROQ_API_KEY configurada? ${!!config.GROQ_API_KEY}`);
+      
       let deletionMessage;
       
       if (useAI) {
@@ -306,8 +310,11 @@ router.post('/messages-delete', async (req, res) => {
           console.log(`[DEBUG] Resposta da IA: ${deletionMessage}`);
           
           if (!deletionMessage || deletionMessage.startsWith('Erro') || deletionMessage.length < 5) {
+            console.log(`[DEBUG] Resposta da IA inválida, usando mensagem padrão do banco`);
             deletionMessage = getRandomElement(messages.messageDeleted) || `${senderName} apagou uma mensagem... 🤔`;
             console.log(`[DEBUG] Usando mensagem padrão: ${deletionMessage}`);
+          } else {
+            console.log(`[DEBUG] Usando mensagem gerada pela IA`);
           }
         } catch (error) {
           console.error('WebhookHandler: Erro ao gerar resposta de AI para mensagem apagada:', error);
@@ -315,10 +322,12 @@ router.post('/messages-delete', async (req, res) => {
           console.log(`[DEBUG] Erro na IA, usando mensagem padrão: ${deletionMessage}`);
         }
       } else {
+        console.log(`[DEBUG] Não usando IA, obtendo mensagem do banco de dados`);
+        console.log(`[DEBUG] Mensagens disponíveis:`, JSON.stringify(messages.messageDeleted));
         deletionMessage = getRandomElement(messages.messageDeleted) || `${senderName} apagou uma mensagem... 🤔`;
         // Substituir [NomeDoRemetente] pelo nome do remetente real na mensagem padrão, se existir
-        deletionMessage = deletionMessage.replace('[NomeDoRemetente]', senderName);
-        console.log(`[DEBUG] Não usando IA, mensagem: ${deletionMessage}`);
+        deletionMessage = deletionMessage.replace(/\[NomeDoRemetente\]/g, senderName);
+        console.log(`[DEBUG] Não usando IA, mensagem final: ${deletionMessage}`);
       }
       
       // Garantir que o nome do remetente está incluído na mensagem

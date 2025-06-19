@@ -359,19 +359,41 @@ async function getGameTipMessage() {
 async function getAIJokeMessage() {
     const messagesAll = MessageService.getMessages();
     const useAI = MessageService.getAIUsageSetting('randomJoke');
+    
+    console.log(`[DEBUG] getAIJokeMessage: Usando IA para piadas? ${useAI}`);
+    console.log(`[DEBUG] getAIJokeMessage: Piadas disponíveis no banco: ${messagesAll.randomJokes?.length || 0}`);
 
     if (useAI) {
-        const prompt = MessageService.getAIPrompt('randomJoke');
-        if (prompt) {
-            const generatedMessage = await GroqApiService.callGroqAPI(prompt);
-            if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
-                return generatedMessage;
+        try {
+            const prompt = MessageService.getAIPrompt('randomJoke');
+            console.log(`[DEBUG] getAIJokeMessage: Prompt para IA: ${prompt?.substring(0, 50)}...`);
+            
+            if (prompt) {
+                const generatedMessage = await GroqApiService.callGroqAPI(prompt);
+                console.log(`[DEBUG] getAIJokeMessage: Resposta da IA: ${generatedMessage?.substring(0, 50)}...`);
+                
+                if (generatedMessage && !generatedMessage.startsWith("Erro") && generatedMessage.length > 5) {
+                    console.log(`[DEBUG] getAIJokeMessage: Usando piada gerada pela IA`);
+                    return generatedMessage;
+                } else {
+                    console.log(`[DEBUG] getAIJokeMessage: Resposta da IA inválida, usando fallback do banco`);
+                }
+            } else {
+                console.log(`[DEBUG] getAIJokeMessage: Prompt não encontrado`);
             }
+        } catch (error) {
+            console.error("SchedulerService: Erro ao gerar piada via IA:", error);
+            console.log(`[DEBUG] getAIJokeMessage: Erro na chamada da IA, usando fallback do banco`);
         }
     }
+    
     if (messagesAll.randomJokes && messagesAll.randomJokes.length > 0) {
-        return getRandomElement(messagesAll.randomJokes);
+        const selectedJoke = getRandomElement(messagesAll.randomJokes);
+        console.log(`[DEBUG] getAIJokeMessage: Usando piada do banco: ${selectedJoke?.substring(0, 50)}...`);
+        return selectedJoke;
     }
+    
+    console.log(`[DEBUG] getAIJokeMessage: Sem piadas no banco, usando piada padrão`);
     return "Qual é o cúmulo da velocidade? Cair de um prédio e passar por um F-18.";
 }
 
