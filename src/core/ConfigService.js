@@ -1,8 +1,12 @@
 import { parseTime } from '../utils/generalUtils.js';
 import DatabaseService from './DatabaseService.js'; // New import
 import dotenv from 'dotenv';
+import { EventEmitter } from 'events';
 
 dotenv.config();
+
+// Cria um emissor de eventos para notificar sobre mudanças de configuração
+const configEventEmitter = new EventEmitter();
 
 const envConfig = process.env;
 const CONFIG_COLLECTION_NAME = 'configurations';
@@ -33,7 +37,6 @@ const DEFAULTS = {
 };
 
 let currentConfig = { ...DEFAULTS }; // Inicializa com padrões
-let onConfigChangeCallback = null;
 
 // Função auxiliar para converter valor para o tipo esperado
 function convertToType(value, targetType, defaultValue, keyName) {
@@ -178,6 +181,7 @@ async function updateConfig(newConfigDataFromForm) {
     
     let timeSettingsChanged = false;
     const updatedConfigSnapshot = { ...currentConfig }; // Começa com a config atual (já processada)
+    const oldConfig = { ...currentConfig };  // Armazena uma cópia para comparação posterior
 
     for (const key in DEFAULTS) { // Itera sobre as chaves conhecidas/esperadas
         if (Object.prototype.hasOwnProperty.call(DEFAULTS, key)) {
@@ -225,9 +229,13 @@ async function updateConfig(newConfigDataFromForm) {
             console.warn("ConfigService: Configuração não foi salva no MongoDB (nem modificada, nem inserida). Verifique o filtro e os dados. Resultado:", result);
         }
         
-        if (onConfigChangeCallback) {
-            onConfigChangeCallback(currentConfig, timeSettingsChanged);
-        }
+        // Emitir evento de mudança de configuração
+        const configChangeData = { 
+            newConfig: currentConfig, 
+            timeSettingsChanged,
+            changedKeys: Object.keys(currentConfig).filter(key => currentConfig[key] !== oldConfig[key])
+        };
+        configEventEmitter.emit('configChanged', configChangeData);
 
     } catch (error) {
         console.error("ConfigService: Erro ao salvar configuração no MongoDB:", error);
@@ -237,8 +245,33 @@ async function updateConfig(newConfigDataFromForm) {
     return currentConfig; // Retorna a configuração atualizada (mesmo que o salvamento falhe)
 }
 
+/**
+ * Registra um listener para mudanças de configuração.
+ * @param {Function} callback Função chamada quando a configuração mudar.
+ * @returns {Function} Função para remover o listener.
+ */
+function onConfigChange(callback) {
+    if (typeof callback !== 'function') {
+        throw new Error("ConfigService.onConfigChange: O argumento deve ser uma função de callback");
+    }
+    
+    // Registra o listener
+    configEventEmitter.on('configChanged', callback);
+    
+    // Retorna uma função para remover o listener
+    return () => {
+        configEventEmitter.off('configChanged', callback);
+    };
+}
+
+/**
+ * @deprecated Use onConfigChange em vez disso. Será removido em versões futuras.
+ */
 function setOnConfigChange(callback) {
-    onConfigChangeCallback = callback;
+    console.warn("ConfigService.setOnConfigChange: Esta função está obsoleta. Use onConfigChange em vez disso.");
+    return onConfigChange((configChangeData) => {
+        callback(configChangeData.newConfig, configChangeData.timeSettingsChanged);
+    });
 }
 
 export default {
@@ -247,5 +280,6 @@ export default {
   getConfig,
   updateConfig,
   parseTime, // Exporting for convenience if needed elsewhere, though primarily internal
-  setOnConfigChange
-}; 
+  setOnConfigChange,
+  onConfigChange
+} 

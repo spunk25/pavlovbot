@@ -329,18 +329,19 @@ document.addEventListener('DOMContentLoaded', () => {
         configForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             responseMessageConfigDiv.classList.add('hidden');
-            const formData = new FormData(configForm);
             const configData = {};
 
-            // Iterar sobre as chaves DEFAULTS do ConfigService (ou uma lista similar no frontend)
-            // para garantir que todos os campos sejam processados, especialmente checkboxes.
-            const allConfigKeys = [ // Mantenha esta lista sincronizada com as chaves em DEFAULTS no ConfigService
-                'EVOLUTION_API_URL', 'INSTANCE_NAME', 'EVOLUTION_API_KEY', 'GROQ_API_KEY',
-                'TARGET_GROUP_ID', 'GROUP_BASE_NAME', 'SERVER_OPEN_TIME', 'SERVER_CLOSE_TIME',
-                'TIMEZONE', 'MESSAGES_DURING_SERVER_OPEN', 'MESSAGES_DURING_DAYTIME',
-                'DAYTIME_START_HOUR', 'DAYTIME_END_HOUR', 'CHAT_SUMMARY_TIMES',
-                'BOT_WEBHOOK_PORT', 'BOT_PUBLIC_URL', 'POLL_MENTION_EVERYONE',
-                'CHAT_SUMMARY_ENABLED', 'CHAT_SUMMARY_COUNT_PER_DAY'
+            // Lista de todas as chaves de configuração esperadas no formulário.
+            // Mantém o código explícito e garante que todos os campos sejam processados.
+            const allConfigKeys = [
+                'GROUP_BASE_NAME', 'TARGET_GROUP_ID',
+                'SERVER_OPEN_TIME', 'SERVER_CLOSE_TIME',
+                'MESSAGES_DURING_SERVER_OPEN',
+                'MESSAGES_DURING_DAYTIME', 'DAYTIME_START_HOUR', 'DAYTIME_END_HOUR',
+                'MESSAGES_TIPS_PER_DAY', 'MESSAGES_JOKES_PER_DAY', // Adicionadas
+                'CHAT_SUMMARY_COUNT_PER_DAY',
+                'POLL_MENTION_EVERYONE', 'CHAT_SUMMARY_ENABLED' // Adicionadas
+                // Chaves como GROQ_API_KEY podem ser adicionadas aqui se o campo for descomentado no HTML
             ];
 
             allConfigKeys.forEach(key => {
@@ -350,37 +351,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         configData[key] = inputElement.checked;
                     } else if (inputElement.type === 'number') {
                         configData[key] = inputElement.value === '' ? null : Number(inputElement.value);
-                    } else if (key === 'CHAT_SUMMARY_TIMES') {
-                        configData[key] = inputElement.value.split(',').map(s => s.trim()).filter(s => s);
                     } else {
                         configData[key] = inputElement.value;
                     }
-                } else {
-                    // Se o campo não estiver no formulário (ex: gerenciado apenas por .env),
-                    // não o envie, para que o backend use o valor existente ou default.
-                    // Ou, se você quiser enviar todos os valores conhecidos:
-                    // if (formData.has(key)) { configData[key] = formData.get(key); }
-                    // console.warn(`Elemento de formulário config_${key} não encontrado.`);
                 }
             });
-            
-            // Adicionar campos que podem não estar diretamente em allConfigKeys mas são parte do form
-            // (embora o ideal seja que allConfigKeys seja completo)
-            formData.forEach((value, key) => {
-                if (!configData.hasOwnProperty(key)) { // Se não foi processado por allConfigKeys
-                     const inputElement = configForm.elements[key];
-                     if (inputElement && inputElement.type === 'checkbox') {
-                         configData[key] = inputElement.checked;
-                     } else if (inputElement && inputElement.type === 'number') {
-                         configData[key] = value === '' ? null : Number(value);
-                     } else if (key === 'CHAT_SUMMARY_TIMES') {
-                         configData[key] = value.split(',').map(s => s.trim()).filter(s => s);
-                     } else {
-                         configData[key] = value;
-                     }
-                }
-            });
-
 
             console.log("Admin.js: Enviando dados de configuração para /admin/api/config:", JSON.stringify(configData, null, 2));
 

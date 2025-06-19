@@ -3,13 +3,14 @@ import { MongoClient } from 'mongodb';
 let client;
 let db;
 
-const MONGODB_URI = process.env.MONGODB_URI;
+// Adicionando fallback para MONGODB_URI
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME || 'pavlovBotDb'; // Default DB name if not in .env
 
 async function connect() {
   if (!MONGODB_URI) {
-    console.error("DatabaseService: MONGODB_URI não está definida nas variáveis de ambiente.");
-    throw new Error("MONGODB_URI não configurada.");
+    console.error("DatabaseService: MONGODB_URI não está definida ou o valor é inválido nas variáveis de ambiente.");
+    throw new Error("MONGODB_URI não configurada corretamente.");
   }
   if (db) {
     console.warn("DatabaseService: Tentativa de conectar quando já conectado.");

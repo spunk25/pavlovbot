@@ -21,6 +21,42 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Função auxiliar para verificar configurações críticas
+function checkCriticalConfigs(config) {
+  const missingConfigs = [];
+
+  // Configurações que são absolutamente necessárias para o funcionamento do bot
+  const REQUIRED_CONFIGS = [
+    { key: 'EVOLUTION_API_URL', description: 'URL da API Evolution (ex: https://evo.audiozap.app)' },
+    { key: 'EVOLUTION_API_KEY', description: 'Chave de API da Evolution' },
+    { key: 'INSTANCE_NAME', description: 'Nome da instância na Evolution API' },
+    { key: 'TARGET_GROUP_ID', description: 'ID do grupo alvo do WhatsApp (ex: 553499999999-1615888888@g.us)' },
+    { key: 'BOT_WEBHOOK_PORT', description: 'Porta para o webhook do bot (ex: 8080)' }
+  ];
+
+  // Configurações desejáveis, mas não críticas (serão gerados avisos, não erros)
+  const RECOMMENDED_CONFIGS = [
+    { key: 'SERVER_OPEN_TIME', description: 'Hora de abertura do servidor (ex: 19:00)' },
+    { key: 'SERVER_CLOSE_TIME', description: 'Hora de fechamento do servidor (ex: 23:59)' },
+    { key: 'MONGODB_URI', description: 'URI de conexão ao MongoDB' },
+    { key: 'BOT_PUBLIC_URL', description: 'URL pública do bot para webhooks' }
+  ];
+
+  for (const { key, description } of REQUIRED_CONFIGS) {
+    if (!config[key]) {
+      missingConfigs.push({ key, description, isCritical: true });
+    }
+  }
+
+  for (const { key, description } of RECOMMENDED_CONFIGS) {
+    if (!config[key]) {
+      missingConfigs.push({ key, description, isCritical: false });
+    }
+  }
+
+  return missingConfigs;
+}
+
 async function startBot() {
   console.log("Iniciando o bot Pavlov (refatorado)...");
 
@@ -29,6 +65,8 @@ async function startBot() {
     await DatabaseService.connect();
   } catch (dbError) {
     console.error("Falha crítica ao conectar ao banco de dados. Encerrando.", dbError);
+    console.error("Certifique-se de que a variável de ambiente MONGODB_URI está configurada corretamente.");
+    console.error("Exemplo: MONGODB_URI='mongodb://localhost:27017/pavlovBot'");
     process.exit(1);
   }
 
@@ -36,17 +74,39 @@ async function startBot() {
   await ConfigService.loadConfig();
   let currentConfig = ConfigService.getConfig();
 
+  // Validate critical configurations
+  const missingConfigs = checkCriticalConfigs(currentConfig);
+  
+  if (missingConfigs.length > 0) {
+    const criticalMissing = missingConfigs.filter(conf => conf.isCritical);
+    const recommendedMissing = missingConfigs.filter(conf => !conf.isCritical);
+    
+    if (criticalMissing.length > 0) {
+      console.error("\n=== ERRO CRÍTICO: CONFIGURAÇÃO INCOMPLETA ===");
+      console.error("As seguintes configurações cruciais não foram definidas:");
+      criticalMissing.forEach(({ key, description }) => {
+        console.error(`- ${key}: ${description}`);
+      });
+      console.error("\nConfigurações podem ser definidas:");
+      console.error("1. No arquivo .env na raiz do projeto");
+      console.error("2. No painel de administração após a primeira inicialização");
+      console.error("3. Nas variáveis de ambiente do sistema");
+      console.error("\nO bot não pode iniciar sem essas configurações. Encerrando.");
+      process.exit(1);
+    }
+    
+    if (recommendedMissing.length > 0) {
+      console.warn("\n⚠️ AVISO: CONFIGURAÇÕES RECOMENDADAS AUSENTES ⚠️");
+      console.warn("As seguintes configurações recomendadas não foram encontradas:");
+      recommendedMissing.forEach(({ key, description }) => {
+        console.warn(`- ${key}: ${description}`);
+      });
+      console.warn("\nO bot irá iniciar, mas algumas funcionalidades podem não operar corretamente.");
+    }
+  }
+
   // Load messages (MessageService.loadMessages now fetches from DB or initializes)
   await MessageService.loadMessages();
-
-  // Validate critical configurations
-  if (!currentConfig.EVOLUTION_API_URL || !currentConfig.EVOLUTION_API_KEY ||
-      !currentConfig.INSTANCE_NAME || !currentConfig.TARGET_GROUP_ID ||
-      !currentConfig.SERVER_OPEN_TIME || !currentConfig.SERVER_CLOSE_TIME ||
-      !currentConfig.BOT_WEBHOOK_PORT) {
-    console.error("ERRO CRÍTICO: Variáveis de ambiente/configuração cruciais não definidas. Verifique .env e config.json.");
-    process.exit(1);
-  }
 
   // Initialize services with dependencies
   // MessageService is loaded on import

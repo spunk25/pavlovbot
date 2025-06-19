@@ -125,7 +125,8 @@ async function handleCommand(command, args, fullMessage, senderJid, isGroupMessa
           break;
       }
     } else { // Non-admin sent a command in PM
-      await EvolutionApiService.sendMessageToGroup("Você não tem permissão para usar comandos. Contate um administrador do grupo alvo.", senderJid);
+      // Não responder nada para não-administradores que tentam usar comandos em PM
+      console.log(`CommandHandler: Comando '${command}' ignorado de usuário não-admin ${senderJid} em PM.`);
       commandProcessed = true;
     }
   } else { // Command is from a Group Message (and it's the TARGET_GROUP_ID)
