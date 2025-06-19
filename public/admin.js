@@ -1,15 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // Formulários
-    const configForm = document.getElementById('configForm');
-    const messagesForm = document.getElementById('messagesForm');
-    const promptsForm = document.getElementById('promptsForm'); // Novo formulário
-
-    // Mensagens de resposta
-    const responseMessageConfig = document.getElementById('responseMessageConfig');
-    const responseMessageMessages = document.getElementById('responseMessageMessages');
-    const responseMessagePrompts = document.getElementById('responseMessagePrompts'); // Nova div de resposta
-
     // Formulário de Mensagens
+    const messagesForm = document.getElementById('messagesForm');
     const responseMessageMessagesDiv = document.getElementById('responseMessageMessages');
     const statusClosedInput = document.getElementById('status_closed');
     const statusOpeningSoonInput = document.getElementById('status_openingSoon');
@@ -61,6 +52,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const aiUsageRandomJokeCheckbox = document.getElementById('aiUsage_randomJoke'); // checkbox para piadas
 
     // Formulário de Configurações Gerais
+    const configForm = document.getElementById('configForm');
+    const responseMessageConfigDiv = document.getElementById('responseMessageConfig');
+    const configTargetGroupIdInput = document.getElementById('config_TARGET_GROUP_ID');
+    const configGroupBaseNameInput = document.getElementById('config_GROUP_BASE_NAME');
+    const configServerOpenTimeInput = document.getElementById('config_SERVER_OPEN_TIME');
+    const configServerCloseTimeInput = document.getElementById('config_SERVER_CLOSE_TIME');
+    const configMessagesDuringServerOpenInput = document.getElementById('config_MESSAGES_DURING_SERVER_OPEN');
+    const configMessagesDuringDaytimeInput = document.getElementById('config_MESSAGES_DURING_DAYTIME');
+    const configDaytimeStartHourInput = document.getElementById('config_DAYTIME_START_HOUR');
+    const configDaytimeEndHourInput = document.getElementById('config_DAYTIME_END_HOUR');
+    const configMessagesTipsPerDayInput = document.getElementById('config_MESSAGES_TIPS_PER_DAY');
+    const configMessagesJokesPerDayInput = document.getElementById('config_MESSAGES_JOKES_PER_DAY');
+    const configChatSummaryTimesInput = document.getElementById('config_CHAT_SUMMARY_TIMES');
+    const configChatSummaryCountPerDayInput = document.getElementById('config_CHAT_SUMMARY_COUNT_PER_DAY');
+    const configPollMentionEveryoneCheckbox = document.getElementById('config_POLL_MENTION_EVERYONE');
+    const configChatSummaryEnabledCheckbox = document.getElementById('config_CHAT_SUMMARY_ENABLED');
+
     const responseMessageGlobalDiv = document.getElementById('responseMessageGlobal');
 
     // Novos elementos para substituir todas as mensagens via JSON
@@ -83,28 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Novos elementos para "Mensagem Apagada"
     const messageDeletedTextarea = document.getElementById('messageDeleted');
     const aiPromptMessageDeletedTextarea = document.getElementById('aiPrompt_messageDeleted');
-
-    // --- EXTENDED DEBUGGING ---
-    console.log("--- Checking Config Input Elements ---");
-    console.log("configEvolutionApiUrlInput:", configEvolutionApiUrlInput);
-    console.log("configInstanceNameInput:", configInstanceNameInput);
-    console.log("configEvolutionApiKeyInput:", configEvolutionApiKeyInput);
-    console.log("configGroqApiKeyInput:", configGroqApiKeyInput);
-    console.log("configTargetGroupIdInput:", configTargetGroupIdInput);
-    console.log("configGroupBaseNameInput:", configGroupBaseNameInput);
-    console.log("configServerOpenTimeInput:", configServerOpenTimeInput);
-    console.log("configServerCloseTimeInput:", configServerCloseTimeInput);
-    console.log("configTimezoneInput:", configTimezoneInput);
-    console.log("configMessagesDuringServerOpenInput:", configMessagesDuringServerOpenInput);
-    console.log("configMessagesDuringDaytimeInput:", configMessagesDuringDaytimeInput);
-    console.log("configDaytimeStartHourInput:", configDaytimeStartHourInput);
-    console.log("configDaytimeEndHourInput:", configDaytimeEndHourInput); // Previous specific debug
-    console.log("configChatSummaryTimesInput:", configChatSummaryTimesInput);
-    console.log("configBotWebhookPortInput:", configBotWebhookPortInput);
-    console.log("configBotPublicUrlInput:", configBotPublicUrlInput);
-    console.log("configChatSummaryCountPerDayInput:", configChatSummaryCountPerDayInput);
-    console.log("--- End Checking Config Input Elements ---");
-    // --- END EXTENDED DEBUGGING ---
 
     function showGlobalMessage(message, isError = false) {
         responseMessageGlobalDiv.textContent = message;
@@ -242,86 +228,134 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    if (messagesForm) {
-        messagesForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const dataToSave = {
-                status: {
-                    closed: statusClosedInput.value.split('\n').map(s => s.trim()).filter(Boolean),
-                    openingSoon: statusOpeningSoonInput.value.split('\n').map(s => s.trim()).filter(Boolean),
-                    open: statusOpenInput.value.split('\n').map(s => s.trim()).filter(Boolean)
-                },
-                newMember: newMemberTextarea.value.split('\n').map(s => s.trim()).filter(Boolean),
-                memberLeft: memberLeftTextarea.value.split('\n').map(s => s.trim()).filter(Boolean),
-                randomActive: randomActiveTextarea.value.split('\n').map(s => s.trim()).filter(Boolean),
-                inGameRandom: inGameRandomTextarea.value.split('\n').map(s => s.trim()).filter(Boolean),
-                gameTips: gameTipsTextarea.value.split('\n').map(s => s.trim()).filter(Boolean),
-                randomJokes: randomJokesTextarea.value.split('\n').map(s => s.trim()).filter(Boolean),
-                messageDeleted: messageDeletedTextarea.value.split('\n').map(s => s.trim()).filter(Boolean),
-                extras: {
-                    sundayNight: extrasSundayNightInput.value.split('\n').map(s => s.trim()).filter(Boolean),
-                    friday: extrasFridayInput.value.split('\n').map(s => s.trim()).filter(Boolean)
-                },
-                aiUsageSettings: {
-                    status_closed: aiUsageStatusClosedCheckbox.checked,
-                    status_openingSoon: aiUsageStatusOpeningSoonCheckbox.checked,
-                    status_open: aiUsageStatusOpenCheckbox.checked,
-                    newMember: aiUsageNewMemberCheckbox.checked,
-                    memberLeft: aiUsageMemberLeftCheckbox.checked,
-                    randomActive: aiUsageRandomActiveCheckbox.checked,
-                    inGameRandom: aiUsageInGameRandomCheckbox.checked,
-                    extras_sundayNight: aiUsageExtrasSundayNightCheckbox.checked,
-                    extras_friday: aiUsageExtrasFridayCheckbox.checked,
-                    messageDeleted: aiUsageMessageDeletedCheckbox.checked,
-                    randomJoke: aiUsageRandomJokeCheckbox.checked
-                }
-            };
-            try {
-                const response = await fetch('/api/admin/messages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dataToSave)
-                });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.message);
-                showGlobalMessage('Mensagens e configurações de uso da IA salvas!', false, responseMessageMessages);
-            } catch (error) {
-                showGlobalMessage(`Erro ao salvar: ${error.message}`, true, responseMessageMessages);
-            }
-        });
-    }
+    messagesForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        responseMessageMessagesDiv.textContent = '';
+        responseMessageMessagesDiv.className = 'response-message';
 
-    if (promptsForm) {
-        promptsForm.addEventListener('submit', async function(event) {
+        const updatedMessages = {
+            status: {
+                closed: statusClosedInput.value.split('\n').map(s => s.trim()).filter(s => s),
+                openingSoon: statusOpeningSoonInput.value.split('\n').map(s => s.trim()).filter(s => s),
+                open: statusOpenInput.value.split('\n').map(s => s.trim()).filter(s => s),
+            },
+            newMember: newMemberTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
+            memberLeft: memberLeftTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
+            randomActive: randomActiveTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
+            inGameRandom: inGameRandomTextarea.value.split('\n').map(s => s.trim()).filter(s => s),
+            gameTips: gameTipsTextarea ? gameTipsTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
+            randomJokes: randomJokesTextarea ? randomJokesTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
+            messageDeleted: messageDeletedTextarea ? messageDeletedTextarea.value.split('\n').map(s => s.trim()).filter(s => s) : [],
+            aiPrompts: {
+                systemPrompt: aiPromptSystemPromptTextarea ? aiPromptSystemPromptTextarea.value.trim() : '',
+                randomActive: aiPromptRandomActiveTextarea ? aiPromptRandomActiveTextarea.value.trim() : '',
+                inGameRandom: aiPromptInGameRandomTextarea ? aiPromptInGameRandomTextarea.value.trim() : '',
+                chatSummary: aiPromptChatSummaryTextarea ? aiPromptChatSummaryTextarea.value.trim() : '',
+                status_closed: aiPromptStatusClosedTextarea ? aiPromptStatusClosedTextarea.value.trim() : '',
+                status_openingSoon: aiPromptStatusOpeningSoonTextarea ? aiPromptStatusOpeningSoonTextarea.value.trim() : '',
+                status_open: aiPromptStatusOpenTextarea ? aiPromptStatusOpenTextarea.value.trim() : '',
+                newMember: aiPromptNewMemberTextarea ? aiPromptNewMemberTextarea.value.trim() : '',
+                memberLeft: aiPromptMemberLeftTextarea ? aiPromptMemberLeftTextarea.value.trim() : '',
+                extras_sundayNight: aiPromptExtrasSundayNightTextarea ? aiPromptExtrasSundayNightTextarea.value.trim() : '',
+                extras_friday: aiPromptExtrasFridayTextarea ? aiPromptExtrasFridayTextarea.value.trim() : '',
+                messageDeleted: aiPromptMessageDeletedTextarea ? aiPromptMessageDeletedTextarea.value.trim() : '',
+                randomJoke: aiPromptRandomJokeTextarea ? aiPromptRandomJokeTextarea.value.trim() : ''
+            },
+            aiUsageSettings: {
+                status_closed: aiUsageStatusClosedCheckbox ? aiUsageStatusClosedCheckbox.checked : false,
+                status_openingSoon: aiUsageStatusOpeningSoonCheckbox ? aiUsageStatusOpeningSoonCheckbox.checked : false,
+                status_open: aiUsageStatusOpenCheckbox ? aiUsageStatusOpenCheckbox.checked : false,
+                newMember: aiUsageNewMemberCheckbox ? aiUsageNewMemberCheckbox.checked : false,
+                memberLeft: aiUsageMemberLeftCheckbox ? aiUsageMemberLeftCheckbox.checked : false,
+                randomActive: aiUsageRandomActiveCheckbox ? aiUsageRandomActiveCheckbox.checked : true, // Default true
+                inGameRandom: aiUsageInGameRandomCheckbox ? aiUsageInGameRandomCheckbox.checked : true, // Default true
+                extras_sundayNight: aiUsageExtrasSundayNightCheckbox ? aiUsageExtrasSundayNightCheckbox.checked : false,
+                extras_friday: aiUsageExtrasFridayCheckbox ? aiUsageExtrasFridayCheckbox.checked : false,
+                messageDeleted: aiUsageMessageDeletedCheckbox ? aiUsageMessageDeletedCheckbox.checked : false,
+                randomJoke: aiUsageRandomJokeCheckbox ? aiUsageRandomJokeCheckbox.checked : false
+            }
+        };
+
+        try {
+            const response = await fetch('/admin/api/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedMessages),
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                showGlobalMessage(result.message || 'Mensagens salvas com sucesso!');
+            } else {
+                throw new Error(result.message || 'Falha ao salvar mensagens.');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar mensagens:', error);
+            responseMessageMessagesDiv.textContent = `Erro ao salvar: ${error.message}`;
+            responseMessageMessagesDiv.className = 'response-message error';
+        }
+    });
+
+    if (configForm) {
+        configForm.addEventListener('submit', async (event) => {
             event.preventDefault();
-            const dataToSave = {
-                aiPrompts: {
-                    systemPrompt: aiPromptSystemPromptTextarea.value.trim(),
-                    randomActive: aiPromptRandomActiveTextarea.value.trim(),
-                    inGameRandom: aiPromptInGameRandomTextarea.value.trim(),
-                    chatSummary: aiPromptChatSummaryTextarea.value.trim(),
-                    status_closed: aiPromptStatusClosedTextarea.value.trim(),
-                    status_openingSoon: aiPromptStatusOpeningSoonTextarea.value.trim(),
-                    status_open: aiPromptStatusOpenTextarea.value.trim(),
-                    newMember: aiPromptNewMemberTextarea.value.trim(),
-                    memberLeft: aiPromptMemberLeftTextarea.value.trim(),
-                    extras_sundayNight: aiPromptExtrasSundayNightTextarea.value.trim(),
-                    extras_friday: aiPromptExtrasFridayTextarea.value.trim(),
-                    messageDeleted: aiPromptMessageDeletedTextarea.value.trim(),
-                    randomJoke: aiPromptRandomJokeTextarea.value.trim()
+            responseMessageConfigDiv.classList.add('hidden');
+            const configData = {};
+
+            // Lista de todas as chaves de configuração esperadas no formulário.
+            // Mantém o código explícito e garante que todos os campos sejam processados.
+            const allConfigKeys = [
+                'GROUP_BASE_NAME', 'TARGET_GROUP_ID',
+                'SERVER_OPEN_TIME', 'SERVER_CLOSE_TIME',
+                'MESSAGES_DURING_SERVER_OPEN',
+                'MESSAGES_DURING_DAYTIME', 'DAYTIME_START_HOUR', 'DAYTIME_END_HOUR',
+                'MESSAGES_TIPS_PER_DAY', 'MESSAGES_JOKES_PER_DAY',
+                'CHAT_SUMMARY_COUNT_PER_DAY', 'CHAT_SUMMARY_TIMES',
+                'POLL_MENTION_EVERYONE', 'CHAT_SUMMARY_ENABLED'
+            ];
+
+            allConfigKeys.forEach(key => {
+                const inputElement = document.getElementById(`config_${key}`);
+                if (inputElement) {
+                    if (inputElement.type === 'checkbox') {
+                        configData[key] = inputElement.checked;
+                    } else if (inputElement.type === 'number') {
+                        configData[key] = inputElement.value === '' ? null : Number(inputElement.value);
+                    } else {
+                        configData[key] = inputElement.value;
+                    }
                 }
-            };
+            });
+
+            console.log("Admin.js: Enviando dados de configuração para /admin/api/config:", JSON.stringify(configData, null, 2));
+
             try {
-                const response = await fetch('/api/admin/messages', {
+                const response = await fetch('/admin/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dataToSave)
+                    body: JSON.stringify(configData),
                 });
                 const result = await response.json();
-                if (!response.ok) throw new Error(result.message);
-                showGlobalMessage('Prompts da IA salvos com sucesso!', false, responseMessagePrompts);
+
+                if (response.ok && result.success) {
+                    showGlobalMessage(result.message || 'Configurações gerais salvas com sucesso!');
+                    if (result.config) {
+                        console.log("Admin.js: Configurações atualizadas recebidas do backend, recarregando formulário.");
+                        // Repopular o formulário com os dados confirmados pelo backend
+                        Object.keys(result.config).forEach(k => {
+                            const el = document.getElementById(`config_${k}`);
+                            if (el) {
+                                if (el.type === 'checkbox') el.checked = !!result.config[k];
+                                else if (k === 'CHAT_SUMMARY_TIMES' && Array.isArray(result.config[k])) el.value = result.config[k].join(',');
+                                else el.value = result.config[k] ?? '';
+                            }
+                        });
+                    }
+                } else {
+                    throw new Error(result.message || 'Falha ao salvar configurações gerais.');
+                }
             } catch (error) {
-                showGlobalMessage(`Erro ao salvar prompts: ${error.message}`, true, responseMessagePrompts);
+                console.error('Erro ao salvar configurações gerais:', error);
+                showFormMessage(responseMessageConfigDiv, `Erro: ${error.message}`, true);
             }
         });
     }
