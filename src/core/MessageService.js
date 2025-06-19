@@ -57,49 +57,56 @@ async function loadMessages() {
     if (!dbMessages) {
       console.warn(`MessageService: Nenhuma configuração de mensagens encontrada no DB para ID '${MESSAGES_DOC_ID}'. Inicializando com padrões.`);
       messages = getDefaultMessageStructure();
-      // Remove _id before assigning to in-memory cache if you don't want it there,
-      // but it's fine to keep it if messages object is what's saved back.
-      // For simplicity, we'll keep it as the save function will handle the _id for upsert.
-      await collection.insertOne({ ...messages }); // Save the defaults to DB
+      await collection.insertOne({ ...messages }); 
       console.log("MessageService: Configurações de mensagens padrão salvas no MongoDB.");
     } else {
-      // Merge DB data with defaults to ensure all keys exist
+      console.log("MessageService: Mensagens encontradas no DB. Mesclando com padrões...");
       const defaultStructure = getDefaultMessageStructure();
-      messages = { ...defaultStructure, ...dbMessages };
-
-      // Deep merge for nested objects like aiPrompts and aiUsageSettings
-      messages.aiPrompts = { ...defaultStructure.aiPrompts, ...(dbMessages.aiPrompts || {}) };
-      messages.aiUsageSettings = { ...defaultStructure.aiUsageSettings, ...(dbMessages.aiUsageSettings || {}) };
-      messages.status = { ...defaultStructure.status, ...(dbMessages.status || {}) };
-      messages.extras = { ...defaultStructure.extras, ...(dbMessages.extras || {}) };
-      messages.chatSummary = { ...defaultStructure.chatSummary, ...(dbMessages.chatSummary || {}) };
-      messages.botInfo = { ...defaultStructure.botInfo, ...(dbMessages.botInfo || {}) };
       
-      // Ensure arrays are arrays
+      // Começa com a estrutura padrão
+      let mergedMessages = { ...defaultStructure };
+
+      // Mescla objetos aninhados de forma profunda, priorizando o DB
+      mergedMessages.status = { ...defaultStructure.status, ...(dbMessages.status || {}) };
+      mergedMessages.extras = { ...defaultStructure.extras, ...(dbMessages.extras || {}) };
+      mergedMessages.aiPrompts = { ...defaultStructure.aiPrompts, ...(dbMessages.aiPrompts || {}) };
+      mergedMessages.aiUsageSettings = { ...defaultStructure.aiUsageSettings, ...(dbMessages.aiUsageSettings || {}) };
+      mergedMessages.chatSummary = { ...defaultStructure.chatSummary, ...(dbMessages.chatSummary || {}) };
+      mergedMessages.botInfo = { ...defaultStructure.botInfo, ...(dbMessages.botInfo || {}) };
+
+      // Mescla arrays de primeiro nível, priorizando o DB apenas se for um array válido
       const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips', 'randomJokes', 'messageDeleted'];
       arrayKeys.forEach(key => {
-        if (!Array.isArray(messages[key])) {
-          messages[key] = defaultStructure[key];
+        if (dbMessages[key] && Array.isArray(dbMessages[key])) {
+          mergedMessages[key] = dbMessages[key];
         }
+        // Se não houver um array válido no DB, o valor do defaultStructure já está em mergedMessages
       });
-      if (messages.status) {
-        Object.keys(messages.status).forEach(key => {
-          if (!Array.isArray(messages.status[key])) messages.status[key] = defaultStructure.status[key] || [];
-        });
+
+      // Validação final para garantir que sub-arrays dentro de objetos também sejam arrays
+      const ensureSubArrays = (obj, defaultObj, keys) => {
+          if (obj) {
+              keys.forEach(key => {
+                  if (!Array.isArray(obj[key])) {
+                      obj[key] = (defaultObj && Array.isArray(defaultObj[key])) ? defaultObj[key] : [];
+                  }
+              });
+          }
+      };
+
+      ensureSubArrays(mergedMessages.status, defaultStructure.status, Object.keys(defaultStructure.status || {}));
+      ensureSubArrays(mergedMessages.extras, defaultStructure.extras, Object.keys(defaultStructure.extras || {}));
+      if (mergedMessages.chatSummary && !Array.isArray(mergedMessages.chatSummary.noNewMessages)) {
+          mergedMessages.chatSummary.noNewMessages = defaultStructure.chatSummary.noNewMessages || [];
       }
-       if (messages.extras) {
-        Object.keys(messages.extras).forEach(key => {
-          if (!Array.isArray(messages.extras[key])) messages.extras[key] = defaultStructure.extras[key] || [];
-        });
-      }
-      if (messages.chatSummary && !Array.isArray(messages.chatSummary.noNewMessages)) {
-        messages.chatSummary.noNewMessages = defaultStructure.chatSummary.noNewMessages || [];
-      }
-      if (messages.botInfo && !Array.isArray(messages.botInfo.defaultPmReply)) {
-        messages.botInfo.defaultPmReply = defaultStructure.botInfo.defaultPmReply || [];
+      if (mergedMessages.botInfo && !Array.isArray(mergedMessages.botInfo.defaultPmReply)) {
+          mergedMessages.botInfo.defaultPmReply = defaultStructure.botInfo.defaultPmReply || [];
       }
 
-      console.log("MessageService: Mensagens carregadas do MongoDB.");
+      messages = mergedMessages; // Atribui a estrutura mesclada final ao cache
+      console.log("MessageService: Mensagens carregadas e mescladas do MongoDB.");
+      // Opcional: logar as piadas carregadas para depuração
+      // console.log("[DEBUG] Piadas carregadas:", JSON.stringify(messages.randomJokes, null, 2));
     }
   } catch (error) {
     console.error("MessageService: Erro ao carregar mensagens do MongoDB. Usando padrões em memória.", error);
