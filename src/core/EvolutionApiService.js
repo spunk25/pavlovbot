@@ -399,15 +399,19 @@ async function getContactName(jid) {
   }
   
   try {
-    // Primeiro tenta obter o nome do contato através da API de contatos
+    console.log(`[DEBUG] getContactName: Tentando obter nome para JID: ${jid}`);
     const response = await evolutionAPIClient.get(`/contact/getContact/${currentConfig.INSTANCE_NAME}`, {
-      params: { number: jid }
+      params: { number: jid.split('@')[0] } // Enviar apenas a parte do número
     });
     
+    console.log(`[DEBUG] getContactName: Resposta da API /contact/getContact:`, JSON.stringify(response.data, null, 2));
+
     if (response.data && response.data.pushName) {
+      console.log(`[DEBUG] getContactName: pushName '${response.data.pushName}' encontrado via /contact/getContact.`);
       return response.data.pushName;
     }
     
+    console.log(`[DEBUG] getContactName: pushName não encontrado via /contact/getContact. Tentando fallback via findMessages.`);
     // Se não conseguir pelo método direto, tenta através da API de mensagens
     // Muitas vezes o pushName é enviado nos eventos de mensagens
     try {
@@ -417,12 +421,19 @@ async function getContactName(jid) {
             participant: jid
           }
         },
-        limit: 1
+        limit: 1,
+        // Ordenar por timestamp para obter a mensagem mais recente
+        sort: {
+          messageTimestamp: -1
+        }
       });
       
+      console.log(`[DEBUG] getContactName: Resposta da API /chat/findMessages:`, JSON.stringify(messageResponse.data, null, 2));
+
       if (messageResponse.data && Array.isArray(messageResponse.data) && messageResponse.data.length > 0) {
         const message = messageResponse.data[0];
         if (message.pushName) {
+          console.log(`[DEBUG] getContactName: pushName '${message.pushName}' encontrado via /chat/findMessages.`);
           return message.pushName;
         }
       }
@@ -431,10 +442,14 @@ async function getContactName(jid) {
     }
     
     // Se não conseguir de nenhuma forma, retorna o número formatado
-    return jid.split('@')[0];
+    const finalName = jid.split('@')[0];
+    console.log(`[DEBUG] getContactName: Nenhum pushName encontrado. Retornando JID: ${finalName}`);
+    return finalName;
   } catch (error) {
-    console.log(`EvolutionApiService: Erro ao obter nome do contato ${jid}:`, error.message);
-    return jid ? jid.split('@')[0] : "alguém";
+    console.log(`EvolutionApiService: Erro ao obter nome do contato ${jid}. Erro: ${error.message}`);
+    const finalName = jid.split('@')[0];
+    console.log(`[DEBUG] getContactName: Exceção ao obter contato. Retornando JID: ${finalName}`);
+    return finalName;
   }
 }
 

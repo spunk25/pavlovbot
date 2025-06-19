@@ -304,28 +304,29 @@ router.post('/messages-delete', async (req, res) => {
       if (useAI) {
         try {
           // Substituir [NomeDoRemetente] pelo nome do remetente real no prompt
-          const customPrompt = MessageService.getAIPrompt('messageDeleted')?.replace('[NomeDoRemetente]', senderName);
+          const customPrompt = MessageService.getAIPrompt('messageDeleted')?.replace(/\[NomeDoRemetente\]/g, senderName);
           console.log(`[DEBUG] Prompt para IA: ${customPrompt}`);
           deletionMessage = await GroqApiService.callGroqAPI(customPrompt);
           console.log(`[DEBUG] Resposta da IA: ${deletionMessage}`);
           
           if (!deletionMessage || deletionMessage.startsWith('Erro') || deletionMessage.length < 5) {
             console.log(`[DEBUG] Resposta da IA inválida, usando mensagem padrão do banco`);
-            deletionMessage = getRandomElement(messages.messageDeleted) || `${senderName} apagou uma mensagem... 🤔`;
-            console.log(`[DEBUG] Usando mensagem padrão: ${deletionMessage}`);
+            deletionMessage = getRandomElement(messages.messageDeleted) || `[NomeDoRemetente] apagou uma mensagem... 🤔`;
+            deletionMessage = deletionMessage.replace(/\[NomeDoRemetente\]/g, senderName);
+            console.log(`[DEBUG] Usando mensagem padrão após fallback da IA: ${deletionMessage}`);
           } else {
             console.log(`[DEBUG] Usando mensagem gerada pela IA`);
           }
         } catch (error) {
           console.error('WebhookHandler: Erro ao gerar resposta de AI para mensagem apagada:', error);
-          deletionMessage = getRandomElement(messages.messageDeleted) || `${senderName} apagou uma mensagem... 🤔`;
+          deletionMessage = getRandomElement(messages.messageDeleted) || `[NomeDoRemetente] apagou uma mensagem... 🤔`;
+          deletionMessage = deletionMessage.replace(/\[NomeDoRemetente\]/g, senderName);
           console.log(`[DEBUG] Erro na IA, usando mensagem padrão: ${deletionMessage}`);
         }
       } else {
         console.log(`[DEBUG] Não usando IA, obtendo mensagem do banco de dados`);
         console.log(`[DEBUG] Mensagens disponíveis:`, JSON.stringify(messages.messageDeleted));
-        deletionMessage = getRandomElement(messages.messageDeleted) || `${senderName} apagou uma mensagem... 🤔`;
-        // Substituir [NomeDoRemetente] pelo nome do remetente real na mensagem padrão, se existir
+        deletionMessage = getRandomElement(messages.messageDeleted) || `[NomeDoRemetente] apagou uma mensagem... 🤔`;
         deletionMessage = deletionMessage.replace(/\[NomeDoRemetente\]/g, senderName);
         console.log(`[DEBUG] Não usando IA, mensagem final: ${deletionMessage}`);
       }
