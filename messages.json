@@ -48,7 +48,18 @@
     "extras_friday": "Gere uma mensagem curta e animada para uma SEXTA-FEIRA para jogadores de Pavlov VR, celebrando o início do fim de semana e chamando para o jogo. Exemplo: Sextou, soldados! Pavlov liberado no final de semana!",
     "messageDeleted": "Gere uma mensagem curta e engraçada para quando um usuário apaga uma mensagem no grupo. Pode ser algo como 'Ih, alguém se arrependeu!' ou 'Ops, mensagem evaporou! O que será que era?'. Se souber o nome do remetente original, pode mencioná-lo de forma leve, por exemplo: 'O [NomeDoRemetente] fez uma mágica e a mensagem sumiu! ✨'"
   },
-  "messageDeleted": ["Alguém apagou uma mensagem... O que será que era? 🤔", "Ops, uma mensagem sumiu do mapa!"],
+  "messageDeleted": [
+    "Eita, [NomeDoRemetente] apagou uma mensagem... O que será que era? 🤔", 
+    "Ops, [NomeDoRemetente] fez uma mensagem sumir do mapa! 🔍", 
+    "Hmm, [NomeDoRemetente] escondeu algo que disse! Suspeito... 🕵️‍♂️", 
+    "[NomeDoRemetente] tentou apagar as provas, mas eu vi! 👀", 
+    "Será que [NomeDoRemetente] falou algo que não devia? 🫢", 
+    "Parece que [NomeDoRemetente] se arrependeu de algo que disse! 🙊", 
+    "[NomeDoRemetente] acabou de usar o poder do CTRL+Z na vida real! ⚡", 
+    "Mensagem de [NomeDoRemetente] foi abduzida por aliens! 👽", 
+    "[NomeDoRemetente] deletou mais rápido que um headshot! 🎯", 
+    "Vish, [NomeDoRemetente] mandou algo errado no grupo certo! 😂"
+  ],
   "aiUsageSettings": {
     "status_closed": false,
     "status_openingSoon": false,
@@ -60,7 +71,8 @@
     "extras_sundayNight": false,
     "extras_friday": false,
     "gameTips": true,
-    "randomJoke": true
+    "randomJoke": true,
+    "messageDeleted": true
   },
   "botInfo": {
     "name": "Bot Pavlov",

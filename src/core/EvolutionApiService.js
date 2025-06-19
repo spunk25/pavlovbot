@@ -388,6 +388,56 @@ async function getLatestGroupMessages(groupId, count = 20) {
   }
 }
 
+/**
+ * Obtém o nome real de um contato a partir do seu JID (número de telefone)
+ * @param {string} jid - O JID do contato (ex: '5511999999999@s.whatsapp.net')
+ * @returns {Promise<string>} - O nome do contato ou o número formatado se não encontrado
+ */
+async function getContactName(jid) {
+  if (!validateApiConfig() || !jid) {
+    return jid ? jid.split('@')[0] : "alguém";
+  }
+  
+  try {
+    // Primeiro tenta obter o nome do contato através da API de contatos
+    const response = await evolutionAPIClient.get(`/contact/getContact/${currentConfig.INSTANCE_NAME}`, {
+      params: { number: jid }
+    });
+    
+    if (response.data && response.data.pushName) {
+      return response.data.pushName;
+    }
+    
+    // Se não conseguir pelo método direto, tenta através da API de mensagens
+    // Muitas vezes o pushName é enviado nos eventos de mensagens
+    try {
+      const messageResponse = await evolutionAPIClient.post(`/chat/findMessages/${currentConfig.INSTANCE_NAME}`, {
+        where: {
+          key: {
+            participant: jid
+          }
+        },
+        limit: 1
+      });
+      
+      if (messageResponse.data && Array.isArray(messageResponse.data) && messageResponse.data.length > 0) {
+        const message = messageResponse.data[0];
+        if (message.pushName) {
+          return message.pushName;
+        }
+      }
+    } catch (msgError) {
+      console.log(`EvolutionApiService: Não foi possível obter o nome do contato ${jid} via mensagens:`, msgError.message);
+    }
+    
+    // Se não conseguir de nenhuma forma, retorna o número formatado
+    return jid.split('@')[0];
+  } catch (error) {
+    console.log(`EvolutionApiService: Erro ao obter nome do contato ${jid}:`, error.message);
+    return jid ? jid.split('@')[0] : "alguém";
+  }
+}
+
 export default {
   initialize,
   updateApiClient,
@@ -399,5 +449,6 @@ export default {
   getGroupParticipants,
   isUserAdmin,
   isFromMe,
-  getLatestGroupMessages
+  getLatestGroupMessages,
+  getContactName
 }; 

@@ -124,7 +124,15 @@ function logCurrentConfig() {
     CHAT_SUMMARY_TIMES: Array.isArray(currentConfig.CHAT_SUMMARY_TIMES) ? currentConfig.CHAT_SUMMARY_TIMES : [],
     CHAT_SUMMARY_COUNT_PER_DAY: currentConfig.CHAT_SUMMARY_COUNT_PER_DAY,
     SEND_NO_SUMMARY_MESSAGE: currentConfig.SEND_NO_SUMMARY_MESSAGE,
-    POLL_MENTION_EVERYONE: currentConfig.POLL_MENTION_EVERYONE
+    POLL_MENTION_EVERYONE: currentConfig.POLL_MENTION_EVERYONE,
+    MESSAGES_TIPS_PER_DAY: currentConfig.MESSAGES_TIPS_PER_DAY,
+    MESSAGES_JOKES_PER_DAY: currentConfig.MESSAGES_JOKES_PER_DAY
+  });
+  
+  // Log específico para depuração das configurações de dicas e piadas
+  console.log("[DEBUG] Configurações de mensagens automáticas:", {
+    MESSAGES_TIPS_PER_DAY: currentConfig.MESSAGES_TIPS_PER_DAY,
+    MESSAGES_JOKES_PER_DAY: currentConfig.MESSAGES_JOKES_PER_DAY
   });
 }
 

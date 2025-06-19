@@ -287,7 +287,10 @@ router.post('/messages-delete', async (req, res) => {
           continue; // Pula para o próximo item se não puder identificar o autor
       }
       
-      const senderName = participant ? participant.split('@')[0] : "alguém";
+      // Obter o nome real do contato em vez de apenas o número
+      const senderName = await EvolutionApiService.getContactName(participant);
+      console.log(`[DEBUG] Nome do remetente obtido: ${senderName} (JID: ${participant})`);
+      
       const messages = MessageService.getMessages();
       
       // Verificar se devemos responder à deleção com uma mensagem padrão ou gerada por IA

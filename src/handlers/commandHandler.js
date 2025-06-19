@@ -111,7 +111,7 @@ async function handleCommand(command, args, fullMessage, senderJid, isGroupMessa
           break;
         case '!enquete':
           const fullArgsString = args.join(" ");
-          const normalizedArgs = fullArgsString.replace(/[“”]/g, '"');
+          const normalizedArgs = fullArgsString.replace(/["']/g, '"');
           const pollArgs = normalizedArgs.match(/"([^"]+)"/g);
           
           if (pollArgs && pollArgs.length >= 2) {
@@ -186,14 +186,26 @@ async function getJoke() {
   const messages = MessageService.getMessages();
   const useAI = MessageService.getAIUsageSetting('randomJoke');
   
+  console.log(`[DEBUG] getJoke: Usando IA para piadas? ${useAI}`);
+  console.log(`[DEBUG] getJoke: Piadas disponíveis: ${messages.randomJokes?.length || 0}`);
+  
   if (useAI) {
     try {
       const prompt = MessageService.getAIPrompt('randomJoke');
+      console.log(`[DEBUG] getJoke: Prompt para IA: ${prompt?.substring(0, 50)}...`);
+      
       if (prompt) {
         const generatedJoke = await GroqApiService.callGroqAPI(prompt);
+        console.log(`[DEBUG] getJoke: Resposta da IA: ${generatedJoke?.substring(0, 50)}...`);
+        
         if (generatedJoke && !generatedJoke.startsWith("Erro") && generatedJoke.length > 5) {
+          console.log(`[DEBUG] getJoke: Usando piada gerada pela IA`);
           return generatedJoke;
+        } else {
+          console.log(`[DEBUG] getJoke: Resposta da IA inválida, usando fallback`);
         }
+      } else {
+        console.log(`[DEBUG] getJoke: Prompt não encontrado`);
       }
     } catch (error) {
       console.error("CommandHandler: Erro ao gerar piada via IA:", error);
@@ -202,10 +214,13 @@ async function getJoke() {
   
   // Fallback para piadas pré-definidas
   if (messages.randomJokes && messages.randomJokes.length > 0) {
-    return getRandomElement(messages.randomJokes);
+    const selectedJoke = getRandomElement(messages.randomJokes);
+    console.log(`[DEBUG] getJoke: Usando piada do banco de dados: ${selectedJoke?.substring(0, 50)}...`);
+    return selectedJoke;
   }
   
   // Piada padrão se não houver outras opções
+  console.log(`[DEBUG] getJoke: Usando piada padrão de fallback`);
   return "Por que o pão não pode namorar a manteiga? Porque a mãe dela disse que não quer ver a filha passando manteiga!";
 }
 

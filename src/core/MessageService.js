@@ -77,8 +77,12 @@ async function loadMessages() {
       // Mescla arrays de primeiro nível, priorizando o DB apenas se for um array válido
       const arrayKeys = ['newMember', 'memberLeft', 'randomActive', 'inGameRandom', 'gameTips', 'randomJokes', 'messageDeleted'];
       arrayKeys.forEach(key => {
-        if (dbMessages[key] && Array.isArray(dbMessages[key])) {
+        console.log(`[DEBUG] Processando array '${key}'. Valor no DB:`, JSON.stringify(dbMessages[key]));
+        if (dbMessages[key] && Array.isArray(dbMessages[key]) && dbMessages[key].length > 0) {
           mergedMessages[key] = dbMessages[key];
+          console.log(`[DEBUG] Usando valor do DB para '${key}':`, JSON.stringify(mergedMessages[key]));
+        } else {
+          console.log(`[DEBUG] Usando valor padrão para '${key}':`, JSON.stringify(defaultStructure[key]));
         }
         // Se não houver um array válido no DB, o valor do defaultStructure já está em mergedMessages
       });
@@ -105,8 +109,10 @@ async function loadMessages() {
 
       messages = mergedMessages; // Atribui a estrutura mesclada final ao cache
       console.log("MessageService: Mensagens carregadas e mescladas do MongoDB.");
-      // Opcional: logar as piadas carregadas para depuração
-      // console.log("[DEBUG] Piadas carregadas:", JSON.stringify(messages.randomJokes, null, 2));
+      
+      // Log para depuração das piadas carregadas
+      console.log("[DEBUG] Piadas carregadas:", JSON.stringify(messages.randomJokes, null, 2));
+      console.log("[DEBUG] Configuração de uso de IA para piadas:", messages.aiUsageSettings.randomJoke);
     }
   } catch (error) {
     console.error("MessageService: Erro ao carregar mensagens do MongoDB. Usando padrões em memória.", error);
