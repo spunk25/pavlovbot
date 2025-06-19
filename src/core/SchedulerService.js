@@ -460,6 +460,10 @@ async function scheduleNextRandomMessage(type) {
 
 async function triggerChatSummary() {
   const config = ConfigService.getConfig();
+  console.log("[DEBUG] Iniciando triggerChatSummary()");
+  console.log("[DEBUG] CHAT_SUMMARY_ENABLED:", config.CHAT_SUMMARY_ENABLED);
+  console.log("[DEBUG] GROQ_API_KEY configurada:", !!config.GROQ_API_KEY);
+  
   if (!config.CHAT_SUMMARY_ENABLED) {
     console.log("SchedulerService: Resumo do chat desabilitado nas configurações. Limpando histórico se existir.");
     await ChatHistoryService.clearChatHistory();
@@ -473,10 +477,14 @@ async function triggerChatSummary() {
 
   let historyForSummary = await ChatHistoryService.getChatHistory();
   let usedApiFallback = false;
+  
+  console.log(`[DEBUG] Tamanho do histórico do DB: ${historyForSummary.length} mensagens`);
 
   if (historyForSummary.length === 0) {
     console.log("SchedulerService: Histórico do DB vazio. Tentando buscar últimas 20 mensagens da API Evolution.");
     const apiMessages = await EvolutionApiService.getLatestGroupMessages(config.TARGET_GROUP_ID, 20);
+    console.log(`[DEBUG] API Evolution retornou: ${apiMessages ? apiMessages.length : 0} mensagens`);
+    
     if (apiMessages && apiMessages.length > 0) {
       console.log(`SchedulerService: Obtidas ${apiMessages.length} mensagens da API para o resumo.`);
       historyForSummary = apiMessages; // Usa as mensagens da API
@@ -521,17 +529,32 @@ async function triggerChatSummary() {
   const baseChatSummaryPrompt = MessageService.getAIPrompt('chatSummary');
   const prompt = baseChatSummaryPrompt.replace('{CHAT_PLACEHOLDER}', ChatHistoryService.formatChatForSummary(chatToSummarize));
 
+  console.log(`[DEBUG] Prompt formatado para GroqAPI: ${prompt.substring(0, 100)}...`);
   console.log(`SchedulerService: Tentando gerar resumo para ${chatToSummarize.length} mensagens.`);
-  const summary = await GroqApiService.callGroqAPI(prompt);
+  
+  try {
+    const summary = await GroqApiService.callGroqAPI(prompt);
+    console.log(`[DEBUG] Resposta da GroqAPI: ${summary ? summary.substring(0, 100) : 'NULA'}...`);
 
-  if (summary && !summary.startsWith("Erro") && !summary.startsWith("Não foi possível") && summary.length > 10) {
-    await EvolutionApiService.sendMessageToGroup(summary);
-    console.log("SchedulerService: Resumo do chat enviado ao grupo.");
-    chatSummaryCountToday++;
-    console.log(`SchedulerService: Resumos enviados hoje: ${chatSummaryCountToday}/${config.CHAT_SUMMARY_COUNT_PER_DAY}`);
-  } else {
-    console.warn("SchedulerService: Falha ao gerar resumo do chat ou resumo inválido:", summary);
+    if (summary && !summary.startsWith("Erro") && !summary.startsWith("Não foi possível") && summary.length > 10) {
+      console.log(`[DEBUG] Enviando resumo para o grupo: ${summary}`);
+      const result = await EvolutionApiService.sendMessageToGroup(summary, config.TARGET_GROUP_ID);
+      
+      if (result && result.success) {
+        console.log("SchedulerService: Resumo do chat enviado ao grupo com sucesso.");
+        chatSummaryCountToday++;
+        console.log(`SchedulerService: Resumos enviados hoje: ${chatSummaryCountToday}/${config.CHAT_SUMMARY_COUNT_PER_DAY}`);
+      } else {
+        console.error("SchedulerService: Falha ao enviar resumo do chat:", result?.error || "Erro desconhecido");
+      }
+    } else {
+      console.warn("SchedulerService: Falha ao gerar resumo do chat ou resumo inválido:", summary);
+    }
+  } catch (error) {
+    console.error("SchedulerService: Erro ao gerar ou enviar resumo do chat:", error);
   }
+  
+  console.log("[DEBUG] triggerChatSummary() concluído");
 }
 
 

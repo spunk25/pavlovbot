@@ -11,7 +11,20 @@
   "randomJokes": [
     "O que o pato disse para a pata? Vem Quá!",
     "Porque o pinheiro não se perde na floresta? Porque ele tem uma pinha!",
-    "Qual é o rei dos queijos? O reiqueijão."
+    "Qual é o rei dos queijos? O reiqueijão.",
+    "Por que o livro de matemática está sempre triste? Porque ele tem muitos problemas.",
+    "Qual é o animal mais antigo do mundo? A zebra, porque está sempre em preto e branco.",
+    "O que acontece quando chove na Inglaterra? Fica tudo inglês.",
+    "Por que o jacaré não usa o celular? Porque ele não quer virar um jacaré-papo.",
+    "Qual é o contrário de volátil? Vem cá sobrinho.",
+    "Por que a aranha é o animal mais carente do mundo? Porque ela é uma web crawler.",
+    "O que é um pontinho amarelo no céu? Um yellowcóptero.",
+    "Por que a plantinha não foi ao médico? Porque ela só tinha problema de autoestima.",
+    "O que o pato vegetariano disse? Quác-tion.",
+    "O que o zero disse para o oito? Belo cinto!",
+    "Por que o jogador de Pavlov não consegue mentir? Porque ele sempre mira na verdade.",
+    "Como se chama a planta que fica tremendo no jardim? Tremelicia.",
+    "Por que a galinha atravessou a estrada? Para chegar ao outro lado."
   ],
   
   "inGameRandom": ["💣 ALGUÉM PLANTOU A BOMBA! CORRE OU DEFENDE, SEUS LERDOS!", "🎯 Headshot! Alguém avisa pra família que foi rápido e indolor... ou não.", "🏃‍♂️💨 Foge que o buja tá vindo com a faca!", "reloading... CUBRAM-ME!", "🔥 Time inimigo eliminado! GG EZ? Ou foi sorte mesmo?", "Segura esse rush que nem mãe segurando filho teimoso!"],
@@ -31,7 +44,7 @@
     "newMember": "Gere uma mensagem de boas-vindas curta, amigável e divertida para um NOVO MEMBRO que acabou de entrar no grupo de Pavlov VR. Pode incluir um toque de humor ou referência ao jogo.",
     "memberLeft": "Gere uma mensagem curta, neutra ou levemente humorística para quando um MEMBRO SAI do grupo de Pavlov VR. Exemplo: Fulano desertou! Menos um pra dividir o loot.",
     "extras_sundayNight": "Gere uma mensagem curta e temática para ser enviada em um DOMINGO À NOITE para jogadores de Pavlov VR, talvez sobre o fim de semana ou a semana que começa, com um toque de Pavlov. Exemplo: Domingo acabando... última chance pra um headshot antes da segunda!",
-    "randomJoke": "Gere uma piada curta e engraçada, no estilo 'tiozão' ou de humor seco.",
+    "randomJoke": "Gere uma piada curta e engraçada, no estilo 'tiozão' ou de humor seco. Preferencialmente no formato de pergunta e resposta, com a resposta sendo engraçada ou surpreendente.",
     "extras_friday": "Gere uma mensagem curta e animada para uma SEXTA-FEIRA para jogadores de Pavlov VR, celebrando o início do fim de semana e chamando para o jogo. Exemplo: Sextou, soldados! Pavlov liberado no final de semana!",
     "messageDeleted": "Gere uma mensagem curta e engraçada para quando um usuário apaga uma mensagem no grupo. Pode ser algo como 'Ih, alguém se arrependeu!' ou 'Ops, mensagem evaporou! O que será que era?'. Se souber o nome do remetente original, pode mencioná-lo de forma leve, por exemplo: 'O [NomeDoRemetente] fez uma mágica e a mensagem sumiu! ✨'"
   },

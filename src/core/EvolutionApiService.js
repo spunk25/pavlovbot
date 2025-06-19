@@ -78,23 +78,51 @@ function validateApiConfig() {
 
 async function sendMessageToGroup(message, recipientJid, options = {}) {
   if (!validateApiConfig()) {
+    console.log("[DEBUG] sendMessageToGroup: falha na validação da API");
     return { success: false, error: "API não configurada para enviar mensagens" };
   }
   
   const targetJid = recipientJid || currentConfig.TARGET_GROUP_ID;
+  console.log(`[DEBUG] sendMessageToGroup: tentando enviar para ${targetJid}`);
+  console.log(`[DEBUG] sendMessageToGroup: mensagem = "${message?.substring(0, 50)}${message?.length > 50 ? '...' : ''}"`);
+  
+  if (!targetJid) {
+    console.error(`[DEBUG] sendMessageToGroup: targetJid está indefinido ou vazio`);
+    return { success: false, error: "ID do destinatário está indefinido ou vazio" };
+  }
   
   try {
+    console.log(`[DEBUG] sendMessageToGroup: chamando API no endpoint /message/sendText/${currentConfig.INSTANCE_NAME}`);
+    
     const response = await evolutionAPIClient.post(`/message/sendText/${currentConfig.INSTANCE_NAME}`, {
       number: targetJid,
       text: message,
       ...options
     });
     
+    console.log(`[DEBUG] sendMessageToGroup: resposta recebida, status=${response.status}`);
+    console.log(`[DEBUG] sendMessageToGroup: dados da resposta:`, JSON.stringify(response.data, null, 2));
+    
     return { success: true, data: response.data };
   } catch (error) {
-    console.error(`EvolutionApiService: Erro ao enviar mensagem para ${targetJid}:`, 
-      error.response ? `Status: ${error.response.status}, Dados: ${JSON.stringify(error.response.data)}` : error.message);
-    return { success: false, error: error.message, details: error.response?.data };
+    console.error(`EvolutionApiService: Erro ao enviar mensagem para ${targetJid}:`);
+    
+    if (error.response) {
+      console.error(`[DEBUG] sendMessageToGroup: erro na resposta, status=${error.response.status}`);
+      console.error(`[DEBUG] sendMessageToGroup: dados do erro:`, JSON.stringify(error.response.data, null, 2));
+    } else if (error.request) {
+      console.error(`[DEBUG] sendMessageToGroup: erro na requisição, sem resposta recebida`);
+      console.error(`[DEBUG] sendMessageToGroup: requisição:`, error.request);
+    } else {
+      console.error(`[DEBUG] sendMessageToGroup: erro na configuração:`, error.message);
+    }
+    
+    return { 
+      success: false, 
+      error: error.message, 
+      details: error.response?.data,
+      status: error.response?.status
+    };
   }
 }
 

@@ -24,6 +24,12 @@ router.post('/', async (req, res, next) => {
     
     const event = (innerPayload.event || '').toLowerCase();
     console.log(`[Webhook Root] Evento recebido: ${event}`);
+
+    // Debug: Log more details for delete events
+    if (event.includes('delete')) {
+        console.log(`[DEBUG] Detalhes do evento de deleção:`, JSON.stringify(receivedPayload, null, 2));
+    }
+
     if (event === 'messages.upsert') {
       req.url  = '/messages-upsert'; // Reroute internally
       // req.body is already set
@@ -221,6 +227,7 @@ router.post('/messages-delete', async (req, res) => {
   const updatesOrDeletedItems = fullReceivedPayload.data; 
   const config = ConfigService.getConfig();
   const eventType = (fullReceivedPayload.event || '').toLowerCase();
+  console.log(`[DEBUG] Início do processamento de evento de deleção (${eventType}).`);
   console.log(`WebhookHandler: Evento de possível deleção de mensagem (${eventType}) recebido:`, JSON.stringify(fullReceivedPayload, null, 2));
 
   if (!updatesOrDeletedItems) {
@@ -246,6 +253,8 @@ router.post('/messages-delete', async (req, res) => {
       continue; 
     }
 
+    console.log(`[DEBUG] Processando item com key:`, JSON.stringify(key, null, 2));
+
     let isMessageEffectivelyDeleted = false;
     if (eventType.includes('delete')) {
         isMessageEffectivelyDeleted = true;
@@ -254,6 +263,11 @@ router.post('/messages-delete', async (req, res) => {
         isMessageEffectivelyDeleted = true;
         console.log(`WebhookHandler: ${eventType} - Item de atualização indicando deleção:`, JSON.stringify(item, null, 2));
     }
+
+    console.log(`[DEBUG] isMessageEffectivelyDeleted: ${isMessageEffectivelyDeleted}`);
+    console.log(`[DEBUG] key.remoteJid: ${key.remoteJid}`);
+    console.log(`[DEBUG] config.TARGET_GROUP_ID: ${config.TARGET_GROUP_ID}`);
+    console.log(`[DEBUG] key.fromMe: ${key.fromMe}`);
 
     if (isMessageEffectivelyDeleted && key.remoteJid === config.TARGET_GROUP_ID && !key.fromMe) {
       console.log(`WebhookHandler: Mensagem apagada (evento: ${eventType}) detectada no grupo ${key.remoteJid}. Key:`, JSON.stringify(key));
@@ -271,19 +285,24 @@ router.post('/messages-delete', async (req, res) => {
         try {
           // Substituir [NomeDoRemetente] pelo nome do remetente real no prompt
           const customPrompt = MessageService.getAIPrompt('messageDeleted')?.replace('[NomeDoRemetente]', senderName);
+          console.log(`[DEBUG] Prompt para IA: ${customPrompt}`);
           deletionMessage = await GroqApiService.callGroqAPI(customPrompt);
+          console.log(`[DEBUG] Resposta da IA: ${deletionMessage}`);
           
           if (!deletionMessage || deletionMessage.startsWith('Erro') || deletionMessage.length < 5) {
             deletionMessage = getRandomElement(messages.messageDeleted) || `${senderName} apagou uma mensagem... 🤔`;
+            console.log(`[DEBUG] Usando mensagem padrão: ${deletionMessage}`);
           }
         } catch (error) {
           console.error('WebhookHandler: Erro ao gerar resposta de AI para mensagem apagada:', error);
           deletionMessage = getRandomElement(messages.messageDeleted) || `${senderName} apagou uma mensagem... 🤔`;
+          console.log(`[DEBUG] Erro na IA, usando mensagem padrão: ${deletionMessage}`);
         }
       } else {
         deletionMessage = getRandomElement(messages.messageDeleted) || `${senderName} apagou uma mensagem... 🤔`;
         // Substituir [NomeDoRemetente] pelo nome do remetente real na mensagem padrão, se existir
         deletionMessage = deletionMessage.replace('[NomeDoRemetente]', senderName);
+        console.log(`[DEBUG] Não usando IA, mensagem: ${deletionMessage}`);
       }
       
       // Garantir que o nome do remetente está incluído na mensagem
@@ -291,19 +310,31 @@ router.post('/messages-delete', async (req, res) => {
         const prefixOptions = ["Eita, ", "Vish, ", "Olha só, ", "Ops, "];
         const suffixOptions = [" apagou uma mensagem!", " fez uma mensagem sumir!", " escondeu algo que disse!", " deletou o que escreveu."];
         deletionMessage = `${getRandomElement(prefixOptions)}${senderName}${getRandomElement(suffixOptions)}`;
+        console.log(`[DEBUG] Recriando mensagem para incluir o nome: ${deletionMessage}`);
       }
       
       // Enviar resposta para a mensagem apagada
       if (deletionMessage) {
         try {
-          await EvolutionApiService.sendMessageToGroup(deletionMessage);
+          console.log(`[DEBUG] Tentando enviar mensagem: ${deletionMessage}`);
+          const result = await EvolutionApiService.sendMessageToGroup(deletionMessage, config.TARGET_GROUP_ID);
+          console.log(`[DEBUG] Resultado do envio:`, JSON.stringify(result, null, 2));
+          
+          if (result && result.success) {
+            console.log(`WebhookHandler: Mensagem de resposta enviada com sucesso para mensagem apagada: ${deletionMessage}`);
+          } else {
+            console.error('WebhookHandler: Falha ao enviar mensagem de resposta para mensagem apagada:', result?.error || 'Erro desconhecido');
+          }
         } catch (error) {
           console.error('WebhookHandler: Erro ao enviar resposta para mensagem apagada:', error);
         }
       }
+    } else {
+      console.log(`[DEBUG] Ignorando item pois não é uma mensagem apagada no grupo alvo ou é do próprio bot`);
     }
   }
 
+  console.log(`[DEBUG] Processamento do evento ${eventType} concluído.`);
   return res.status(200).send(`Evento ${eventType} processado com sucesso.`);
 });
 

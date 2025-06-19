@@ -4,6 +4,7 @@ import SchedulerService from '../core/SchedulerService.js';
 import ConfigService from '../core/ConfigService.js';
 import MessageService from '../core/MessageService.js';
 import ChatHistoryService from '../core/ChatHistoryService.js'; // For !resumo
+import { getRandomElement } from '../utils/generalUtils.js';
 
 async function handleCommand(command, args, fullMessage, senderJid, isGroupMessage, isAdminInTargetGroup) {
   const config = ConfigService.getConfig();
@@ -22,6 +23,7 @@ async function handleCommand(command, args, fullMessage, senderJid, isGroupMessa
     "• !audio <URL> – Envia áudio da <URL> para o grupo alvo.\n" +
     '• !enquete "Título" "Opção 1" ... – Envia enquete customizada para o grupo alvo.\n' +
     "• !resumo      – Gera e envia resumo do chat atual para o grupo alvo.\n" +
+    "• !piada       – Envia uma piada para o grupo com pausa entre pergunta e resposta.\n" +
     "• !statusjobs  – Mostra o status das tarefas agendadas (para admin em PV).\n" +
     "• !teste       – Envia uma mensagem de teste para você (admin em PV).";
 
@@ -68,6 +70,42 @@ async function handleCommand(command, args, fullMessage, senderJid, isGroupMessa
             await EvolutionApiService.sendMessageToGroup(`Áudio enviado para o grupo: ${args[0]}`, senderJid);
           } else {
             await EvolutionApiService.sendMessageToGroup("Uso: !audio <URL_DO_AUDIO>", senderJid);
+          }
+          commandProcessed = true;
+          break;
+        case '!piada':
+          // Enviar uma piada para o grupo com atraso entre pergunta e resposta
+          try {
+            // Obter uma piada aleatória
+            let piada = await getJoke();
+            
+            // Verificar se a piada contém um ponto de interrogação
+            const parts = splitJokeAtQuestionMark(piada);
+            
+            if (parts.length === 2) {
+              // Enviar a pergunta
+              await EvolutionApiService.sendMessageToGroup(parts[0].trim(), config.TARGET_GROUP_ID);
+              
+              // Informar o admin que a piada está sendo enviada
+              await EvolutionApiService.sendMessageToGroup("Piada enviada! A resposta será enviada em 20 segundos.", senderJid);
+              
+              // Agendar o envio da resposta após 20 segundos
+              setTimeout(async () => {
+                try {
+                  await EvolutionApiService.sendMessageToGroup(parts[1].trim(), config.TARGET_GROUP_ID);
+                  console.log("CommandHandler: Resposta da piada enviada com sucesso.");
+                } catch (error) {
+                  console.error("CommandHandler: Erro ao enviar resposta da piada:", error);
+                }
+              }, 20000); // 20 segundos
+            } else {
+              // Se a piada não tem formato de pergunta/resposta, enviar tudo de uma vez
+              await EvolutionApiService.sendMessageToGroup(piada, config.TARGET_GROUP_ID);
+              await EvolutionApiService.sendMessageToGroup("Piada enviada ao grupo (formato sem pergunta/resposta).", senderJid);
+            }
+          } catch (error) {
+            console.error("CommandHandler: Erro ao processar comando !piada:", error);
+            await EvolutionApiService.sendMessageToGroup("Erro ao enviar piada. Tente novamente mais tarde.", senderJid);
           }
           commandProcessed = true;
           break;
@@ -141,6 +179,52 @@ async function handleCommand(command, args, fullMessage, senderJid, isGroupMessa
     }
   }
   return commandProcessed;
+}
+
+// Função para obter uma piada aleatória
+async function getJoke() {
+  const messages = MessageService.getMessages();
+  const useAI = MessageService.getAIUsageSetting('randomJoke');
+  
+  if (useAI) {
+    try {
+      const prompt = MessageService.getAIPrompt('randomJoke');
+      if (prompt) {
+        const generatedJoke = await GroqApiService.callGroqAPI(prompt);
+        if (generatedJoke && !generatedJoke.startsWith("Erro") && generatedJoke.length > 5) {
+          return generatedJoke;
+        }
+      }
+    } catch (error) {
+      console.error("CommandHandler: Erro ao gerar piada via IA:", error);
+    }
+  }
+  
+  // Fallback para piadas pré-definidas
+  if (messages.randomJokes && messages.randomJokes.length > 0) {
+    return getRandomElement(messages.randomJokes);
+  }
+  
+  // Piada padrão se não houver outras opções
+  return "Por que o pão não pode namorar a manteiga? Porque a mãe dela disse que não quer ver a filha passando manteiga!";
+}
+
+// Função para dividir a piada no ponto de interrogação
+function splitJokeAtQuestionMark(joke) {
+  if (!joke) return [joke];
+  
+  // Procura pelo primeiro ponto de interrogação
+  const questionMarkIndex = joke.indexOf('?');
+  
+  if (questionMarkIndex !== -1) {
+    // Divide a piada no ponto de interrogação, mantendo o ponto de interrogação na primeira parte
+    const firstPart = joke.substring(0, questionMarkIndex + 1);
+    const secondPart = joke.substring(questionMarkIndex + 1);
+    return [firstPart, secondPart];
+  }
+  
+  // Se não houver ponto de interrogação, retorna a piada inteira como um único elemento
+  return [joke];
 }
 
 export default {
