@@ -395,49 +395,67 @@ document.addEventListener('DOMContentLoaded', () => {
         const button = event.target;
         const messageType = button.dataset.messageType; // e.g., "status_closed", "newMember", "randomActive"
         
-        const targetElement = document.getElementById(messageType);
+        console.log(`[DEBUG] Gerando mensagem IA para tipo: ${messageType}`);
+        
+        // Mapeamento de tipos de mensagem para IDs de elementos
+        const typeToElementId = {
+            'randomJoke': 'randomJokes',
+            'gameTip': 'gameTips',
+            // Adicione outros mapeamentos especiais aqui se necessário
+        };
+        
+        // Determinar o elemento alvo com base no tipo de mensagem
+        let targetElement;
+        if (typeToElementId[messageType]) {
+            // Usar o mapeamento especial se existir
+            targetElement = document.getElementById(typeToElementId[messageType]);
+            console.log(`[DEBUG] Usando mapeamento especial para ${messageType}: elemento ${typeToElementId[messageType]} ${targetElement ? 'encontrado' : 'não encontrado'}`);
+        } else {
+            // Caso contrário, tentar usar o tipo diretamente como ID
+            targetElement = document.getElementById(messageType);
+            console.log(`[DEBUG] Usando ID padrão para ${messageType}: ${targetElement ? 'encontrado' : 'não encontrado'}`);
+        }
+        
+        // Buscar o spinner correspondente
         const spinner = document.getElementById(`aiSpinner_${messageType}`) || 
                         (messageType === 'randomActive' ? aiMessageSpinner : null) || 
                         (messageType === 'inGameRandom' ? aiMessageSpinnerInGameRandom : null);
 
         if (!targetElement) {
             console.error(`Elemento alvo não encontrado para messageType: ${messageType}`);
+            alert(`Erro: Elemento para ${messageType} não encontrado. Por favor, recarregue a página.`);
             return;
         }
+        
         if (!spinner) {
-            console.error(`Spinner não encontrado para messageType: ${messageType}`);
-            // Fallback para os spinners originais se os IDs dinâmicos não forem encontrados (para os botões já existentes)
-            if (messageType === 'randomActive') {
-                 // aiMessageSpinner já é o spinner correto
-            } else if (messageType === 'inGameRandom') {
-                // aiMessageSpinnerInGameRandom já é o spinner correto
-            } else {
-                return;
-            }
+            console.warn(`Spinner não encontrado para messageType: ${messageType}, continuando sem animação de carregamento`);
         }
         
         const actualSpinner = spinner || (messageType === 'randomActive' ? aiMessageSpinner : aiMessageSpinnerInGameRandom);
 
-
-        actualSpinner.style.display = 'inline-block';
+        if (actualSpinner) actualSpinner.style.display = 'inline-block';
         button.disabled = true;
         responseMessageMessagesDiv.textContent = '';
         responseMessageMessagesDiv.className = 'response-message';
 
         try {
+            console.log(`[DEBUG] Enviando requisição para gerar mensagem IA do tipo: ${messageType}`);
             const response = await fetch('/admin/api/generate-message', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ type: messageType }) // Envia o tipo de mensagem
             });
             const result = await response.json();
+            console.log(`[DEBUG] Resposta recebida para ${messageType}:`, result);
 
             if (response.ok && result.success && result.message) {
                 if (targetElement.tagName === 'TEXTAREA') {
                     const currentMessages = targetElement.value.trim();
                     targetElement.value = currentMessages ? `${currentMessages}\n${result.message}` : result.message;
+                    console.log(`[DEBUG] Mensagem adicionada ao textarea para ${messageType}`);
                 } else if (targetElement.tagName === 'INPUT') {
                     targetElement.value = result.message; // Substitui o conteúdo para inputs
+                    console.log(`[DEBUG] Mensagem definida no input para ${messageType}`);
                 }
                 showGlobalMessage(`Mensagem IA (${messageType}) gerada! Não se esqueça de salvar.`);
             } else {
@@ -447,8 +465,9 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(`Erro ao gerar mensagem IA (${messageType}):`, error);
             responseMessageMessagesDiv.textContent = `Erro IA (${messageType}): ${error.message}`;
             responseMessageMessagesDiv.className = 'response-message error';
+            alert(`Erro ao gerar mensagem IA: ${error.message}`);
         } finally {
-            actualSpinner.style.display = 'none';
+            if (actualSpinner) actualSpinner.style.display = 'none';
             button.disabled = false;
         }
     }

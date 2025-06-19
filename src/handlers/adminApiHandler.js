@@ -75,25 +75,54 @@ router.post('/config', express.json(), async (req, res) => {
 // Test Groq API or generate a message based on a prompt
 router.post('/generate-message', express.json(), async (req, res) => {
   const { prompt, type } = req.body; // type can be 'test' or a specific prompt key
+  console.log(`[DEBUG] /generate-message recebido com tipo: ${type}, prompt fornecido: ${prompt ? 'sim' : 'não'}`);
+  
   if (!prompt && !type) {
+    console.error("[DEBUG] Erro: Nem prompt nem tipo fornecidos");
     return res.status(400).json({ success: false, message: "Prompt ou tipo de prompt necessário." });
   }
 
   try {
     let finalPrompt = prompt;
+    
     if (type && !prompt) { // If type is given, use the stored prompt for that type
-        finalPrompt = MessageService.getAIPrompt(type);
-        if (!finalPrompt && type === 'system') finalPrompt = MessageService.getSystemPrompt(); // Special case for system
+        // Tratamento especial para randomJoke
+        if (type === 'randomJoke') {
+            finalPrompt = MessageService.getAIPrompt('randomJoke');
+            console.log(`[DEBUG] Tipo randomJoke detectado, usando prompt específico: ${finalPrompt ? finalPrompt.substring(0, 50) + '...' : 'não encontrado'}`);
+        } else if (type === 'gameTip') {
+            finalPrompt = MessageService.getAIPrompt('gameTip');
+            console.log(`[DEBUG] Tipo gameTip detectado, usando prompt específico: ${finalPrompt ? finalPrompt.substring(0, 50) + '...' : 'não encontrado'}`);
+            // Se não houver prompt específico para dicas, usar um padrão
+            if (!finalPrompt) {
+                finalPrompt = "Gere uma dica útil e curta para jogadores de Pavlov VR, relacionada a táticas, controles ou mecânicas do jogo.";
+                console.log(`[DEBUG] Usando prompt padrão para gameTip`);
+            }
+        } else {
+            finalPrompt = MessageService.getAIPrompt(type);
+            console.log(`[DEBUG] Tipo ${type} detectado, prompt encontrado: ${finalPrompt ? 'sim' : 'não'}`);
+        }
+        
+        if (!finalPrompt && type === 'system') {
+            finalPrompt = MessageService.getSystemPrompt(); // Special case for system
+            console.log(`[DEBUG] Usando system prompt para tipo 'system'`);
+        }
     }
 
     if (!finalPrompt) {
+        console.error(`[DEBUG] Nenhum prompt encontrado para o tipo: ${type}`);
         return res.status(400).json({ success: false, message: `Nenhum prompt encontrado para o tipo: ${type}` });
     }
 
+    console.log(`[DEBUG] Chamando GroqAPI com prompt: ${finalPrompt.substring(0, 100)}...`);
     const generatedMessage = await GroqApiService.callGroqAPI(finalPrompt);
+    console.log(`[DEBUG] Resposta da GroqAPI: ${generatedMessage.substring(0, 100)}...`);
+    
     if (generatedMessage.startsWith("Erro:")) {
+        console.error(`[DEBUG] Erro retornado da GroqAPI: ${generatedMessage}`);
         res.json({ success: false, message: generatedMessage });
     } else {
+        console.log(`[DEBUG] Mensagem gerada com sucesso para tipo ${type}`);
         res.json({ success: true, message: generatedMessage });
     }
   } catch (error) {
