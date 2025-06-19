@@ -331,14 +331,6 @@ router.post('/messages-delete', async (req, res) => {
         console.log(`[DEBUG] Não usando IA, mensagem final: ${deletionMessage}`);
       }
       
-      // Garantir que o nome do remetente está incluído na mensagem
-      if (!deletionMessage.toLowerCase().includes(senderName.toLowerCase())) {
-        const prefixOptions = ["Eita, ", "Vish, ", "Olha só, ", "Ops, "];
-        const suffixOptions = [" apagou uma mensagem!", " fez uma mensagem sumir!", " escondeu algo que disse!", " deletou o que escreveu."];
-        deletionMessage = `${getRandomElement(prefixOptions)}${senderName}${getRandomElement(suffixOptions)}`;
-        console.log(`[DEBUG] Recriando mensagem para incluir o nome: ${deletionMessage}`);
-      }
-      
       // Enviar resposta para a mensagem apagada
       if (deletionMessage) {
         try {
